@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 4%;
+    --foreground: 210 20% 95%;
+    --card: 220 18% 7%;
+    --card-foreground: 210 20% 95%;
+    --popover: 220 18% 7%;
+    --popover-foreground: 210 20% 95%;
+    --primary: 45 100% 51%;
+    --primary-foreground: 220 20% 4%;
+    --secondary: 220 16% 12%;
+    --secondary-foreground: 210 20% 80%;
+    --muted: 220 14% 14%;
+    --muted-foreground: 215 12% 55%;
+    --accent: 45 100% 51%;
+    --accent-foreground: 220 20% 4%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 72% 50%;
+    --success-foreground: 0 0% 100%;
+    --border: 220 14% 16%;
+    --input: 220 14% 16%;
+    --ring: 45 100% 51%;
+    --chart-1: 45 100% 51%;
+    --chart-2: 142 72% 50%;
+    --chart-3: 0 72% 51%;
+    --chart-4: 199 89% 48%;
+    --chart-5: 262 83% 58%;
+    --radius: 0.5rem;
+    --sidebar-background: 220 18% 7%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 45 100% 51%;
+    --sidebar-primary-foreground: 220 20% 4%;
+    --sidebar-accent: 220 16% 12%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 220 14% 16%;
+    --sidebar-ring: 45 100% 51%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(220 18% 7%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(220 14% 20%);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(220 14% 28%);
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+/* Remove transition for transforms and sizes to avoid layout jitter */
+input, textarea, select, button, a {
+  transition-property: background-color, border-color, color, opacity, box-shadow;
+  transition-duration: 150ms;
+}
