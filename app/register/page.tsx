@@ -403,6 +403,12 @@ export default function RegisterPage() {
                   Log In
                 </Link>
               </div>
+
+              <div className="mt-8 text-center">
+                <p className="text-[10px] text-muted-foreground/60">
+                  Tryd&trade; 2026. All rights reserved.
+                </p>
+              </div>
             </>
           ) : (
             /* Email/Phone Verification */

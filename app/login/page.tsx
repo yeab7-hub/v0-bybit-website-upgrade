@@ -228,6 +228,12 @@ export default function LoginPage() {
                   Sign Up
                 </Link>
               </div>
+
+              <div className="mt-8 text-center">
+                <p className="text-[10px] text-muted-foreground/60">
+                  Tryd&trade; 2026. All rights reserved.
+                </p>
+              </div>
             </>
           ) : (
             /* 2FA Verification */
