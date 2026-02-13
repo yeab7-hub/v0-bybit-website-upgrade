@@ -1,4 +1,3 @@
-"use cache"
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
 
