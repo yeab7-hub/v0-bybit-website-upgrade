@@ -85,7 +85,7 @@ export function Footer() {
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
           <p className="text-xs text-muted-foreground">
-            2026 Tryd. All rights reserved.
+            Tryd&trade; 2026. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             <Link
