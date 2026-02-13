@@ -19,8 +19,8 @@ interface Stats {
   pendingKYC: number
   approvedKYC: number
   rejectedKYC: number
-  recentSignups: number
-  activeToday: number
+  totalTrades: number
+  openTickets: number
 }
 
 export default function AdminOverview() {
@@ -29,8 +29,8 @@ export default function AdminOverview() {
     pendingKYC: 0,
     approvedKYC: 0,
     rejectedKYC: 0,
-    recentSignups: 0,
-    activeToday: 0,
+    totalTrades: 0,
+    openTickets: 0,
   })
   const [recentUsers, setRecentUsers] = useState<
     { id: string; email: string; full_name: string | null; kyc_status: string; created_at: string }[]
@@ -59,13 +59,22 @@ export default function AdminOverview() {
         .select("*", { count: "exact", head: true })
         .eq("kyc_status", "rejected")
 
+      const { count: totalTrades } = await supabase
+        .from("trades")
+        .select("*", { count: "exact", head: true })
+
+      const { count: openTickets } = await supabase
+        .from("support_tickets")
+        .select("*", { count: "exact", head: true })
+        .in("status", ["open", "in_progress"])
+
       setStats({
         totalUsers: totalUsers || 0,
         pendingKYC: pendingKYC || 0,
         approvedKYC: approvedKYC || 0,
         rejectedKYC: rejectedKYC || 0,
-        recentSignups: totalUsers || 0,
-        activeToday: Math.max(1, Math.floor((totalUsers || 0) * 0.6)),
+        totalTrades: totalTrades || 0,
+        openTickets: openTickets || 0,
       })
 
       // Recent users
@@ -111,18 +120,18 @@ export default function AdminOverview() {
       bg: "bg-destructive/10",
     },
     {
-      label: "Active Today",
-      value: stats.activeToday,
+      label: "Total Trades",
+      value: stats.totalTrades,
       icon: Activity,
       color: "text-primary",
       bg: "bg-primary/10",
     },
     {
-      label: "Recent Signups",
-      value: stats.recentSignups,
+      label: "Open Tickets",
+      value: stats.openTickets,
       icon: TrendingUp,
-      color: "text-success",
-      bg: "bg-success/10",
+      color: "text-chart-4",
+      bg: "bg-chart-4/10",
     },
   ]
 

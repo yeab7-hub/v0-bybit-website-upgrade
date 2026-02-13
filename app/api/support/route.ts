@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
     if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-    const { data: tickets } = await supabase.from("support_tickets").select("*, profiles(display_name, email)").order("created_at", { ascending: false })
+    const { data: tickets } = await supabase.from("support_tickets").select("*, profiles(full_name, email)").order("created_at", { ascending: false })
     return NextResponse.json({ tickets: tickets ?? [] })
   }
 

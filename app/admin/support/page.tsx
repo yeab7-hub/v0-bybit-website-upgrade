@@ -133,7 +133,7 @@ export default function AdminSupportPage() {
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {tickets.map((t: { id: string; subject: string; category: string; status: string; priority: string; created_at: string; profiles?: { display_name?: string; email?: string } }) => {
+                {tickets.map((t: { id: string; subject: string; category: string; status: string; priority: string; created_at: string; profiles?: { full_name?: string; email?: string } }) => {
                   const StatusIcon = statusIcons[t.status] || MessageCircle
                   return (
                     <button key={t.id} onClick={() => setSelectedTicket(t.id)}
@@ -148,7 +148,7 @@ export default function AdminSupportPage() {
                         </div>
                         <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
                           <User className="h-2.5 w-2.5" />
-                          <span className="truncate">{t.profiles?.display_name || t.profiles?.email || "User"}</span>
+                          <span className="truncate">{t.profiles?.full_name || t.profiles?.email || "User"}</span>
                           <span className="flex items-center gap-0.5"><Clock className="h-2.5 w-2.5" />{new Date(t.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
