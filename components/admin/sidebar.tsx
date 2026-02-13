@@ -9,12 +9,14 @@ import {
   Activity,
   Settings,
   ArrowLeft,
+  MessageCircle,
 } from "lucide-react"
 
 const navLinks = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/kyc", label: "KYC Review", icon: Shield },
+  { href: "/admin/support", label: "Support Tickets", icon: MessageCircle },
   { href: "/admin/activity", label: "Activity Logs", icon: Activity },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ]

@@ -15,6 +15,7 @@ import {
   Shield,
   LogOut,
   Wallet,
+  MessageCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
@@ -250,6 +251,14 @@ export function Header() {
                         >
                           <Shield className="h-4 w-4" />
                           KYC Verification
+                        </Link>
+                        <Link
+                          href="/support"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          Support
                         </Link>
                         <Link
                           href="#"
