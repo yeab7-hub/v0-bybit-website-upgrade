@@ -2,22 +2,22 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   Eye,
   EyeOff,
   Mail,
   Lock,
   User,
-  Smartphone,
   ArrowRight,
   Check,
   Gift,
   Shield,
   Zap,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-
-type RegisterMethod = "email" | "phone"
+import { createClient } from "@/lib/supabase/client"
 
 const passwordRequirements = [
   { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
@@ -31,31 +31,69 @@ const passwordRequirements = [
 ]
 
 export default function RegisterPage() {
-  const [method, setMethod] = useState<RegisterMethod>("email")
+  const router = useRouter()
   const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("")
+  const [fullName, setFullName] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [referral, setReferral] = useState("")
   const [showReferral, setShowReferral] = useState(false)
   const [agreed, setAgreed] = useState(false)
-  const [step, setStep] = useState<"form" | "verify">("form")
-  const [verifyCode, setVerifyCode] = useState(["", "", "", "", "", ""])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleVerifyChange = (index: number, value: string) => {
-    if (value.length > 1) return
-    const newCode = [...verifyCode]
-    newCode[index] = value
-    setVerifyCode(newCode)
-    if (value && index < 5) {
-      const next = document.getElementById(`verify-${index + 1}`)
-      next?.focus()
+  const supabase = createClient()
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    const allMet = passwordRequirements.every((r) => r.test(password))
+    if (!allMet) {
+      setError("Please meet all password requirements.")
+      setLoading(false)
+      return
     }
+
+    const { error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo:
+          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+          `${window.location.origin}/auth/callback`,
+        data: {
+          full_name: fullName,
+          referral_code: referral || null,
+        },
+      },
+    })
+
+    if (authError) {
+      setError(authError.message)
+      setLoading(false)
+      return
+    }
+
+    router.push("/auth/sign-up-success")
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setStep("verify")
+  const handleOAuthSignUp = async (provider: "google" | "apple") => {
+    setLoading(true)
+    setError(null)
+
+    const { error: authError } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+
+    if (authError) {
+      setError(authError.message)
+      setLoading(false)
+    }
   }
 
   return (
@@ -67,8 +105,8 @@ export default function RegisterPage() {
             Start Your Crypto Journey
           </h2>
           <p className="mt-4 text-muted-foreground">
-            Join millions of traders worldwide. Create your account in
-            minutes and access the full suite of trading tools.
+            Join millions of traders worldwide. Create your account in minutes
+            and access the full suite of trading tools.
           </p>
 
           <div className="mt-10 flex flex-col gap-6">
@@ -114,9 +152,8 @@ export default function RegisterPage() {
               Limited Time Offer
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Sign up now and trade with 0% maker fees for your first 30
-              days. Plus earn up to 20% commission through our referral
-              program.
+              Sign up now and trade with 0% maker fees for your first 30 days.
+              Plus earn up to 20% commission through our referral program.
             </p>
           </div>
         </div>
@@ -128,343 +165,262 @@ export default function RegisterPage() {
           {/* Logo */}
           <Link href="/" className="mb-8 flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <span className="text-sm font-bold text-primary-foreground">T</span>
+              <span className="text-sm font-bold text-primary-foreground">
+                T
+              </span>
             </div>
             <span className="text-xl font-bold text-foreground">Tryd</span>
           </Link>
 
-          {step === "form" ? (
-            <>
-              <h1 className="text-2xl font-bold text-foreground">
-                Create Account
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Join Tryd and start trading 500+ cryptocurrencies
-              </p>
+          <h1 className="text-2xl font-bold text-foreground">
+            Create Account
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Join Tryd and start trading 500+ cryptocurrencies
+          </p>
 
-              {/* Method tabs */}
-              <div className="mt-6 flex items-center gap-1 rounded-lg bg-secondary p-1">
-                <button
-                  onClick={() => setMethod("email")}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium ${
-                    method === "email"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  <Mail className="h-3.5 w-3.5" />
-                  Email
-                </button>
-                <button
-                  onClick={() => setMethod("phone")}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium ${
-                    method === "phone"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  <Smartphone className="h-3.5 w-3.5" />
-                  Phone
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="mt-6">
-                {method === "email" ? (
-                  <div className="mb-4">
-                    <label className="mb-1.5 block text-xs font-medium text-foreground">
-                      Email Address
-                    </label>
-                    <div className="flex items-center rounded-lg border border-border bg-secondary/30 px-3 py-2.5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
-                      <Mail className="mr-2 h-4 w-4 text-muted-foreground" />
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Enter your email"
-                        className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                        required
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mb-4">
-                    <label className="mb-1.5 block text-xs font-medium text-foreground">
-                      Phone Number
-                    </label>
-                    <div className="flex items-center rounded-lg border border-border bg-secondary/30 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
-                      <button
-                        type="button"
-                        className="flex items-center gap-1 border-r border-border px-3 py-2.5 text-sm text-muted-foreground"
-                      >
-                        +1
-                        <svg
-                          width="10"
-                          height="10"
-                          viewBox="0 0 10 10"
-                          fill="currentColor"
-                        >
-                          <path d="M2 4l3 3 3-3" />
-                        </svg>
-                      </button>
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="Enter phone number"
-                        className="flex-1 bg-transparent px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                        required
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Password */}
-                <div className="mb-4">
-                  <label className="mb-1.5 block text-xs font-medium text-foreground">
-                    Password
-                  </label>
-                  <div className="flex items-center rounded-lg border border-border bg-secondary/30 px-3 py-2.5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
-                    <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Create a strong password"
-                      className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Password strength */}
-                  {password.length > 0 && (
-                    <div className="mt-2 flex flex-col gap-1">
-                      {passwordRequirements.map((req) => {
-                        const met = req.test(password)
-                        return (
-                          <div
-                            key={req.label}
-                            className="flex items-center gap-1.5"
-                          >
-                            <div
-                              className={`flex h-3.5 w-3.5 items-center justify-center rounded-full ${
-                                met
-                                  ? "bg-success"
-                                  : "border border-border"
-                              }`}
-                            >
-                              {met && (
-                                <Check className="h-2.5 w-2.5 text-success-foreground" />
-                              )}
-                            </div>
-                            <span
-                              className={`text-[10px] ${
-                                met
-                                  ? "text-success"
-                                  : "text-muted-foreground"
-                              }`}
-                            >
-                              {req.label}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Referral */}
-                {!showReferral ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowReferral(true)}
-                    className="mb-4 flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    <User className="h-3.5 w-3.5" />
-                    Have a referral code?
-                  </button>
-                ) : (
-                  <div className="mb-4">
-                    <label className="mb-1.5 block text-xs font-medium text-foreground">
-                      Referral Code (Optional)
-                    </label>
-                    <div className="flex items-center rounded-lg border border-border bg-secondary/30 px-3 py-2.5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
-                      <User className="mr-2 h-4 w-4 text-muted-foreground" />
-                      <input
-                        type="text"
-                        value={referral}
-                        onChange={(e) => setReferral(e.target.value)}
-                        placeholder="Enter referral code"
-                        className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Agreement */}
-                <label className="mb-6 flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={agreed}
-                    onChange={(e) => setAgreed(e.target.checked)}
-                    className="mt-0.5 rounded border-border"
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    I agree to Tryd&apos;s{" "}
-                    <Link
-                      href="#"
-                      className="text-primary hover:underline"
-                    >
-                      Terms of Service
-                    </Link>{" "}
-                    and{" "}
-                    <Link
-                      href="#"
-                      className="text-primary hover:underline"
-                    >
-                      Privacy Policy
-                    </Link>
-                  </span>
-                </label>
-
-                <Button
-                  type="submit"
-                  disabled={!agreed}
-                  className="w-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                >
-                  Create Account
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </form>
-
-              {/* Social sign up */}
-              <div className="mt-6">
-                <div className="relative flex items-center justify-center">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-border" />
-                  </div>
-                  <span className="relative bg-background px-3 text-xs text-muted-foreground">
-                    or sign up with
-                  </span>
-                </div>
-
-                <div className="mt-4 flex items-center gap-3">
-                  <button className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm text-foreground hover:bg-secondary">
-                    <svg width="16" height="16" viewBox="0 0 24 24">
-                      <path
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-                        fill="#4285F4"
-                      />
-                      <path
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                        fill="#34A853"
-                      />
-                      <path
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                        fill="#FBBC05"
-                      />
-                      <path
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                        fill="#EA4335"
-                      />
-                    </svg>
-                    Google
-                  </button>
-                  <button className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm text-foreground hover:bg-secondary">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.18 0-.36-.02-.53-.06-.01-.17-.03-.36-.03-.56 0-1.12.535-2.3 1.235-3.07.36-.39.81-.73 1.36-1 .55-.27 1.06-.42 1.56-.46.02.16.03.32.03.5zm4.563 17.97c-.033.1-.05.2-.07.3-.43 1.38-1.12 2.73-2.02 3.9-.79 1.01-1.6 2.02-2.87 2.05-1.13.03-1.59-.67-3.22-.67-1.63 0-2.13.65-3.2.7-1.22.05-2.15-1.1-2.95-2.1-1.63-2.05-2.88-5.79-1.2-8.32.83-1.25 2.31-2.04 3.92-2.06 1.1-.02 2.14.74 2.81.74.67 0 1.93-.92 3.26-.78.55.02 2.1.22 3.1 1.68-.08.05-1.85 1.08-1.83 3.22.03 2.56 2.24 3.42 2.27 3.43z" />
-                    </svg>
-                    Apple
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-6 text-center text-sm text-muted-foreground">
-                Already have an account?{" "}
-                <Link
-                  href="/login"
-                  className="font-medium text-primary hover:underline"
-                >
-                  Log In
-                </Link>
-              </div>
-
-              <div className="mt-8 text-center">
-                <p className="text-[10px] text-muted-foreground/60">
-                  Tryd&trade; 2026. All rights reserved.
-                </p>
-              </div>
-            </>
-          ) : (
-            /* Email/Phone Verification */
-            <div>
-              <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                <Mail className="h-6 w-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Verify Your {method === "email" ? "Email" : "Phone"}
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {"We've sent a 6-digit code to "}
-                <span className="font-medium text-foreground">
-                  {method === "email" ? email || "your email" : phone || "your phone"}
-                </span>
-              </p>
-
-              <div className="mt-8 flex items-center justify-center gap-3">
-                {verifyCode.map((digit, i) => (
-                  <input
-                    key={i}
-                    id={`verify-${i}`}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) =>
-                      handleVerifyChange(i, e.target.value)
-                    }
-                    className="h-12 w-12 rounded-lg border border-border bg-secondary/30 text-center font-mono text-xl text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
-                  />
-                ))}
-              </div>
-
-              <Button className="mt-8 w-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
-                Verify & Continue
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-
-              <div className="mt-4 flex items-center justify-center gap-4">
-                <button className="text-xs text-primary hover:underline">
-                  Resend Code
-                </button>
-                <span className="text-xs text-muted-foreground">
-                  Expires in 4:59
-                </span>
-              </div>
-
-              <button
-                onClick={() => setStep("form")}
-                className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground"
-              >
-                Back to registration
-              </button>
+          {error && (
+            <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+              {error}
             </div>
           )}
+
+          <form onSubmit={handleSignUp} className="mt-6">
+            {/* Full Name */}
+            <div className="mb-4">
+              <label className="mb-1.5 block text-xs font-medium text-foreground">
+                Full Name
+              </label>
+              <div className="flex items-center rounded-lg border border-border bg-secondary/30 px-3 py-2.5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
+                <User className="mr-2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your full name"
+                  className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="mb-4">
+              <label className="mb-1.5 block text-xs font-medium text-foreground">
+                Email Address
+              </label>
+              <div className="flex items-center rounded-lg border border-border bg-secondary/30 px-3 py-2.5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
+                <Mail className="mr-2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="mb-4">
+              <label className="mb-1.5 block text-xs font-medium text-foreground">
+                Password
+              </label>
+              <div className="flex items-center rounded-lg border border-border bg-secondary/30 px-3 py-2.5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
+                <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a strong password"
+                  className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+
+              {/* Password strength */}
+              {password.length > 0 && (
+                <div className="mt-2 flex flex-col gap-1">
+                  {passwordRequirements.map((req) => {
+                    const met = req.test(password)
+                    return (
+                      <div
+                        key={req.label}
+                        className="flex items-center gap-1.5"
+                      >
+                        <div
+                          className={`flex h-3.5 w-3.5 items-center justify-center rounded-full ${
+                            met ? "bg-success" : "border border-border"
+                          }`}
+                        >
+                          {met && (
+                            <Check className="h-2.5 w-2.5 text-success-foreground" />
+                          )}
+                        </div>
+                        <span
+                          className={`text-[10px] ${
+                            met ? "text-success" : "text-muted-foreground"
+                          }`}
+                        >
+                          {req.label}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Referral */}
+            {!showReferral ? (
+              <button
+                type="button"
+                onClick={() => setShowReferral(true)}
+                className="mb-4 flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <Gift className="h-3.5 w-3.5" />
+                Have a referral code?
+              </button>
+            ) : (
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  Referral Code (Optional)
+                </label>
+                <div className="flex items-center rounded-lg border border-border bg-secondary/30 px-3 py-2.5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
+                  <Gift className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={referral}
+                    onChange={(e) => setReferral(e.target.value)}
+                    placeholder="Enter referral code"
+                    className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Agreement */}
+            <label className="mb-6 flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-0.5 rounded border-border"
+              />
+              <span className="text-xs text-muted-foreground">
+                I agree to Tryd&apos;s{" "}
+                <Link href="#" className="text-primary hover:underline">
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link href="#" className="text-primary hover:underline">
+                  Privacy Policy
+                </Link>
+              </span>
+            </label>
+
+            <Button
+              type="submit"
+              disabled={!agreed || loading}
+              className="w-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Create Account
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+          </form>
+
+          {/* OAuth */}
+          <div className="mt-6">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <span className="relative bg-background px-3 text-xs text-muted-foreground">
+                or sign up with
+              </span>
+            </div>
+
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                onClick={() => handleOAuthSignUp("google")}
+                disabled={loading}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24">
+                  <path
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                    fill="#4285F4"
+                  />
+                  <path
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    fill="#34A853"
+                  />
+                  <path
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    fill="#FBBC05"
+                  />
+                  <path
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    fill="#EA4335"
+                  />
+                </svg>
+                Google
+              </button>
+              <button
+                onClick={() => handleOAuthSignUp("apple")}
+                disabled={loading}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.18 0-.36-.02-.53-.06-.01-.17-.03-.36-.03-.56 0-1.12.535-2.3 1.235-3.07.36-.39.81-.73 1.36-1 .55-.27 1.06-.42 1.56-.46.02.16.03.32.03.5zm4.563 17.97c-.033.1-.05.2-.07.3-.43 1.38-1.12 2.73-2.02 3.9-.79 1.01-1.6 2.02-2.87 2.05-1.13.03-1.59-.67-3.22-.67-1.63 0-2.13.65-3.2.7-1.22.05-2.15-1.1-2.95-2.1-1.63-2.05-2.88-5.79-1.2-8.32.83-1.25 2.31-2.04 3.92-2.06 1.1-.02 2.14.74 2.81.74.67 0 1.93-.92 3.26-.78.55.02 2.1.22 3.1 1.68-.08.05-1.85 1.08-1.83 3.22.03 2.56 2.24 3.42 2.27 3.43z" />
+                </svg>
+                Apple
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 text-center text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-medium text-primary hover:underline"
+            >
+              Log In
+            </Link>
+          </div>
+
+          <div className="mt-8 text-center">
+            <p className="text-[10px] text-muted-foreground/60">
+              Tryd&trade; 2026. All rights reserved.
+            </p>
+          </div>
         </div>
       </div>
     </div>

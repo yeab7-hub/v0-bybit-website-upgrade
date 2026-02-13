@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import {
   ChevronDown,
   Menu,
@@ -9,8 +10,15 @@ import {
   Globe,
   Search,
   Download,
+  User,
+  Settings,
+  Shield,
+  LogOut,
+  Wallet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { createClient } from "@/lib/supabase/client"
+import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 const navItems = [
   {
@@ -62,8 +70,54 @@ const navItems = [
 ]
 
 export function Header() {
+  const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    const getUser = async () => {
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser()
+      setUser(currentUser)
+
+      if (currentUser) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", currentUser.id)
+          .single()
+        setIsAdmin(profile?.role === "admin")
+      }
+    }
+    getUser()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      if (!session?.user) setIsAdmin(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabase.auth, supabase])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    setUserMenuOpen(false)
+    router.push("/")
+    router.refresh()
+  }
+
+  const displayName =
+    user?.user_metadata?.full_name ||
+    user?.email?.split("@")[0] ||
+    "User"
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-xl">
@@ -72,7 +126,9 @@ export function Header() {
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <span className="text-sm font-bold text-primary-foreground">T</span>
+              <span className="text-sm font-bold text-primary-foreground">
+                T
+              </span>
             </div>
             <span className="text-xl font-bold text-foreground">Tryd</span>
           </Link>
@@ -90,7 +146,7 @@ export function Header() {
               >
                 <Link
                   href={item.href}
-                  className="flex items-center gap-1 rounded-md px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-1 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {item.label}
                   {item.children && <ChevronDown className="h-3 w-3" />}
@@ -102,7 +158,7 @@ export function Header() {
                       <Link
                         key={child.label}
                         href={child.href}
-                        className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        className="block rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                       >
                         {child.label}
                       </Link>
@@ -120,21 +176,120 @@ export function Header() {
             <Search className="h-4 w-4" />
           </button>
 
-          <Link href="/login">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Log In
-            </Button>
-          </Link>
+          {user ? (
+            /* Logged in state */
+            <div className="flex items-center gap-2">
+              <Link href="/wallet">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="hidden text-muted-foreground hover:text-foreground lg:flex"
+                >
+                  <Wallet className="mr-1.5 h-4 w-4" />
+                  Wallet
+                </Button>
+              </Link>
 
-          <Link href="/register">
-            <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-              Sign Up
-            </Button>
-          </Link>
+              {/* User menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+                    {displayName.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="hidden text-sm lg:block">
+                    {displayName}
+                  </span>
+                  <ChevronDown className="hidden h-3 w-3 lg:block" />
+                </button>
+
+                {userMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setUserMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-border bg-card p-2 shadow-xl">
+                      <div className="border-b border-border px-3 pb-2 pt-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {displayName}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {user.email}
+                        </p>
+                      </div>
+                      <div className="pt-2">
+                        <Link
+                          href="/wallet"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        >
+                          <Wallet className="h-4 w-4" />
+                          Wallet
+                        </Link>
+                        <Link
+                          href="/kyc"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        >
+                          <Shield className="h-4 w-4" />
+                          KYC Verification
+                        </Link>
+                        <Link
+                          href="#"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        >
+                          <Settings className="h-4 w-4" />
+                          Settings
+                        </Link>
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+                          >
+                            <Shield className="h-4 w-4" />
+                            Admin Panel
+                          </Link>
+                        )}
+                        <button
+                          onClick={handleSignOut}
+                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Logged out state */
+            <>
+              <Link href="/login">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Log In
+                </Button>
+              </Link>
+              <Link href="/register">
+                <Button
+                  size="sm"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  Sign Up
+                </Button>
+              </Link>
+            </>
+          )}
 
           <button className="hidden rounded-md p-2 text-muted-foreground hover:text-foreground lg:block">
             <Download className="h-4 w-4" />
@@ -148,7 +303,11 @@ export function Header() {
             className="rounded-md p-2 text-muted-foreground hover:text-foreground lg:hidden"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </button>
         </div>
       </div>
