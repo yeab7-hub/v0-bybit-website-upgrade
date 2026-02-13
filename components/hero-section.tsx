@@ -33,8 +33,8 @@ export function HeroSection() {
       {/* Background effects */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-1/2 top-0 h-[700px] w-[900px] -translate-x-1/2 rounded-full bg-primary/5 blur-[140px]" />
-        <div className="absolute bottom-0 left-0 h-[400px] w-[400px] rounded-full bg-primary/3 blur-[100px]" />
-        <div className="absolute bottom-0 right-0 h-[300px] w-[300px] rounded-full bg-success/3 blur-[80px]" />
+        <div className="absolute bottom-0 left-0 h-[400px] w-[400px] rounded-full bg-primary/5 blur-[100px]" />
+        <div className="absolute bottom-0 right-0 h-[300px] w-[300px] rounded-full bg-success/5 blur-[80px]" />
       </div>
 
       {/* Grid pattern overlay */}

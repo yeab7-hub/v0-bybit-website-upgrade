@@ -76,15 +76,9 @@
   background: hsl(220 14% 28%);
 }
 
-/* Smooth transitions */
-* {
-  transition-property: background-color, border-color, color, opacity;
-  transition-duration: 150ms;
-  transition-timing-function: ease;
-}
-
-/* Remove transition for transforms and sizes to avoid layout jitter */
-input, textarea, select, button, a {
+/* Smooth transitions for interactive elements only */
+button, a, input, select, textarea {
   transition-property: background-color, border-color, color, opacity, box-shadow;
   transition-duration: 150ms;
+  transition-timing-function: ease;
 }

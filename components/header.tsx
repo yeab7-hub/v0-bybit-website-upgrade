@@ -77,38 +77,52 @@ export function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
 
-  const supabase = createClient()
-
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser()
-      setUser(currentUser)
+    let subscription: { unsubscribe: () => void } | null = null
 
-      if (currentUser) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", currentUser.id)
-          .single()
-        setIsAdmin(profile?.role === "admin")
+    try {
+      const supabase = createClient()
+
+      const getUser = async () => {
+        try {
+          const {
+            data: { user: currentUser },
+          } = await supabase.auth.getUser()
+          setUser(currentUser)
+
+          if (currentUser) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("role")
+              .eq("id", currentUser.id)
+              .single()
+            setIsAdmin(profile?.role === "admin")
+          }
+        } catch {
+          // Auth not available yet
+        }
       }
+      getUser()
+
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null)
+        if (!session?.user) setIsAdmin(false)
+      })
+      subscription = data.subscription
+    } catch {
+      // Supabase not configured yet
     }
-    getUser()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      if (!session?.user) setIsAdmin(false)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [supabase.auth, supabase])
+    return () => subscription?.unsubscribe()
+  }, [])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch {
+      // ignore
+    }
     setUserMenuOpen(false)
     router.push("/")
     router.refresh()
