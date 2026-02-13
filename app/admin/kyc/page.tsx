@@ -37,9 +37,8 @@ export default function AdminKYCPage() {
   const [viewRecord, setViewRecord] = useState<KYCRecord | null>(null)
   const [processing, setProcessing] = useState(false)
 
-  const supabase = createClient()
-
   const fetchRecords = useCallback(async () => {
+    const supabase = createClient()
     let query = supabase
       .from("kyc_documents")
       .select("*, profiles(email, full_name)")
@@ -51,7 +50,7 @@ export default function AdminKYCPage() {
 
     const { data } = await query
     if (data) setRecords(data as KYCRecord[])
-  }, [supabase, filter])
+  }, [filter])
 
   useEffect(() => {
     fetchRecords()
@@ -63,6 +62,7 @@ export default function AdminKYCPage() {
     action: "approved" | "rejected"
   ) => {
     setProcessing(true)
+    const supabase = createClient()
 
     await supabase
       .from("kyc_documents")

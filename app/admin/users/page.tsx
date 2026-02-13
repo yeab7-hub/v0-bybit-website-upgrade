@@ -33,10 +33,10 @@ export default function AdminUsersPage() {
   const [total, setTotal] = useState(0)
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
 
-  const supabase = createClient()
   const pageSize = 15
 
   const fetchUsers = useCallback(async () => {
+    const supabase = createClient()
     let query = supabase
       .from("profiles")
       .select("*", { count: "exact" })
@@ -56,19 +56,21 @@ export default function AdminUsersPage() {
     const { data, count } = await query
     if (data) setUsers(data)
     if (count !== null) setTotal(count)
-  }, [supabase, page, filterKYC, search])
+  }, [page, filterKYC, search])
 
   useEffect(() => {
     fetchUsers()
   }, [fetchUsers])
 
   const updateUserRole = async (userId: string, role: string) => {
+    const supabase = createClient()
     await supabase.from("profiles").update({ role }).eq("id", userId)
     setActiveMenu(null)
     fetchUsers()
   }
 
   const toggleBan = async (userId: string, isBanned: boolean) => {
+    const supabase = createClient()
     await supabase
       .from("profiles")
       .update({ is_banned: !isBanned })

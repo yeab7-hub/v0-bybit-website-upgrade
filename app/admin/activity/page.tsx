@@ -25,13 +25,13 @@ export default function AdminActivityPage() {
   const [total, setTotal] = useState(0)
   const [filterAction, setFilterAction] = useState("all")
 
-  const supabase = createClient()
   const pageSize = 20
 
   const fetchLogs = useCallback(async () => {
+    const supabase = createClient()
     let query = supabase
       .from("activity_logs")
-      .select("*, admin_profile:profiles!activity_logs_admin_id_fkey(email, full_name)", {
+      .select("*, admin_profile:profiles(email, full_name)", {
         count: "exact",
       })
       .order("created_at", { ascending: false })
@@ -44,7 +44,7 @@ export default function AdminActivityPage() {
     const { data, count } = await query
     if (data) setLogs(data as ActivityLog[])
     if (count !== null) setTotal(count)
-  }, [supabase, page, filterAction])
+  }, [page, filterAction])
 
   useEffect(() => {
     fetchLogs()

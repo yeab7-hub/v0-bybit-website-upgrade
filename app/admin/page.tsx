@@ -36,9 +36,8 @@ export default function AdminOverview() {
     { id: string; email: string; full_name: string | null; kyc_status: string; created_at: string }[]
   >([])
 
-  const supabase = createClient()
-
   useEffect(() => {
+    const supabase = createClient()
     const fetchStats = async () => {
       const { count: totalUsers } = await supabase
         .from("profiles")
@@ -88,7 +87,7 @@ export default function AdminOverview() {
     }
 
     fetchStats()
-  }, [supabase])
+  }, [])
 
   const statCards = [
     {
