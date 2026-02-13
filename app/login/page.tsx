@@ -70,30 +70,9 @@ export default function LoginPage() {
     router.refresh()
   }
 
-  const handleOAuthLogin = async (provider: "google" | "apple") => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-
-      if (authError) {
-        if (authError.message.includes("provider is not enabled")) {
-          setError(`${provider.charAt(0).toUpperCase() + provider.slice(1)} login is not available yet. Please use email and password to sign in.`)
-        } else {
-          setError(authError.message)
-        }
-        setLoading(false)
-      }
-    } catch {
-      setError("OAuth login is not available. Please use email and password.")
-      setLoading(false)
-    }
+  const handleOAuthLogin = (provider: "google" | "apple") => {
+    const name = provider.charAt(0).toUpperCase() + provider.slice(1)
+    setError(`${name} login is coming soon. Please use email and password to sign in.`)
   }
 
   return (

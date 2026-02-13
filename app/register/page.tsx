@@ -89,30 +89,9 @@ export default function RegisterPage() {
     }
   }
 
-  const handleOAuthSignUp = async (provider: "google" | "apple") => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-
-      if (authError) {
-        if (authError.message.includes("provider is not enabled")) {
-          setError(`${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-up is not available yet. Please use email and password to create your account.`)
-        } else {
-          setError(authError.message)
-        }
-        setLoading(false)
-      }
-    } catch {
-      setError("OAuth sign-up is not available. Please use email and password.")
-      setLoading(false)
-    }
+  const handleOAuthSignUp = (provider: "google" | "apple") => {
+    const name = provider.charAt(0).toUpperCase() + provider.slice(1)
+    setError(`${name} sign-up is coming soon. Please use email and password to create your account.`)
   }
 
   return (
