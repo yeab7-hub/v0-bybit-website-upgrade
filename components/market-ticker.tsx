@@ -1,65 +1,68 @@
 "use client"
 
-import { useEffect, useState } from "react"
-
-interface TickerItem {
-  symbol: string
-  price: string
-  change: number
-}
-
-const initialTickers: TickerItem[] = [
-  { symbol: "BTC/USDT", price: "97,432.50", change: 2.34 },
-  { symbol: "ETH/USDT", price: "3,842.18", change: -1.12 },
-  { symbol: "SOL/USDT", price: "214.67", change: 5.43 },
-  { symbol: "XRP/USDT", price: "2.4831", change: 0.87 },
-  { symbol: "BNB/USDT", price: "712.30", change: -0.45 },
-  { symbol: "ADA/USDT", price: "1.0524", change: 3.21 },
-  { symbol: "DOGE/USDT", price: "0.3847", change: -2.18 },
-  { symbol: "AVAX/USDT", price: "48.92", change: 1.56 },
-]
+import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
 
 export function MarketTicker() {
-  const [tickers, setTickers] = useState(initialTickers)
+  const { crypto, forex, commodities, stocks, isLoading } = useLivePrices(4000)
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTickers((prev) =>
-        prev.map((t) => ({
-          ...t,
-          change: t.change + (Math.random() - 0.5) * 0.1,
-        }))
-      )
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [])
+  // Combine all asset classes into one ticker
+  const allAssets = [
+    ...crypto.slice(0, 8),
+    ...forex.slice(0, 3),
+    ...commodities.slice(0, 2),
+    ...stocks.slice(0, 3),
+  ]
+
+  if (isLoading || allAssets.length === 0) {
+    return (
+      <div className="overflow-hidden border-b border-border bg-card/50">
+        <div className="flex items-center gap-8 px-4 py-2 lg:px-6">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="flex shrink-0 items-center gap-3">
+              <div className="h-3 w-16 animate-pulse rounded bg-secondary" />
+              <div className="h-3 w-20 animate-pulse rounded bg-secondary" />
+              <div className="h-3 w-12 animate-pulse rounded bg-secondary" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="overflow-hidden border-b border-border bg-card/50">
       <div className="flex items-center gap-8 overflow-x-auto px-4 py-2 scrollbar-none lg:px-6">
-        {tickers.map((ticker) => (
-          <div
-            key={ticker.symbol}
-            className="flex shrink-0 items-center gap-3"
-          >
-            <span className="text-xs font-medium text-foreground">
-              {ticker.symbol}
-            </span>
-            <span className="font-mono text-xs text-foreground">
-              {ticker.price}
-            </span>
-            <span
-              className={`font-mono text-xs ${
-                ticker.change >= 0
-                  ? "text-success"
-                  : "text-destructive"
-              }`}
+        {allAssets.map((asset) => {
+          const pairLabel =
+            asset.category === "crypto"
+              ? `${asset.symbol}/USDT`
+              : asset.symbol
+          return (
+            <div
+              key={asset.id}
+              className="flex shrink-0 items-center gap-3"
             >
-              {ticker.change >= 0 ? "+" : ""}
-              {ticker.change.toFixed(2)}%
-            </span>
-          </div>
-        ))}
+              <span className="text-xs font-medium text-foreground">
+                {pairLabel}
+              </span>
+              <span className="font-mono text-xs text-foreground">
+                {asset.category === "forex"
+                  ? asset.price.toFixed(4)
+                  : `$${formatPrice(asset.price)}`}
+              </span>
+              <span
+                className={`font-mono text-xs ${
+                  asset.change24h >= 0
+                    ? "text-success"
+                    : "text-destructive"
+                }`}
+              >
+                {asset.change24h >= 0 ? "+" : ""}
+                {asset.change24h.toFixed(2)}%
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

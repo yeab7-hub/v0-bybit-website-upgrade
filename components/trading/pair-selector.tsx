@@ -2,44 +2,15 @@
 
 import { useState } from "react"
 import { Search, Star } from "lucide-react"
+import { useLivePrices, formatPrice, formatVolume } from "@/hooks/use-live-prices"
 
-interface TradingPair {
-  symbol: string
-  lastPrice: string
-  change: number
-  volume: string
-}
-
-const pairs: TradingPair[] = [
-  { symbol: "BTC/USDT", lastPrice: "97,432.50", change: 2.34, volume: "1.21B" },
-  { symbol: "ETH/USDT", lastPrice: "3,842.18", change: -1.12, volume: "682M" },
-  { symbol: "SOL/USDT", lastPrice: "214.67", change: 5.43, volume: "412M" },
-  { symbol: "XRP/USDT", lastPrice: "2.4831", change: 0.87, volume: "389M" },
-  { symbol: "BNB/USDT", lastPrice: "712.30", change: -0.45, volume: "198M" },
-  { symbol: "DOGE/USDT", lastPrice: "0.3847", change: -2.18, volume: "287M" },
-  { symbol: "ADA/USDT", lastPrice: "1.0524", change: 3.21, volume: "156M" },
-  { symbol: "AVAX/USDT", lastPrice: "48.92", change: 1.56, volume: "98M" },
-  { symbol: "DOT/USDT", lastPrice: "9.87", change: 0.34, volume: "76M" },
-  { symbol: "MATIC/USDT", lastPrice: "1.23", change: -0.89, volume: "65M" },
-  { symbol: "LINK/USDT", lastPrice: "22.45", change: 1.78, volume: "112M" },
-  { symbol: "UNI/USDT", lastPrice: "14.32", change: -1.56, volume: "54M" },
-]
-
-const categories = ["Favorites", "USDT", "USDC", "BTC", "ETH"]
+const categories = ["Favorites", "Crypto", "Forex", "Stocks"]
 
 export function PairSelector() {
+  const { crypto, forex, stocks, isLoading } = useLivePrices(5000)
   const [search, setSearch] = useState("")
-  const [activeCategory, setActiveCategory] = useState("USDT")
-  const [favorites, setFavorites] = useState<Set<string>>(new Set(["BTC/USDT", "ETH/USDT"]))
-
-  const filtered = pairs.filter((p) =>
-    p.symbol.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const displayPairs =
-    activeCategory === "Favorites"
-      ? filtered.filter((p) => favorites.has(p.symbol))
-      : filtered
+  const [activeCategory, setActiveCategory] = useState("Crypto")
+  const [favorites, setFavorites] = useState<Set<string>>(new Set(["BTC", "ETH"]))
 
   const toggleFav = (symbol: string) => {
     setFavorites((prev) => {
@@ -50,9 +21,19 @@ export function PairSelector() {
     })
   }
 
+  // Get current dataset
+  let assets = activeCategory === "Forex" ? forex : activeCategory === "Stocks" ? stocks : crypto
+  if (activeCategory === "Favorites") {
+    assets = [...crypto, ...forex, ...stocks].filter((a) => favorites.has(a.symbol))
+  }
+
+  const filtered = assets.filter((a) =>
+    a.symbol.toLowerCase().includes(search.toLowerCase()) ||
+    a.name.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
     <div className="flex h-full flex-col">
-      {/* Search */}
       <div className="border-b border-border p-2">
         <div className="flex items-center gap-2 rounded-md bg-secondary/50 px-2 py-1.5">
           <Search className="h-3.5 w-3.5 text-muted-foreground" />
@@ -66,7 +47,6 @@ export function PairSelector() {
         </div>
       </div>
 
-      {/* Categories */}
       <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
         {categories.map((cat) => (
           <button
@@ -78,61 +58,71 @@ export function PairSelector() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {cat === "Favorites" ? (
-              <Star className="h-3 w-3" />
-            ) : (
-              cat
-            )}
+            {cat === "Favorites" ? <Star className="h-3 w-3" /> : cat}
           </button>
         ))}
       </div>
 
-      {/* Column headers */}
       <div className="grid grid-cols-3 px-2 py-1">
         <span className="text-[10px] text-muted-foreground">Pair</span>
-        <span className="text-right text-[10px] text-muted-foreground">
-          Last Price
-        </span>
-        <span className="text-right text-[10px] text-muted-foreground">
-          24h Chg%
-        </span>
+        <span className="text-right text-[10px] text-muted-foreground">Price</span>
+        <span className="text-right text-[10px] text-muted-foreground">{"24h %"}</span>
       </div>
 
-      {/* Pair list */}
       <div className="flex-1 overflow-y-auto">
-        {displayPairs.map((pair) => (
-          <div
-            key={pair.symbol}
-            className="group grid cursor-pointer grid-cols-3 items-center px-2 py-1.5 hover:bg-secondary/30"
-          >
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => toggleFav(pair.symbol)}>
-                <Star
-                  className={`h-3 w-3 ${
-                    favorites.has(pair.symbol)
-                      ? "fill-primary text-primary"
-                      : "text-muted-foreground"
-                  }`}
-                />
-              </button>
-              <span className="text-xs font-medium text-foreground">
-                {pair.symbol}
+        {isLoading ? (
+          Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="grid grid-cols-3 px-2 py-1.5">
+              <div className="h-3 w-16 animate-pulse rounded bg-secondary" />
+              <div className="ml-auto h-3 w-16 animate-pulse rounded bg-secondary" />
+              <div className="ml-auto h-3 w-10 animate-pulse rounded bg-secondary" />
+            </div>
+          ))
+        ) : (
+          filtered.map((asset) => (
+            <div
+              key={asset.id}
+              className="group grid cursor-pointer grid-cols-3 items-center px-2 py-1.5 hover:bg-secondary/30"
+            >
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => toggleFav(asset.symbol)}>
+                  <Star
+                    className={`h-3 w-3 ${
+                      favorites.has(asset.symbol)
+                        ? "fill-primary text-primary"
+                        : "text-muted-foreground"
+                    }`}
+                  />
+                </button>
+                <span className="text-xs font-medium text-foreground">
+                  {asset.category === "crypto" ? `${asset.symbol}/USDT` : asset.symbol}
+                </span>
+              </div>
+              <span className="text-right font-mono text-xs text-foreground">
+                {asset.category === "forex" ? asset.price.toFixed(4) : formatPrice(asset.price)}
+              </span>
+              <span
+                className={`text-right font-mono text-xs ${
+                  asset.change24h >= 0 ? "text-success" : "text-destructive"
+                }`}
+              >
+                {asset.change24h >= 0 ? "+" : ""}
+                {asset.change24h.toFixed(2)}%
               </span>
             </div>
-            <span className="text-right font-mono text-xs text-foreground">
-              {pair.lastPrice}
-            </span>
-            <span
-              className={`text-right font-mono text-xs ${
-                pair.change >= 0 ? "text-success" : "text-destructive"
-              }`}
-            >
-              {pair.change >= 0 ? "+" : ""}
-              {pair.change.toFixed(2)}%
-            </span>
-          </div>
-        ))}
+          ))
+        )}
       </div>
+
+      {/* Volume footer */}
+      {!isLoading && filtered.length > 0 && (
+        <div className="border-t border-border px-2 py-1.5">
+          <span className="text-[10px] text-muted-foreground">
+            {filtered.length} pairs | Total Vol: $
+            {formatVolume(filtered.reduce((s, a) => s + a.volume, 0))}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,32 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useEffect } from "react"
 import { ArrowRight, Play, TrendingUp, Shield, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
-
-const livePrices = [
-  { symbol: "BTC", base: 97432.5 },
-  { symbol: "ETH", base: 3842.18 },
-  { symbol: "SOL", base: 214.67 },
-]
+import { useLivePrices, formatPrice, formatVolume } from "@/hooks/use-live-prices"
 
 export function HeroSection() {
-  const [prices, setPrices] = useState(livePrices.map((p) => ({ ...p, price: p.base, change: 0 })))
+  const { crypto, isLoading } = useLivePrices(5000)
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPrices((prev) =>
-        prev.map((p) => {
-          const delta = (Math.random() - 0.48) * p.base * 0.001
-          const newPrice = p.price + delta
-          const change = ((newPrice - p.base) / p.base) * 100
-          return { ...p, price: newPrice, change }
-        })
-      )
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [])
+  // Show top 3 coins
+  const topCoins = crypto.slice(0, 3)
 
   return (
     <section className="relative overflow-hidden">
@@ -56,7 +39,7 @@ export function HeroSection() {
               <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
             <span className="text-xs font-medium text-primary">
-              New: Zero-Fee Trading for 30 Days
+              Live Prices Updating Every 5 Seconds
             </span>
             <ArrowRight className="h-3 w-3 text-primary" />
           </div>
@@ -115,79 +98,113 @@ export function HeroSection() {
 
           {/* Live Price Cards */}
           <div className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {prices.map((coin) => (
-              <div
-                key={coin.symbol}
-                className="group relative overflow-hidden rounded-xl border border-border bg-card/80 p-5 backdrop-blur-sm hover:border-primary/30"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold text-foreground">
-                      {coin.symbol[0]}
-                    </div>
-                    <div className="text-left">
-                      <div className="text-sm font-semibold text-foreground">
-                        {coin.symbol}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {coin.symbol}/USDT
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-mono text-sm font-semibold text-foreground">
-                      $
-                      {coin.price.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </div>
-                    <div
-                      className={`font-mono text-xs ${
-                        coin.change >= 0
-                          ? "text-success"
-                          : "text-destructive"
-                      }`}
-                    >
-                      {coin.change >= 0 ? "+" : ""}
-                      {coin.change.toFixed(2)}%
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mini sparkline */}
-                <div className="mt-3 h-8 w-full overflow-hidden rounded bg-secondary/50">
-                  <svg
-                    viewBox="0 0 200 30"
-                    className="h-full w-full"
-                    preserveAspectRatio="none"
+            {isLoading || topCoins.length === 0
+              ? Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-xl border border-border bg-card/80 p-5"
                   >
-                    <path
-                      d={
-                        coin.change >= 0
-                          ? "M0,25 C30,22 50,18 80,15 C110,12 130,20 160,10 C180,5 190,8 200,3"
-                          : "M0,5 C30,8 50,12 80,15 C110,18 130,10 160,20 C180,25 190,22 200,27"
-                      }
-                      fill="none"
-                      stroke={
-                        coin.change >= 0
-                          ? "hsl(142, 72%, 50%)"
-                          : "hsl(0, 72%, 51%)"
-                      }
-                      strokeWidth="1.5"
-                    />
-                  </svg>
-                </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 animate-pulse rounded-full bg-secondary" />
+                        <div>
+                          <div className="h-4 w-12 animate-pulse rounded bg-secondary" />
+                          <div className="mt-1 h-3 w-16 animate-pulse rounded bg-secondary" />
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="h-4 w-24 animate-pulse rounded bg-secondary" />
+                        <div className="mt-1 h-3 w-14 animate-pulse rounded bg-secondary" />
+                      </div>
+                    </div>
+                    <div className="mt-3 h-8 animate-pulse rounded bg-secondary/50" />
+                    <div className="mt-3 h-8 animate-pulse rounded bg-secondary/30" />
+                  </div>
+                ))
+              : topCoins.map((coin) => (
+                  <div
+                    key={coin.id}
+                    className="group relative overflow-hidden rounded-xl border border-border bg-card/80 p-5 backdrop-blur-sm hover:border-primary/30"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold text-foreground">
+                          {coin.symbol[0]}
+                        </div>
+                        <div className="text-left">
+                          <div className="text-sm font-semibold text-foreground">
+                            {coin.symbol}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {coin.symbol}/USDT
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono text-sm font-semibold text-foreground">
+                          ${formatPrice(coin.price)}
+                        </div>
+                        <div
+                          className={`font-mono text-xs ${
+                            coin.change24h >= 0
+                              ? "text-success"
+                              : "text-destructive"
+                          }`}
+                        >
+                          {coin.change24h >= 0 ? "+" : ""}
+                          {coin.change24h.toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
 
-                <Link
-                  href="/trade"
-                  className="mt-3 flex items-center justify-center gap-1 rounded-lg bg-primary/10 py-2 text-xs font-medium text-primary hover:bg-primary/20"
-                >
-                  Trade {coin.symbol}
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-            ))}
+                    {/* Mini sparkline from real data */}
+                    <div className="mt-3 h-8 w-full overflow-hidden rounded bg-secondary/50">
+                      {coin.sparkline && coin.sparkline.length > 1 ? (
+                        <svg
+                          viewBox="0 0 200 30"
+                          className="h-full w-full"
+                          preserveAspectRatio="none"
+                        >
+                          <path
+                            d={coin.sparkline
+                              .map((v, i) => {
+                                const x = (i / (coin.sparkline!.length - 1)) * 200
+                                const min = Math.min(...coin.sparkline!)
+                                const max = Math.max(...coin.sparkline!)
+                                const range = max - min || 1
+                                const y = 28 - ((v - min) / range) * 26
+                                return `${i === 0 ? "M" : "L"}${x},${y}`
+                              })
+                              .join(" ")}
+                            fill="none"
+                            stroke={
+                              coin.change24h >= 0
+                                ? "hsl(142, 72%, 50%)"
+                                : "hsl(0, 72%, 51%)"
+                            }
+                            strokeWidth="1.5"
+                          />
+                        </svg>
+                      ) : (
+                        <div className="h-full w-full animate-pulse bg-secondary/30" />
+                      )}
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[10px] text-muted-foreground">
+                        Vol: ${formatVolume(coin.volume)}
+                      </span>
+                    </div>
+
+                    <Link
+                      href="/trade"
+                      className="mt-2 flex items-center justify-center gap-1 rounded-lg bg-primary/10 py-2 text-xs font-medium text-primary hover:bg-primary/20"
+                    >
+                      Trade {coin.symbol}
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  </div>
+                ))}
           </div>
 
           {/* Stats */}

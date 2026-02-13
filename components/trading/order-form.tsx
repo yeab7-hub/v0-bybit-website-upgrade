@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
 
 type OrderSide = "buy" | "sell"
 type OrderType = "Limit" | "Market" | "Stop-Limit"
@@ -11,10 +12,19 @@ const percentages = [25, 50, 75, 100]
 export function OrderForm() {
   const [side, setSide] = useState<OrderSide>("buy")
   const [orderType, setOrderType] = useState<OrderType>("Limit")
-  const [price, setPrice] = useState("97,432.50")
+  const [price, setPrice] = useState("")
   const [amount, setAmount] = useState("")
   const [stopPrice, setStopPrice] = useState("")
   const [selectedPercent, setSelectedPercent] = useState<number | null>(null)
+  const { crypto } = useLivePrices(5000)
+  const btcPrice = crypto.find((c) => c.symbol === "BTC")?.price ?? 0
+
+  // Set initial price from live data
+  useEffect(() => {
+    if (btcPrice > 0 && !price) {
+      setPrice(formatPrice(btcPrice))
+    }
+  }, [btcPrice, price])
 
   const isBuy = side === "buy"
 
