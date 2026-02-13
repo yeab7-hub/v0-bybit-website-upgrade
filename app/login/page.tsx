@@ -55,7 +55,13 @@ export default function LoginPage() {
     })
 
     if (authError) {
-      setError(authError.message)
+      if (authError.message.includes("Invalid login credentials")) {
+        setError("Invalid email or password. Please check your credentials or sign up for a new account.")
+      } else if (authError.message.includes("Email not confirmed")) {
+        setError("Please check your email and confirm your account before logging in.")
+      } else {
+        setError(authError.message)
+      }
       setLoading(false)
       return
     }
@@ -68,15 +74,24 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const { error: authError } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
+    try {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
 
-    if (authError) {
-      setError(authError.message)
+      if (authError) {
+        if (authError.message.includes("provider is not enabled")) {
+          setError(`${provider.charAt(0).toUpperCase() + provider.slice(1)} login is not available yet. Please use email and password to sign in.`)
+        } else {
+          setError(authError.message)
+        }
+        setLoading(false)
+      }
+    } catch {
+      setError("OAuth login is not available. Please use email and password.")
       setLoading(false)
     }
   }

@@ -56,7 +56,7 @@ export default function RegisterPage() {
       return
     }
 
-    const { error: authError } = await supabase.auth.signUp({
+    const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -71,27 +71,46 @@ export default function RegisterPage() {
     })
 
     if (authError) {
-      setError(authError.message)
+      if (authError.message.includes("already registered")) {
+        setError("This email is already registered. Please log in instead.")
+      } else {
+        setError(authError.message)
+      }
       setLoading(false)
       return
     }
 
-    router.push("/auth/sign-up-success")
+    // If email confirmation is disabled, the user is logged in immediately
+    if (data.session) {
+      router.push("/trade")
+      router.refresh()
+    } else {
+      router.push("/auth/sign-up-success")
+    }
   }
 
   const handleOAuthSignUp = async (provider: "google" | "apple") => {
     setLoading(true)
     setError(null)
 
-    const { error: authError } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
+    try {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
 
-    if (authError) {
-      setError(authError.message)
+      if (authError) {
+        if (authError.message.includes("provider is not enabled")) {
+          setError(`${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-up is not available yet. Please use email and password to create your account.`)
+        } else {
+          setError(authError.message)
+        }
+        setLoading(false)
+      }
+    } catch {
+      setError("OAuth sign-up is not available. Please use email and password.")
       setLoading(false)
     }
   }
