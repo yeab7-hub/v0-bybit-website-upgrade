@@ -85,14 +85,26 @@ export default function RegisterPage() {
       router.push("/trade")
       router.refresh()
     } else {
-      // Email was auto-confirmed by trigger, sign in now
+      // Wait for auto-confirm trigger to fire, then sign in
+      await new Promise((r) => setTimeout(r, 1000))
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       if (signInError) {
-        // If auto-login fails, redirect to success page
-        router.push("/auth/sign-up-success")
+        // Try once more after another second
+        await new Promise((r) => setTimeout(r, 1500))
+        const { error: retryError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+        if (retryError) {
+          router.push("/auth/sign-up-success")
+        } else {
+          router.push("/trade")
+          router.refresh()
+        }
       } else {
         router.push("/trade")
         router.refresh()
