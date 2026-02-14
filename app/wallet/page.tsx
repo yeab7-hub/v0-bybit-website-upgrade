@@ -58,7 +58,7 @@ export default function WalletPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-6 lg:px-6">
         {/* Top balance card */}
         <div className="mb-6 rounded-2xl border border-border bg-card p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -83,11 +83,11 @@ export default function WalletPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="mb-6 flex gap-1 rounded-xl border border-border bg-card p-1">
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition ${tab === t.id ? "bg-[#f7a600] text-[#0a0e17]" : "text-muted-foreground hover:text-foreground"}`}>
-              <t.icon className="h-4 w-4" />{t.label}
+  <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 scrollbar-none">
+  {tabs.map(t => (
+  <button key={t.id} onClick={() => setTab(t.id)}
+  className={`flex shrink-0 flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition ${tab === t.id ? "bg-[#f7a600] text-[#0a0e17]" : "text-muted-foreground hover:text-foreground"}`}>
+  <t.icon className="h-4 w-4" /><span className="whitespace-nowrap">{t.label}</span>
             </button>
           ))}
         </div>

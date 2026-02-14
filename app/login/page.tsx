@@ -82,6 +82,9 @@ export default function LoginPage() {
       return
     }
 
+    // Notify admin of login
+    fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
+
     router.push(redirectTo)
     router.refresh()
   }
