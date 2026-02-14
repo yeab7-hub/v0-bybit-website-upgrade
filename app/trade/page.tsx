@@ -8,20 +8,21 @@ import { OrderForm } from "@/components/trading/order-form"
 import { TradeHistory } from "@/components/trading/trade-history"
 import { OpenOrders } from "@/components/trading/open-orders"
 import { PairSelector } from "@/components/trading/pair-selector"
-import { ChevronDown, X, List } from "lucide-react"
+import { ChevronDown, X } from "lucide-react"
 
 export default function TradePage() {
   const [selectedPair, setSelectedPair] = useState("BTCUSDT")
   const [showMobilePairs, setShowMobilePairs] = useState(false)
-  const [mobileTab, setMobileTab] = useState<"chart" | "book" | "trades" | "order">("chart")
+  const [mobileTab, setMobileTab] = useState<"chart" | "book" | "order">("chart")
 
   const pairDisplay = selectedPair.replace("USDT", "/USDT")
+  const baseAsset = selectedPair.replace("USDT", "")
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
       <Header />
 
-      {/* Mobile pair header */}
+      {/* ─── MOBILE TOP BAR ─── */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2 lg:hidden">
         <button
           onClick={() => setShowMobilePairs(true)}
@@ -31,21 +32,21 @@ export default function TradePage() {
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
         <div className="flex gap-1">
-          {(["chart", "book", "trades", "order"] as const).map((tab) => (
+          {(["chart", "book", "order"] as const).map((t) => (
             <button
-              key={tab}
-              onClick={() => setMobileTab(tab)}
-              className={`rounded px-2.5 py-1 text-[11px] font-medium capitalize transition-colors ${
-                mobileTab === tab ? "bg-[#f7a600]/10 text-[#f7a600]" : "text-muted-foreground"
+              key={t}
+              onClick={() => setMobileTab(t)}
+              className={`rounded px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                mobileTab === t ? "bg-[#f7a600]/10 text-[#f7a600]" : "text-muted-foreground"
               }`}
             >
-              {tab}
+              {t === "book" ? "Book" : t === "order" ? "Trade" : "Chart"}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Mobile pair selector overlay */}
+      {/* ─── MOBILE PAIR OVERLAY ─── */}
       {showMobilePairs && (
         <div className="fixed inset-0 z-50 bg-background lg:hidden">
           <div className="flex h-full flex-col">
@@ -58,54 +59,48 @@ export default function TradePage() {
             <div className="flex-1 overflow-hidden">
               <PairSelector
                 activePair={selectedPair}
-                onSelectPair={(pair) => {
-                  setSelectedPair(pair)
-                  setShowMobilePairs(false)
-                }}
+                onSelectPair={(pair) => { setSelectedPair(pair); setShowMobilePairs(false) }}
               />
             </div>
           </div>
         </div>
       )}
 
-      {/* Desktop layout */}
+      {/* ─── DESKTOP LAYOUT ─── */}
       <div className="hidden flex-1 overflow-hidden lg:flex">
-        {/* Left: Pair Selector */}
-        <div className="w-[240px] shrink-0 border-r border-border xl:w-[260px]">
+        {/* Left: Pair List */}
+        <div className="w-[240px] shrink-0 border-r border-border">
           <PairSelector onSelectPair={setSelectedPair} activePair={selectedPair} />
         </div>
 
-        {/* Center: Chart */}
+        {/* Center column */}
         <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Top row: Chart + OrderBook + OrderForm */}
           <div className="flex flex-1 overflow-hidden">
-            <div className="flex-1 border-r border-border">
+            {/* Chart */}
+            <div className="flex-1">
               <PriceChart symbol={selectedPair} />
             </div>
 
-            {/* Right sidebar: Order Book + Trade History */}
-            <div className="hidden w-[260px] shrink-0 flex-col xl:flex 2xl:w-[300px]">
-              <div className="h-1/2 border-b border-border">
-                <OrderBook />
-              </div>
-              <div className="h-1/2">
-                <TradeHistory />
-              </div>
+            {/* Order Book */}
+            <div className="w-[240px] shrink-0 border-l border-border">
+              <OrderBook />
             </div>
 
-            {/* Order Form */}
-            <div className="hidden w-[280px] shrink-0 border-l border-border 2xl:block">
-              <OrderForm />
+            {/* Order Form (Buy / Sell) */}
+            <div className="w-[280px] shrink-0 border-l border-border">
+              <OrderForm pair={pairDisplay} />
             </div>
           </div>
 
-          {/* Bottom: Open Orders */}
-          <div className="h-[180px] shrink-0 border-t border-border">
+          {/* Bottom: Open Orders + Trade History */}
+          <div className="h-[200px] shrink-0 border-t border-border">
             <OpenOrders />
           </div>
         </div>
       </div>
 
-      {/* Mobile layout */}
+      {/* ─── MOBILE LAYOUT ─── */}
       <div className="flex flex-1 flex-col overflow-hidden lg:hidden">
         {mobileTab === "chart" && (
           <div className="flex-1">
@@ -117,27 +112,30 @@ export default function TradePage() {
             <OrderBook />
           </div>
         )}
-        {mobileTab === "trades" && (
-          <div className="flex-1 overflow-hidden">
-            <TradeHistory />
-          </div>
-        )}
         {mobileTab === "order" && (
-          <div className="flex-1 overflow-auto p-3">
-            <OrderForm />
+          <div className="flex-1 overflow-auto">
+            <OrderForm pair={pairDisplay} />
           </div>
         )}
       </div>
 
-      {/* Mobile Buy/Sell buttons */}
-      <div className="flex gap-2 border-t border-border p-3 lg:hidden">
-        <button className="flex-1 rounded-lg bg-[#0ecb81] py-3 text-sm font-semibold text-white">
-          Buy {selectedPair.replace("USDT", "")}
-        </button>
-        <button className="flex-1 rounded-lg bg-[#f6465d] py-3 text-sm font-semibold text-white">
-          Sell {selectedPair.replace("USDT", "")}
-        </button>
-      </div>
+      {/* ─── MOBILE STICKY BUY / SELL ─── */}
+      {mobileTab !== "order" && (
+        <div className="flex gap-2 border-t border-border p-3 lg:hidden">
+          <button
+            onClick={() => setMobileTab("order")}
+            className="flex-1 rounded-lg bg-[#0ecb81] py-3 text-sm font-semibold text-white"
+          >
+            Buy {baseAsset}
+          </button>
+          <button
+            onClick={() => setMobileTab("order")}
+            className="flex-1 rounded-lg bg-[#f6465d] py-3 text-sm font-semibold text-white"
+          >
+            Sell {baseAsset}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

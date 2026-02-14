@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
 import { PageLoader } from "@/components/page-loader"
+import { SupportChat } from "@/components/support-chat"
 import "./globals.css"
 
 const inter = Inter({
@@ -36,6 +37,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <PageLoader />
         {children}
+        <SupportChat />
       </body>
     </html>
   )

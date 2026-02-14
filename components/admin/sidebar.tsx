@@ -15,6 +15,7 @@ import {
   ArrowLeftRight,
   Bell,
   X,
+  Headphones,
 } from "lucide-react"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -24,6 +25,7 @@ const navLinks = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/transactions", label: "Transactions", icon: ArrowLeftRight },
   { href: "/admin/kyc", label: "KYC Review", icon: Shield },
+  { href: "/admin/chat", label: "Live Chat", icon: Headphones },
   { href: "/admin/support", label: "Support Tickets", icon: MessageCircle },
   { href: "/admin/activity", label: "Activity Logs", icon: Activity },
   { href: "/admin/settings", label: "Settings", icon: Settings },
