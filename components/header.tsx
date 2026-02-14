@@ -140,13 +140,12 @@ export function Header() {
       <div className="flex items-center justify-between px-4 py-3 lg:px-6">
         {/* Logo */}
         <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f7a600]">
-              <span className="text-sm font-bold text-[#0a0e17]">
-                B
-              </span>
-            </div>
-            <span className="text-xl font-bold text-foreground">Bybit</span>
+          <Link href="/" className="flex items-center">
+            <img
+              src="/images/bybit-logo.png"
+              alt="Bybit"
+              className="h-6"
+            />
           </Link>
 
           {/* Desktop Nav */}

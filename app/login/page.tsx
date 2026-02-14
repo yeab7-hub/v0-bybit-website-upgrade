@@ -97,13 +97,8 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <Link href="/" className="mb-8 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <span className="text-sm font-bold text-primary-foreground">
-                T
-              </span>
-            </div>
-            <span className="text-xl font-bold text-foreground">Bybit</span>
+          <Link href="/" className="mb-8 flex items-center">
+            <img src="/images/bybit-logo.png" alt="Bybit" className="h-6" />
           </Link>
 
           {!show2FA ? (
