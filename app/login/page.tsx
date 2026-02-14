@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Eye,
   EyeOff,
@@ -21,6 +21,8 @@ type LoginMethod = "email" | "phone" | "qr"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get("redirect") || "/dashboard"
   const [method, setMethod] = useState<LoginMethod>("email")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
@@ -68,7 +70,7 @@ export default function LoginPage() {
           return
         }
         // Retry succeeded
-        router.push("/trade")
+        router.push(redirectTo)
         router.refresh()
         return
       } else if (authError.message.includes("Invalid login credentials")) {
@@ -80,7 +82,7 @@ export default function LoginPage() {
       return
     }
 
-    router.push("/trade")
+    router.push(redirectTo)
     router.refresh()
   }
 
