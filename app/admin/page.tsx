@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import {
   Users,
   Shield,
@@ -24,6 +25,8 @@ interface Stats {
 }
 
 export default function AdminOverview() {
+  const router = useRouter()
+  const [authorized, setAuthorized] = useState(false)
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     pendingKYC: 0,
@@ -38,6 +41,16 @@ export default function AdminOverview() {
 
   useEffect(() => {
     const supabase = createClient()
+
+    const checkAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push("/login?redirect=/admin"); return }
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+      if (profile?.role !== "admin") { router.push("/"); return }
+      setAuthorized(true)
+    }
+    checkAdmin()
+
     const fetchStats = async () => {
       const { count: totalUsers } = await supabase
         .from("profiles")
@@ -161,6 +174,17 @@ export default function AdminOverview() {
           </span>
         )
     }
+  }
+
+  if (!authorized) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Verifying access...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

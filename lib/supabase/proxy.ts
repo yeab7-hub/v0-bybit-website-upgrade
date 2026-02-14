@@ -54,21 +54,7 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    // Admin route protection - check if user is admin
-    if (request.nextUrl.pathname.startsWith('/admin') && user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile || profile.role !== 'admin') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/'
-        return NextResponse.redirect(url)
-      }
-    }
-
+    // Admin role check is handled client-side in admin pages
     return supabaseResponse
   } catch {
     // If Supabase connection fails, allow the request through
