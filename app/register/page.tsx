@@ -115,9 +115,19 @@ export default function RegisterPage() {
     }
   }
 
-  const handleOAuthSignUp = (provider: "google" | "apple") => {
-    const name = provider.charAt(0).toUpperCase() + provider.slice(1)
-    setError(`${name} sign-up is coming soon. Please use email and password to create your account.`)
+  const handleOAuthSignUp = async (provider: "google" | "apple") => {
+    setLoading(true)
+    setError(null)
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+      },
+    })
+    if (oauthError) {
+      setError(oauthError.message)
+      setLoading(false)
+    }
   }
 
   return (
