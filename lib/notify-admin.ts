@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 
-const ADMIN_EMAIL = "yeabsratenager2013@gmail.com"
+const ADMIN_EMAIL = "yeabtenager7@gmail.com"
 
 interface NotifyPayload {
   subject: string
