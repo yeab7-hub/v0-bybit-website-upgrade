@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     // Check balance
     const { data: balance } = await supabase
       .from("balances")
-      .select("available")
+      .select("available, frozen")
       .eq("user_id", user.id)
       .eq("asset", asset)
       .single()
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       .from("balances")
       .update({
         available: balance.available - amountNum,
-        frozen: (balance as any).frozen ? (balance as any).frozen + amountNum : amountNum,
+        frozen: (balance.frozen || 0) + amountNum,
       })
       .eq("user_id", user.id)
       .eq("asset", asset)

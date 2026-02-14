@@ -69,7 +69,7 @@ export default function TermsPage() {
           <p className="text-sm text-muted-foreground">
             If you have questions about these Terms, please contact us at{" "}
             <Link href="/support" className="text-primary hover:underline">our support center</Link> or
-            email us at legal@tryd.com.
+            email us at legal@bybit.com.
           </p>
         </div>
       </main>

@@ -72,7 +72,7 @@ export default function PrivacyPage() {
           <p className="text-sm text-muted-foreground">
             If you have questions about this Privacy Policy, please contact our Data Protection Officer at{" "}
             <Link href="/support" className="text-primary hover:underline">our support center</Link> or
-            email privacy@tryd.com.
+            email privacy@bybit.com.
           </p>
         </div>
       </main>

@@ -7,7 +7,7 @@ import { AdminSidebar } from "@/components/admin/sidebar"
 import { createClient } from "@/lib/supabase/client"
 import {
   CheckCircle2, XCircle, Clock, ArrowDownLeft, ArrowUpRight,
-  ArrowLeftRight, MessageSquare, Loader2, User, Search,
+  ArrowLeftRight, MessageSquare, Loader2, User, Search, X,
 } from "lucide-react"
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
