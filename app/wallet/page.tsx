@@ -6,7 +6,7 @@ import { Footer } from "@/components/footer"
 import {
   Eye, EyeOff, ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Search,
   ChevronDown, TrendingUp, TrendingDown, History, Wallet, PiggyBank, BarChart3,
-  Copy, Check, X, AlertTriangle, QrCode,
+  Copy, Check, X, AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLivePrices, formatPrice, type PriceData } from "@/hooks/use-live-prices"
@@ -76,10 +76,17 @@ function DepositModal({ coin, onClose }: { coin: CoinDepositConfig; onClose: () 
           </div>
         )}
 
-        {/* QR-like display */}
+        {/* Real QR code */}
         <div className="mb-4 flex flex-col items-center rounded-xl bg-secondary/30 p-6">
-          <div className="mb-3 flex h-24 w-24 items-center justify-center rounded-xl border-2 border-dashed border-border bg-card">
-            <QrCode className="h-12 w-12 text-muted-foreground" />
+          <div className="mb-3 flex h-[180px] w-[180px] items-center justify-center rounded-xl bg-white p-2">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(network.address)}&bgcolor=ffffff&color=000000&format=svg`}
+              alt={`QR code for ${coin.symbol} ${network.network} deposit address`}
+              width={160}
+              height={160}
+              className="h-[160px] w-[160px]"
+              crossOrigin="anonymous"
+            />
           </div>
           <p className="text-center text-[10px] text-muted-foreground">Scan QR code or copy address below</p>
         </div>

@@ -4,11 +4,11 @@ const footerSections = [
   {
     title: "About",
     links: [
-      { label: "About Tryd", href: "#" },
-      { label: "Careers", href: "#" },
-      { label: "Press", href: "#" },
-      { label: "Blog", href: "#" },
-      { label: "Community", href: "#" },
+      { label: "About Tryd", href: "/about" },
+      { label: "Careers", href: "/about" },
+      { label: "Press", href: "/about" },
+      { label: "Blog", href: "/about" },
+      { label: "Community", href: "/about" },
     ],
   },
   {
@@ -16,29 +16,29 @@ const footerSections = [
     links: [
       { label: "Spot Trading", href: "/trade" },
       { label: "Derivatives", href: "/trade" },
-      { label: "Earn", href: "#" },
-      { label: "Copy Trading", href: "#" },
-      { label: "Launchpad", href: "#" },
+      { label: "Earn", href: "/earn" },
+      { label: "Copy Trading", href: "/trade" },
+      { label: "Launchpad", href: "/finance" },
     ],
   },
   {
     title: "Services",
     links: [
-      { label: "Buy Crypto", href: "#" },
-      { label: "P2P Trading", href: "#" },
-      { label: "Institutional", href: "#" },
-      { label: "VIP Services", href: "#" },
-      { label: "API", href: "#" },
+      { label: "Buy Crypto", href: "/buy-crypto" },
+      { label: "P2P Trading", href: "/buy-crypto" },
+      { label: "Institutional", href: "/finance" },
+      { label: "VIP Services", href: "/finance" },
+      { label: "API", href: "/about" },
     ],
   },
   {
     title: "Support",
     links: [
-      { label: "Help Center", href: "#" },
-      { label: "Fees", href: "#" },
-      { label: "Trading Rules", href: "#" },
-      { label: "Announcements", href: "#" },
-      { label: "Submit a Request", href: "#" },
+      { label: "Help Center", href: "/support" },
+      { label: "Fees", href: "/terms" },
+      { label: "Trading Rules", href: "/terms" },
+      { label: "Announcements", href: "/support" },
+      { label: "Submit a Request", href: "/support" },
     ],
   },
 ]
@@ -89,19 +89,19 @@ export function Footer() {
           </p>
           <div className="flex items-center gap-6">
             <Link
-              href="#"
+              href="/terms"
               className="text-xs text-muted-foreground hover:text-foreground"
             >
               Terms of Service
             </Link>
             <Link
-              href="#"
+              href="/privacy"
               className="text-xs text-muted-foreground hover:text-foreground"
             >
               Privacy Policy
             </Link>
             <Link
-              href="#"
+              href="/cookies"
               className="text-xs text-muted-foreground hover:text-foreground"
             >
               Cookie Policy

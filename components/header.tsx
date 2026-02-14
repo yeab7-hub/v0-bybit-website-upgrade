@@ -25,11 +25,11 @@ import type { User as SupabaseUser } from "@supabase/supabase-js"
 const navItems = [
   {
     label: "Buy Crypto",
-    href: "#",
+    href: "/buy-crypto",
     children: [
-      { label: "Express Buy", href: "#" },
-      { label: "P2P Trading", href: "#" },
-      { label: "Third Party", href: "#" },
+      { label: "Express Buy", href: "/buy-crypto" },
+      { label: "P2P Trading", href: "/buy-crypto" },
+      { label: "Third Party", href: "/buy-crypto" },
     ],
   },
   {
@@ -43,30 +43,30 @@ const navItems = [
       { label: "Spot Trading", href: "/trade" },
       { label: "Margin Trading", href: "/trade" },
       { label: "Derivatives", href: "/trade" },
-      { label: "Copy Trading", href: "#" },
-      { label: "Trading Bots", href: "#" },
+      { label: "Copy Trading", href: "/trade" },
+      { label: "Trading Bots", href: "/trade" },
     ],
   },
   {
     label: "Earn",
-    href: "#",
+    href: "/earn",
     children: [
-      { label: "Savings", href: "#" },
-      { label: "Liquidity Mining", href: "#" },
-      { label: "Launchpool", href: "#" },
+      { label: "Savings", href: "/earn" },
+      { label: "Liquidity Mining", href: "/earn" },
+      { label: "Launchpool", href: "/earn" },
     ],
   },
   {
     label: "Finance",
-    href: "#",
+    href: "/finance",
   },
   {
     label: "More",
-    href: "#",
+    href: "/about",
     children: [
-      { label: "Rewards Hub", href: "#" },
-      { label: "Referral", href: "#" },
-      { label: "Affiliates", href: "#" },
+      { label: "Rewards Hub", href: "/earn" },
+      { label: "Referral", href: "/finance" },
+      { label: "Affiliates", href: "/finance" },
     ],
   },
 ]
