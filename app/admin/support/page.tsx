@@ -208,7 +208,7 @@ export default function AdminSupportPage() {
                 {/* Admin reply */}
                 <div className="border-t border-border p-4">
                   <div className="flex items-end gap-3">
-                    <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Reply as Tryd Support admin..."
+                    <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Reply as Bybit Support admin..."
                       className="flex-1 rounded-lg border border-border bg-secondary/30 px-4 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply() } }} />
                     <Button onClick={sendReply} disabled={submitting || !replyText.trim()} className="bg-primary text-primary-foreground">

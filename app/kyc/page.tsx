@@ -214,7 +214,7 @@ export default function KYCPage() {
                 </h1>
                 <p className="mt-3 text-muted-foreground">
                   Your identity has been verified. You now have full access to
-                  all Tryd features including deposits and withdrawals.
+                  all Bybit features including deposits and withdrawals.
                 </p>
               </>
             )}
@@ -250,7 +250,7 @@ export default function KYCPage() {
               </Button>
             </Link>
             <p className="mt-8 text-[10px] text-muted-foreground/60">
-              Tryd&trade; 2026. All rights reserved.
+              Bybit&trade; 2026. All rights reserved.
             </p>
           </div>
         </div>
@@ -769,7 +769,7 @@ export default function KYCPage() {
         )}
 
         <p className="mt-8 text-center text-[10px] text-muted-foreground/60">
-          Tryd&trade; 2026. All rights reserved.
+          Bybit&trade; 2026. All rights reserved.
         </p>
       </div>
     </div>

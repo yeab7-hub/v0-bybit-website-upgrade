@@ -53,7 +53,7 @@ export function HeroSection() {
           <p className="mx-auto mt-8 max-w-2xl text-pretty text-lg leading-relaxed text-muted-foreground md:text-xl">
             Access 500+ trading pairs, deep liquidity, and
             institutional-grade security. Join 20 million traders building
-            their future with Tryd.
+            their future with Bybit.
           </p>
 
           {/* CTA Buttons */}

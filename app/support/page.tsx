@@ -230,7 +230,7 @@ export default function SupportPage() {
                   <div className={`max-w-[75%] rounded-xl px-4 py-3 ${msg.sender_role === "admin" ? "bg-primary/10 text-foreground" : "bg-secondary text-foreground"}`}>
                     <div className="mb-1 flex items-center gap-2">
                       <span className={`text-[10px] font-semibold ${msg.sender_role === "admin" ? "text-primary" : "text-muted-foreground"}`}>
-                        {msg.sender_role === "admin" ? "Tryd Support" : "You"}
+                        {msg.sender_role === "admin" ? "Bybit Support" : "You"}
                       </span>
                       <span className="text-[10px] text-muted-foreground">{new Date(msg.created_at).toLocaleTimeString()}</span>
                     </div>

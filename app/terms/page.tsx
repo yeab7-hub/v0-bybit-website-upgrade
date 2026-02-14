@@ -5,7 +5,7 @@ import Link from "next/link"
 const sections = [
   {
     title: "1. Acceptance of Terms",
-    content: `By accessing or using the Tryd platform ("Platform"), including our website, mobile applications, APIs, and all related services, you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you must not use the Platform. We reserve the right to modify these Terms at any time, and such modifications will be effective immediately upon posting. Your continued use of the Platform constitutes acceptance of the modified Terms.`,
+    content: `By accessing or using the Bybit platform ("Platform"), including our website, mobile applications, APIs, and all related services, you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you must not use the Platform. We reserve the right to modify these Terms at any time, and such modifications will be effective immediately upon posting. Your continued use of the Platform constitutes acceptance of the modified Terms.`,
   },
   {
     title: "2. Eligibility",
@@ -33,11 +33,11 @@ const sections = [
   },
   {
     title: "8. Intellectual Property",
-    content: `All content, features, and functionality of the Platform, including but not limited to text, graphics, logos, icons, software, and the design and arrangement thereof, are the exclusive property of Tryd and are protected by international copyright, trademark, patent, and trade secret laws.`,
+    content: `All content, features, and functionality of the Platform, including but not limited to text, graphics, logos, icons, software, and the design and arrangement thereof, are the exclusive property of Bybit and are protected by international copyright, trademark, patent, and trade secret laws.`,
   },
   {
     title: "9. Limitation of Liability",
-    content: `To the maximum extent permitted by law, Tryd shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or related to your use of the Platform. Our total liability for any claims arising under these Terms shall not exceed the total fees paid by you to us in the twelve (12) months preceding the claim.`,
+    content: `To the maximum extent permitted by law, Bybit shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or related to your use of the Platform. Our total liability for any claims arising under these Terms shall not exceed the total fees paid by you to us in the twelve (12) months preceding the claim.`,
   },
   {
     title: "10. Governing Law",

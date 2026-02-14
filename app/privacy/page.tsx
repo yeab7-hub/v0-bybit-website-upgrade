@@ -53,7 +53,7 @@ export default function PrivacyPage() {
 
         <div className="mb-8 rounded-xl border border-primary/20 bg-primary/5 p-6">
           <p className="text-sm leading-relaxed text-muted-foreground">
-            At Tryd, we are committed to protecting your privacy and ensuring the security of your personal information.
+            At Bybit, we are committed to protecting your privacy and ensuring the security of your personal information.
             This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform.
           </p>
         </div>

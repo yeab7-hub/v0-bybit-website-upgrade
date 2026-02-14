@@ -4,7 +4,7 @@ const footerSections = [
   {
     title: "About",
     links: [
-      { label: "About Tryd", href: "/about" },
+      { label: "About Bybit", href: "/about" },
       { label: "Careers", href: "/about" },
       { label: "Press", href: "/about" },
       { label: "Blog", href: "/about" },
@@ -51,10 +51,10 @@ export function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <span className="text-sm font-bold text-primary-foreground">T</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f7a600]">
+                <span className="text-sm font-bold text-[#0a0e17]">B</span>
               </div>
-              <span className="text-xl font-bold text-foreground">Tryd</span>
+              <span className="text-xl font-bold text-foreground">Bybit</span>
             </div>
             <p className="mt-4 max-w-xs text-sm text-muted-foreground">
               Trade smarter with next-generation tools, institutional-grade
@@ -85,7 +85,7 @@ export function Footer() {
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
           <p className="text-xs text-muted-foreground">
-            Tryd&trade; 2026. All rights reserved.
+            Bybit 2026. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             <Link

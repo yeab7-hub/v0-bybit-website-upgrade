@@ -10,11 +10,13 @@ import {
   Settings,
   ArrowLeft,
   MessageCircle,
+  ArrowLeftRight,
 } from "lucide-react"
 
 const navLinks = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/transactions", label: "Transactions", icon: ArrowLeftRight },
   { href: "/admin/kyc", label: "KYC Review", icon: Shield },
   { href: "/admin/support", label: "Support Tickets", icon: MessageCircle },
   { href: "/admin/activity", label: "Activity Logs", icon: Activity },
@@ -28,11 +30,11 @@ export function AdminSidebar() {
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-border bg-card">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-          <span className="text-sm font-bold text-primary-foreground">T</span>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f7a600]">
+          <span className="text-sm font-bold text-[#0a0e17]">B</span>
         </div>
         <div>
-          <p className="text-sm font-bold text-foreground">Tryd Admin</p>
+          <p className="text-sm font-bold text-foreground">Bybit Admin</p>
           <p className="text-[10px] text-muted-foreground">Management Panel</p>
         </div>
       </div>
@@ -73,7 +75,7 @@ export function AdminSidebar() {
           Back to Platform
         </Link>
         <p className="mt-3 px-3 text-[10px] text-muted-foreground/60">
-          Tryd&trade; 2026
+          Bybit 2026
         </p>
       </div>
     </aside>

@@ -5,7 +5,7 @@ import { ArrowRight, Clock } from "lucide-react"
 const news = [
   {
     category: "Announcement",
-    title: "Tryd Launches Zero-Fee Spot Trading Promotion for New Users",
+    title: "Bybit Launches Zero-Fee Spot Trading Promotion for New Users",
     excerpt:
       "New users can enjoy zero trading fees on all spot pairs for their first 30 days. Limited time offer.",
     date: "Feb 13, 2026",
@@ -29,7 +29,7 @@ const news = [
   },
   {
     category: "New Listing",
-    title: "RENDER, ONDO, and JUP Now Available on Tryd Spot",
+    title: "RENDER, ONDO, and JUP Now Available on Bybit Spot",
     excerpt:
       "Three new tokens added to our spot marketplace with USDT trading pairs and competitive maker/taker fees.",
     date: "Feb 10, 2026",
@@ -45,7 +45,7 @@ const news = [
   },
   {
     category: "Security",
-    title: "Tryd Publishes Q4 2025 Proof of Reserves Report",
+    title: "Bybit Publishes Q4 2025 Proof of Reserves Report",
     excerpt:
       "Independent audit confirms 1:1 backing across all user assets with $12B+ in reserves.",
     date: "Feb 8, 2026",

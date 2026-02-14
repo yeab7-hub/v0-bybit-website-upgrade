@@ -8,7 +8,7 @@ const testimonials = [
     name: "Marcus Chen",
     role: "Professional Trader",
     location: "Singapore",
-    text: "Tryd has the fastest execution I have experienced on any exchange. The order book depth on major pairs is exceptional, and the fee structure makes it my go-to for high-frequency trading.",
+    text: "Bybit has the fastest execution I have experienced on any exchange. The order book depth on major pairs is exceptional, and the fee structure makes it my go-to for high-frequency trading.",
     rating: 5,
   },
   {
@@ -29,7 +29,7 @@ const testimonials = [
     name: "Elena Kowalski",
     role: "DeFi Researcher",
     location: "Berlin, Germany",
-    text: "Tryd Earn products are some of the most competitive in the market. The auto-compounding feature on savings is brilliant, and the launchpad has given me access to great early-stage projects.",
+    text: "Bybit Earn products are some of the most competitive in the market. The auto-compounding feature on savings is brilliant, and the launchpad has given me access to great early-stage projects.",
     rating: 4,
   },
   {
@@ -66,7 +66,7 @@ export function TestimonialsSection() {
               Loved by Traders Worldwide
             </h2>
             <p className="mt-2 max-w-lg text-muted-foreground">
-              Join millions of traders who trust Tryd for their crypto journey.
+              Join millions of traders who trust Bybit for their crypto journey.
             </p>
           </div>
           <div className="flex items-center gap-2">

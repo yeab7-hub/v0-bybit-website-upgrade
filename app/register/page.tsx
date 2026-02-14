@@ -190,14 +190,14 @@ export default function RegisterPage() {
                 T
               </span>
             </div>
-            <span className="text-xl font-bold text-foreground">Tryd</span>
+            <span className="text-xl font-bold text-foreground">Bybit</span>
           </Link>
 
           <h1 className="text-2xl font-bold text-foreground">
             Create Account
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Join Tryd and start trading 500+ cryptocurrencies
+            Join Bybit and start trading 500+ cryptocurrencies
           </p>
 
           {error && (
@@ -345,7 +345,7 @@ export default function RegisterPage() {
                 className="mt-0.5 rounded border-border"
               />
               <span className="text-xs text-muted-foreground">
-                I agree to Tryd&apos;s{" "}
+                I agree to Bybit&apos;s{" "}
                 <Link href="#" className="text-primary hover:underline">
                   Terms of Service
                 </Link>{" "}
@@ -439,7 +439,7 @@ export default function RegisterPage() {
 
           <div className="mt-8 text-center">
             <p className="text-[10px] text-muted-foreground/60">
-              Tryd&trade; 2026. All rights reserved.
+              Bybit&trade; 2026. All rights reserved.
             </p>
           </div>
         </div>

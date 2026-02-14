@@ -141,12 +141,12 @@ export function Header() {
         {/* Logo */}
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <span className="text-sm font-bold text-primary-foreground">
-                T
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f7a600]">
+              <span className="text-sm font-bold text-[#0a0e17]">
+                B
               </span>
             </div>
-            <span className="text-xl font-bold text-foreground">Tryd</span>
+            <span className="text-xl font-bold text-foreground">Bybit</span>
           </Link>
 
           {/* Desktop Nav */}

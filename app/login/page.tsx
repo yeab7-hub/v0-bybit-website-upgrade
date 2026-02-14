@@ -103,7 +103,7 @@ export default function LoginPage() {
                 T
               </span>
             </div>
-            <span className="text-xl font-bold text-foreground">Tryd</span>
+            <span className="text-xl font-bold text-foreground">Bybit</span>
           </Link>
 
           {!show2FA ? (
@@ -112,7 +112,7 @@ export default function LoginPage() {
                 Welcome Back
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Log in to your Tryd account to continue trading
+                Log in to your Bybit account to continue trading
               </p>
 
               {error && (
@@ -175,7 +175,7 @@ export default function LoginPage() {
                     </div>
                   </div>
                   <p className="mt-4 text-center text-sm text-muted-foreground">
-                    Scan with the Tryd mobile app to log in
+                    Scan with the Bybit mobile app to log in
                   </p>
                 </div>
               ) : (
@@ -351,7 +351,7 @@ export default function LoginPage() {
 
               <div className="mt-8 text-center">
                 <p className="text-[10px] text-muted-foreground/60">
-                  Tryd&trade; 2026. All rights reserved.
+                  Bybit&trade; 2026. All rights reserved.
                 </p>
               </div>
             </>

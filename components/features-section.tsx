@@ -55,7 +55,7 @@ export function FeaturesSection() {
             Built for Serious Traders
           </h2>
           <p className="mt-4 text-pretty text-muted-foreground">
-            Whether you are a beginner or a professional, Tryd gives you the
+            Whether you are a beginner or a professional, Bybit gives you the
             tools and infrastructure to trade with confidence.
           </p>
         </div>

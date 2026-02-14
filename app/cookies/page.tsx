@@ -40,7 +40,7 @@ export default function CookiePolicyPage() {
 
         <div className="mb-8 rounded-xl border border-primary/20 bg-primary/5 p-6">
           <p className="text-sm leading-relaxed text-muted-foreground">
-            This Cookie Policy explains how Tryd uses cookies and similar technologies to recognize you
+            This Cookie Policy explains how Bybit uses cookies and similar technologies to recognize you
             when you visit our platform. It explains what these technologies are and why we use them,
             as well as your rights to control our use of them.
           </p>

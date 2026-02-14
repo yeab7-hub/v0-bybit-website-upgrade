@@ -13,7 +13,7 @@ export default function SignUpSuccessPage() {
           Check Your Email
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {"We've sent a confirmation link to your email address. Click it to activate your Tryd account."}
+          {"We've sent a confirmation link to your email address. Click it to activate your Bybit account."}
         </p>
         <Link href="/login">
           <Button
@@ -24,7 +24,7 @@ export default function SignUpSuccessPage() {
           </Button>
         </Link>
         <p className="mt-6 text-[10px] text-muted-foreground/60">
-          Tryd&trade; 2026. All rights reserved.
+          Bybit&trade; 2026. All rights reserved.
         </p>
       </div>
     </div>

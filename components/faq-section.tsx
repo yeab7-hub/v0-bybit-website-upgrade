@@ -5,24 +5,24 @@ import { ChevronDown } from "lucide-react"
 
 const faqs = [
   {
-    question: "How do I create an account on Tryd?",
+    question: "How do I create an account on Bybit?",
     answer:
       "Creating an account is simple. Click 'Sign Up', enter your email address, create a secure password, and verify your email. You can then complete KYC verification to unlock full trading features including deposits and withdrawals.",
   },
   {
-    question: "What are the trading fees on Tryd?",
+    question: "What are the trading fees on Bybit?",
     answer:
-      "Tryd offers a competitive tiered fee structure. Spot trading starts at 0.10% maker / 0.10% taker, with discounts available based on your 30-day trading volume and TRYD token holdings. VIP tiers can enjoy fees as low as 0.02% maker / 0.04% taker.",
+      "Bybit offers a competitive tiered fee structure. Spot trading starts at 0.10% maker / 0.10% taker, with discounts available based on your 30-day trading volume and BIT token holdings. VIP tiers can enjoy fees as low as 0.02% maker / 0.04% taker.",
   },
   {
-    question: "How does Tryd keep my assets safe?",
+    question: "How does Bybit keep my assets safe?",
     answer:
       "We employ a multi-layered security approach: 95% of assets are stored in multi-signature cold wallets with HSM modules, real-time AI monitoring detects suspicious activity, and our insurance fund covers potential breaches. We also publish regular third-party proof-of-reserves audits.",
   },
   {
-    question: "What cryptocurrencies can I trade on Tryd?",
+    question: "What cryptocurrencies can I trade on Bybit?",
     answer:
-      "Tryd supports 500+ trading pairs across major cryptocurrencies like Bitcoin, Ethereum, and Solana, as well as emerging altcoins. We regularly add new listings based on community interest and thorough security reviews.",
+      "Bybit supports 500+ trading pairs across major cryptocurrencies like Bitcoin, Ethereum, and Solana, as well as emerging altcoins. We regularly add new listings based on community interest and thorough security reviews.",
   },
   {
     question: "How do deposits and withdrawals work?",
@@ -35,9 +35,9 @@ const faqs = [
       "KYC (Know Your Customer) is an identity verification process required by financial regulations. It helps prevent fraud, money laundering, and protects all users. Verification typically takes under 5 minutes with a government-issued ID and a selfie.",
   },
   {
-    question: "Does Tryd offer leverage trading?",
+    question: "Does Bybit offer leverage trading?",
     answer:
-      "Yes, Tryd offers leverage up to 100x on perpetual and quarterly futures contracts. We support both USDT-margined and coin-margined contracts with cross and isolated margin modes. Risk management tools including stop-loss, take-profit, and trailing stops are available.",
+      "Yes, Bybit offers leverage up to 100x on perpetual and quarterly futures contracts. We support both USDT-margined and coin-margined contracts with cross and isolated margin modes. Risk management tools including stop-loss, take-profit, and trailing stops are available.",
   },
   {
     question: "How does copy trading work?",
@@ -60,7 +60,7 @@ export function FAQSection() {
             Frequently Asked Questions
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Everything you need to know about trading on Tryd.
+            Everything you need to know about trading on Bybit.
           </p>
         </div>
 

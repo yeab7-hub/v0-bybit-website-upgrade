@@ -14,7 +14,7 @@ export function AppDownloadSection() {
               Trade Anywhere
             </span>
             <h2 className="mt-3 text-balance text-3xl font-bold text-foreground md:text-4xl">
-              Download the Tryd App
+              Download the Bybit App
             </h2>
             <p className="mt-4 max-w-lg leading-relaxed text-muted-foreground">
               Access your portfolio, execute trades, and manage your assets from
@@ -97,7 +97,7 @@ export function AppDownloadSection() {
                       T
                     </div>
                     <span className="text-xs font-bold text-foreground">
-                      Tryd
+                      Bybit
                     </span>
                   </div>
 

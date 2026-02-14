@@ -21,7 +21,7 @@ const values = [
 ]
 
 const timeline = [
-  { year: "2023", title: "Founded", desc: "Tryd was founded with a mission to make crypto trading accessible to everyone." },
+  { year: "2023", title: "Founded", desc: "Bybit was founded with a mission to make crypto trading accessible to everyone." },
   { year: "2024", title: "Global Expansion", desc: "Expanded to 100+ countries, launched derivatives trading, and reached 1M users." },
   { year: "2025", title: "Institutional Grade", desc: "Launched OTC desk, institutional custody, and crossed $1B daily trading volume." },
   { year: "2026", title: "Next Generation", desc: "Introduced AI-powered trading tools, copy trading, and advanced financial products." },
@@ -37,7 +37,7 @@ export default function AboutPage() {
           <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6 lg:py-24">
             <div className="mx-auto max-w-3xl text-center">
               <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground lg:text-5xl">
-                About Tryd
+                About Bybit
               </h1>
               <p className="mt-4 text-pretty text-lg text-muted-foreground">
                 We are building the most trusted and advanced cryptocurrency exchange

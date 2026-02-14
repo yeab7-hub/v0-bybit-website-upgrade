@@ -12,7 +12,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Tryd - Crypto Exchange & Trading Platform",
+  title: "Bybit - Crypto Exchange & Trading Platform",
   description:
     "Trade Bitcoin, Ethereum, and 500+ cryptocurrencies on the world's leading exchange. Spot, derivatives, and copy trading with institutional-grade security.",
 }

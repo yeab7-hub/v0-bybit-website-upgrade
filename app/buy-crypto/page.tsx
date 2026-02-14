@@ -209,7 +209,7 @@ export default function BuyCryptoPage() {
         <section className="border-b border-border">
           <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6">
             <div className="mb-10 text-center">
-              <h2 className="text-3xl font-bold text-foreground">Why Buy Crypto on Tryd</h2>
+              <h2 className="text-3xl font-bold text-foreground">Why Buy Crypto on Bybit</h2>
               <p className="mt-2 text-muted-foreground">The fastest and most secure way to buy digital assets</p>
             </div>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -237,7 +237,7 @@ export default function BuyCryptoPage() {
               {[
                 { step: "01", title: "Create Account", desc: "Sign up and complete identity verification to unlock all features." },
                 { step: "02", title: "Select Payment", desc: "Choose your preferred payment method and enter the amount you want to spend." },
-                { step: "03", title: "Receive Crypto", desc: "Your purchased crypto is instantly deposited into your Tryd wallet." },
+                { step: "03", title: "Receive Crypto", desc: "Your purchased crypto is instantly deposited into your Bybit wallet." },
               ].map((s) => (
                 <div key={s.step} className="relative rounded-xl border border-border bg-card p-6">
                   <div className="mb-4 font-mono text-4xl font-bold text-primary/20">{s.step}</div>

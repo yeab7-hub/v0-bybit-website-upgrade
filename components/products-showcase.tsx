@@ -81,7 +81,7 @@ const products = [
   {
     id: "earn",
     icon: Coins,
-    title: "Tryd Earn",
+    title: "Bybit Earn",
     subtitle: "Passive income",
     description:
       "Put your assets to work with flexible and fixed savings products, liquidity mining, and dual asset investments.",

@@ -57,7 +57,7 @@ export default function TradePage() {
       {/* Trademark bar */}
       <div className="flex h-6 shrink-0 items-center justify-center border-t border-border bg-card">
         <p className="text-[10px] text-muted-foreground">
-          Tryd&trade; 2026. All rights reserved.
+          Bybit&trade; 2026. All rights reserved.
         </p>
       </div>
 

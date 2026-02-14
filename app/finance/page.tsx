@@ -53,7 +53,7 @@ const services = [
   {
     icon: Globe,
     title: "Crypto Card",
-    desc: "Spend your crypto anywhere with the Tryd Visa card. Earn cashback on every purchase and manage everything from the app.",
+    desc: "Spend your crypto anywhere with the Bybit Visa card. Earn cashback on every purchase and manage everything from the app.",
     stats: "Up to 5% cashback",
     color: "text-success bg-success/10",
     features: ["Global acceptance", "Cashback rewards", "No annual fee"],
