@@ -86,32 +86,34 @@ export function SupportChat() {
     setSending(false)
   }
 
+  const HeadphoneButton = ({ size = 56, onClick }: { size?: number; onClick: () => void }) => (
+    <button
+      onClick={onClick}
+      className="fixed bottom-6 right-6 z-50 flex items-center justify-center rounded-full bg-[#f7a600] shadow-[0_4px_24px_rgba(247,166,0,0.4)] transition-all duration-200 hover:scale-110 hover:shadow-[0_6px_32px_rgba(247,166,0,0.5)] active:scale-95"
+      style={{ width: size, height: size }}
+      aria-label="Support Chat"
+    >
+      <svg width={size * 0.43} height={size * 0.43} viewBox="0 0 24 24" fill="none" stroke="#0a0e17" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+      </svg>
+    </button>
+  )
+
   if (!user) {
-    return (
-      <button
-        onClick={() => (window.location.href = "/login?redirect=" + window.location.pathname)}
-        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-2xl transition-transform hover:scale-110"
-        aria-label="Support Chat"
-      >
-        <img src="/images/support-icon.png" alt="Support" className="h-full w-full" />
-      </button>
-    )
+    return <HeadphoneButton onClick={() => (window.location.href = "/login?redirect=" + window.location.pathname)} />
   }
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-2xl transition-transform hover:scale-110"
-        aria-label="Support Chat"
-      >
-        <img src="/images/support-icon.png" alt="Support" className="h-full w-full" />
+      <div className="fixed bottom-6 right-6 z-50">
+        <HeadphoneButton onClick={() => setOpen(true)} />
         {messages.length > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#f7a600] text-[9px] font-bold text-[#0a0e17]">
+          <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow">
             !
           </span>
         )}
-      </button>
+      </div>
     )
   }
 
@@ -119,9 +121,12 @@ export function SupportChat() {
     return (
       <button
         onClick={() => setMinimized(false)}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-[#f7a600] px-5 py-3 text-sm font-semibold text-[#0a0e17] shadow-2xl transition-transform hover:scale-105"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-full bg-[#f7a600] py-3 pl-4 pr-5 text-sm font-semibold text-[#0a0e17] shadow-[0_4px_24px_rgba(247,166,0,0.4)] transition-all duration-200 hover:scale-105 active:scale-95"
       >
-        <img src="/images/support-icon.png" alt="" className="h-6 w-6" />
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0a0e17" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+        </svg>
         Live Chat
       </button>
     )
@@ -132,7 +137,12 @@ export function SupportChat() {
       {/* Header */}
       <div className="flex items-center justify-between bg-[#f7a600] px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <img src="/images/support-icon.png" alt="" className="h-8 w-8" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0a0e17]/10">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a0e17" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+              <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+            </svg>
+          </div>
           <div>
             <p className="text-sm font-bold text-[#0a0e17]">Bybit Support</p>
             <p className="text-[10px] text-[#0a0e17]/70">We typically reply instantly</p>
@@ -152,7 +162,12 @@ export function SupportChat() {
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {!activeTicket && messages.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <img src="/images/support-icon.png" alt="" className="h-12 w-12 opacity-60" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f7a600]/15">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f7a600" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+              </svg>
+            </div>
             <p className="text-sm font-medium text-foreground">Welcome to Bybit Support</p>
             <p className="text-xs text-muted-foreground">
               Send a message to start a live chat with our support team.

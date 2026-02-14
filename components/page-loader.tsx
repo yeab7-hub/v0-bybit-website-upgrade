@@ -1,43 +1,56 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { usePathname } from "next/navigation"
 
 export function PageLoader() {
   const pathname = usePathname()
-  const [loading, setLoading] = useState(false)
+  const [visible, setVisible] = useState(false)
   const [fadeOut, setFadeOut] = useState(false)
+  const isFirst = useRef(true)
 
   useEffect(() => {
-    setLoading(true)
+    // Skip the very first mount (initial page load already rendered)
+    if (isFirst.current) {
+      isFirst.current = false
+      return
+    }
+
+    // Show overlay immediately on route change
+    setVisible(true)
     setFadeOut(false)
 
-    const fadeTimer = setTimeout(() => setFadeOut(true), 150)
-    const hideTimer = setTimeout(() => setLoading(false), 350)
+    // Hold the overlay to let the new page render underneath,
+    // then fade it out smoothly
+    const holdTimer = setTimeout(() => setFadeOut(true), 500)
+    const removeTimer = setTimeout(() => setVisible(false), 900)
 
     return () => {
-      clearTimeout(fadeTimer)
-      clearTimeout(hideTimer)
+      clearTimeout(holdTimer)
+      clearTimeout(removeTimer)
     }
   }, [pathname])
 
-  if (!loading) return null
+  if (!visible) return null
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-background transition-opacity duration-200 ${
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-[#0a0e17] transition-opacity duration-400 ease-out ${
         fadeOut ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
     >
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center gap-5">
         <img
           src="/images/bybit-logo.png"
           alt="Bybit"
-          className="h-7 animate-pulse"
-          style={{ animationDuration: "0.8s" }}
+          className="h-8"
+          style={{ animation: "logoPulse 1s ease-in-out infinite" }}
         />
-        <div className="h-0.5 w-16 overflow-hidden rounded-full bg-border">
-          <div className="h-full w-1/2 animate-[shimmer_0.6s_ease-in-out_infinite] rounded-full bg-[#f7a600]" />
+        <div className="h-[2px] w-20 overflow-hidden rounded-full bg-[#1a1f2e]">
+          <div
+            className="h-full rounded-full bg-[#f7a600]"
+            style={{ animation: "loaderSlide 0.8s ease-in-out infinite" }}
+          />
         </div>
       </div>
     </div>
