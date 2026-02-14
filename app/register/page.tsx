@@ -80,12 +80,23 @@ export default function RegisterPage() {
       return
     }
 
-    // If email confirmation is disabled, the user is logged in immediately
+    // Auto-confirm trigger runs on DB, so try signing in immediately
     if (data.session) {
       router.push("/trade")
       router.refresh()
     } else {
-      router.push("/auth/sign-up-success")
+      // Email was auto-confirmed by trigger, sign in now
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (signInError) {
+        // If auto-login fails, redirect to success page
+        router.push("/auth/sign-up-success")
+      } else {
+        router.push("/trade")
+        router.refresh()
+      }
     }
   }
 
