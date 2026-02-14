@@ -55,10 +55,24 @@ export default function LoginPage() {
     })
 
     if (authError) {
-      if (authError.message.includes("Invalid login credentials")) {
+      if (authError.message.includes("Email not confirmed")) {
+        // Auto-confirm trigger may not have fired yet, retry after a moment
+        await new Promise((r) => setTimeout(r, 1500))
+        const { error: retryError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+        if (retryError) {
+          setError("Your email is not confirmed yet. Please wait a moment and try again.")
+          setLoading(false)
+          return
+        }
+        // Retry succeeded
+        router.push("/trade")
+        router.refresh()
+        return
+      } else if (authError.message.includes("Invalid login credentials")) {
         setError("Invalid email or password. Please check your credentials or sign up for a new account.")
-      } else if (authError.message.includes("Email not confirmed")) {
-        setError("Please check your email and confirm your account before logging in.")
       } else {
         setError(authError.message)
       }
