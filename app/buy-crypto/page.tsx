@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import Link from "next/link"
@@ -9,16 +9,17 @@ import {
   ChevronDown, BadgeCheck, Globe, ArrowRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
 
-const cryptos = [
-  { symbol: "BTC", name: "Bitcoin", price: 105420 },
-  { symbol: "ETH", name: "Ethereum", price: 3280 },
-  { symbol: "SOL", name: "Solana", price: 178.5 },
-  { symbol: "USDT", name: "Tether", price: 1.0 },
-  { symbol: "XRP", name: "XRP", price: 2.45 },
-  { symbol: "ADA", name: "Cardano", price: 0.72 },
-  { symbol: "BNB", name: "BNB", price: 620 },
-  { symbol: "AVAX", name: "Avalanche", price: 38.2 },
+const defaultCryptos = [
+  { symbol: "BTC", name: "Bitcoin" },
+  { symbol: "ETH", name: "Ethereum" },
+  { symbol: "SOL", name: "Solana" },
+  { symbol: "USDT", name: "Tether" },
+  { symbol: "XRP", name: "XRP" },
+  { symbol: "ADA", name: "Cardano" },
+  { symbol: "BNB", name: "BNB" },
+  { symbol: "AVAX", name: "Avalanche" },
 ]
 
 const currencies = ["USD", "EUR", "GBP", "AED", "INR", "TRY"]
@@ -37,12 +38,21 @@ const features = [
 ]
 
 export default function BuyCryptoPage() {
+  const { crypto: livePrices } = useLivePrices(5000)
   const [fiatAmount, setFiatAmount] = useState("100")
-  const [selectedCrypto, setSelectedCrypto] = useState(cryptos[0])
+  const [selectedSymbol, setSelectedSymbol] = useState("BTC")
   const [selectedCurrency, setSelectedCurrency] = useState("USD")
   const [selectedMethod, setSelectedMethod] = useState("card")
   const [cryptoOpen, setCryptoOpen] = useState(false)
 
+  const cryptos = useMemo(() => {
+    return defaultCryptos.map((c) => {
+      const live = livePrices.find((p) => p.symbol === c.symbol)
+      return { ...c, price: c.symbol === "USDT" ? 1 : (live?.price ?? 0) }
+    })
+  }, [livePrices])
+
+  const selectedCrypto = cryptos.find((c) => c.symbol === selectedSymbol) || cryptos[0]
   const fee = selectedMethod === "card" ? 0.018 : selectedMethod === "bank" ? 0.005 : 0.012
   const fiatNum = Number(fiatAmount) || 0
   const feeAmount = fiatNum * fee
@@ -133,7 +143,7 @@ export default function BuyCryptoPage() {
                           <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-card p-1 shadow-xl">
                             {cryptos.map((c) => (
                               <button key={c.symbol}
-                                onClick={() => { setSelectedCrypto(c); setCryptoOpen(false) }}
+                                onClick={() => { setSelectedSymbol(c.symbol); setCryptoOpen(false) }}
                                 className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground">
                                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-[9px] font-bold text-foreground">{c.symbol.charAt(0)}</span>
                                 {c.symbol} <span className="ml-auto text-[10px] text-muted-foreground">{c.name}</span>
@@ -179,7 +189,7 @@ export default function BuyCryptoPage() {
                 <div className="mb-4 rounded-xl bg-secondary/30 p-4 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Price</span>
-                    <span className="font-mono text-foreground">1 {selectedCrypto.symbol} = ${selectedCrypto.price.toLocaleString()}</span>
+                    <span className="font-mono text-foreground">1 {selectedCrypto.symbol} = ${formatPrice(selectedCrypto.price)}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Fee</span>

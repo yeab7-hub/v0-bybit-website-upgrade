@@ -108,13 +108,15 @@ export function PriceChart() {
   const high24h = btcData?.high24h ?? 0
   const low24h = btcData?.low24h ?? 0
 
-  const { data: candleData } = useSWR(
+  const { data: candleData, error: candleError } = useSWR(
     `/api/candles?symbol=BTCUSDT&interval=${activeTimeframe}&limit=300`,
     fetcher,
-    { refreshInterval: activeTimeframe === "1m" ? 5000 : 15000 }
+    { refreshInterval: activeTimeframe === "1m" ? 5000 : 15000, revalidateOnFocus: true }
   )
 
   const candles: CandleData[] = candleData?.candles ?? []
+
+
 
   const toggleIndicator = (ind: Indicator) => {
     setActiveIndicators((prev) => {
@@ -552,12 +554,21 @@ export function PriceChart() {
       </div>
 
       {/* Canvas */}
-      <div ref={containerRef} className="relative flex-1">
+      <div ref={containerRef} className="relative min-h-[400px] flex-1">
         {candles.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="flex flex-col items-center gap-2">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <span className="text-xs text-muted-foreground">Loading chart data...</span>
+              {candleError ? (
+                <>
+                  <span className="text-xs text-destructive">Failed to load chart data</span>
+                  <button onClick={() => window.location.reload()} className="text-xs text-primary hover:underline">Retry</button>
+                </>
+              ) : (
+                <>
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <span className="text-xs text-muted-foreground">Loading chart data...</span>
+                </>
+              )}
             </div>
           </div>
         ) : (
