@@ -1,122 +1,103 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
+import { useEffect, useRef, useState, useCallback } from "react"
 import useSWR from "swr"
+import {
+  createChart,
+  type IChartApi,
+  type ISeriesApi,
+  type CandlestickData,
+  type HistogramData,
+  type LineData,
+  type Time,
+  CrosshairMode,
+  ColorType,
+} from "lightweight-charts"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-const timeframes = ["1m", "5m", "15m", "1H", "4H", "1D", "1W"]
-const chartTypes = ["Candles", "Line"] as const
-const indicators = ["MA", "EMA", "BOLL", "VOL", "RSI", "MACD"] as const
-type Indicator = (typeof indicators)[number]
+const timeframes = [
+  { label: "1m", value: "1m" },
+  { label: "5m", value: "5m" },
+  { label: "15m", value: "15m" },
+  { label: "1H", value: "1H" },
+  { label: "4H", value: "4H" },
+  { label: "1D", value: "1D" },
+  { label: "1W", value: "1W" },
+]
 
-interface CandleData {
-  time: number
-  open: number
-  high: number
-  low: number
-  close: number
-  volume: number
-}
+const indicatorList = ["MA", "EMA", "BOLL", "VOL"] as const
+type Indicator = (typeof indicatorList)[number]
 
-// ---- Indicator calculation helpers ----
-function calcSMA(data: number[], period: number): (number | null)[] {
-  const result: (number | null)[] = []
-  for (let i = 0; i < data.length; i++) {
-    if (i < period - 1) { result.push(null); continue }
+function calcMA(data: CandlestickData<Time>[], period: number): LineData<Time>[] {
+  const result: LineData<Time>[] = []
+  for (let i = period - 1; i < data.length; i++) {
     let sum = 0
-    for (let j = i - period + 1; j <= i; j++) sum += data[j]
-    result.push(sum / period)
+    for (let j = i - period + 1; j <= i; j++) sum += (data[j] as CandlestickData<Time>).close
+    result.push({ time: data[i].time, value: sum / period })
   }
   return result
 }
 
-function calcEMA(data: number[], period: number): (number | null)[] {
-  const result: (number | null)[] = []
-  const multiplier = 2 / (period + 1)
-  for (let i = 0; i < data.length; i++) {
-    if (i < period - 1) { result.push(null); continue }
-    if (i === period - 1) {
-      let sum = 0
-      for (let j = 0; j < period; j++) sum += data[j]
-      result.push(sum / period)
-      continue
-    }
-    const prev = result[i - 1]
-    if (prev === null) { result.push(null); continue }
-    result.push((data[i] - prev) * multiplier + prev)
-  }
-  return result
-}
-
-function calcBollinger(data: number[], period: number = 20, mult: number = 2) {
-  const middle = calcSMA(data, period)
-  const upper: (number | null)[] = []
-  const lower: (number | null)[] = []
-  for (let i = 0; i < data.length; i++) {
-    if (middle[i] === null) { upper.push(null); lower.push(null); continue }
-    let variance = 0
-    for (let j = i - period + 1; j <= i; j++) variance += (data[j] - middle[i]!) ** 2
-    const std = Math.sqrt(variance / period)
-    upper.push(middle[i]! + mult * std)
-    lower.push(middle[i]! - mult * std)
-  }
-  return { middle, upper, lower }
-}
-
-function calcRSI(data: number[], period: number = 14): (number | null)[] {
-  const result: (number | null)[] = [null]
-  const gains: number[] = []
-  const losses: number[] = []
+function calcEMA(data: CandlestickData<Time>[], period: number): LineData<Time>[] {
+  const result: LineData<Time>[] = []
+  const k = 2 / (period + 1)
+  let ema = (data[0] as CandlestickData<Time>).close
+  result.push({ time: data[0].time, value: ema })
   for (let i = 1; i < data.length; i++) {
-    const change = data[i] - data[i - 1]
-    gains.push(change > 0 ? change : 0)
-    losses.push(change < 0 ? -change : 0)
-    if (i < period) { result.push(null); continue }
-    if (i === period) {
-      const avgGain = gains.slice(0, period).reduce((a, b) => a + b, 0) / period
-      const avgLoss = losses.slice(0, period).reduce((a, b) => a + b, 0) / period
-      result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss))
-      continue
-    }
-    const prevRsi = result[i - 1]
-    if (prevRsi === null) { result.push(null); continue }
-    const prevAvgGain = (100 / (100 - prevRsi) - 1) !== Infinity ? gains[gains.length - 1] : 0
-    const avgGain = (prevAvgGain * (period - 1) + gains[gains.length - 1]) / period
-    const avgLoss = ((100 - prevRsi) !== 0 ? losses[losses.length - 1] : 0)
-    const smooth = (avgGain * (period - 1) + gains[gains.length - 1]) / period
-    const smoothLoss = (avgLoss * (period - 1) + losses[losses.length - 1]) / period
-    result.push(smoothLoss === 0 ? 100 : 100 - 100 / (1 + smooth / smoothLoss))
+    ema = (data[i] as CandlestickData<Time>).close * k + ema * (1 - k)
+    result.push({ time: data[i].time, value: ema })
   }
   return result
+}
+
+function calcBollinger(data: CandlestickData<Time>[], period = 20, mult = 2) {
+  const upper: LineData<Time>[] = []
+  const middle: LineData<Time>[] = []
+  const lower: LineData<Time>[] = []
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0
+    for (let j = i - period + 1; j <= i; j++) sum += (data[j] as CandlestickData<Time>).close
+    const avg = sum / period
+    let sqSum = 0
+    for (let j = i - period + 1; j <= i; j++) sqSum += Math.pow((data[j] as CandlestickData<Time>).close - avg, 2)
+    const std = Math.sqrt(sqSum / period)
+    middle.push({ time: data[i].time, value: avg })
+    upper.push({ time: data[i].time, value: avg + mult * std })
+    lower.push({ time: data[i].time, value: avg - mult * std })
+  }
+  return { upper, middle, lower }
 }
 
 export function PriceChart() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const chartContainerRef = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<IChartApi | null>(null)
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null)
+  const indicatorSeriesRef = useRef<ISeriesApi<"Line">[]>([])
+
   const [activeTimeframe, setActiveTimeframe] = useState("15m")
-  const [chartType, setChartType] = useState<typeof chartTypes[number]>("Candles")
   const [activeIndicators, setActiveIndicators] = useState<Set<Indicator>>(new Set(["VOL", "MA"]))
-  const [hoveredCandle, setHoveredCandle] = useState<CandleData | null>(null)
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null)
   const [showIndicatorMenu, setShowIndicatorMenu] = useState(false)
-  const { crypto } = useLivePrices(3000)
-  const btcData = crypto.find((c) => c.symbol === "BTC")
-  const currentPrice = btcData?.price ?? 0
-  const change24h = btcData?.change24h ?? 0
-  const high24h = btcData?.high24h ?? 0
-  const low24h = btcData?.low24h ?? 0
+  const [chartType, setChartType] = useState<"Candles" | "Line">("Candles")
+  const [ohlc, setOhlc] = useState<{ o: number; h: number; l: number; c: number; v: number; t: number } | null>(null)
 
   const { data: candleData, error: candleError } = useSWR(
-    `/api/candles?symbol=BTCUSDT&interval=${activeTimeframe}&limit=300`,
+    `/api/candles?symbol=BTCUSDT&interval=${activeTimeframe}&limit=500`,
     fetcher,
-    { refreshInterval: activeTimeframe === "1m" ? 5000 : 15000, revalidateOnFocus: true }
+    { refreshInterval: activeTimeframe === "1m" ? 3000 : 10000, revalidateOnFocus: true }
   )
 
-  const candles: CandleData[] = candleData?.candles ?? []
-
-
+  const candles: CandlestickData<Time>[] = (candleData?.candles ?? []).map(
+    (c: { time: number; open: number; high: number; low: number; close: number; volume: number }) => ({
+      time: c.time as Time,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume,
+    })
+  )
 
   const toggleIndicator = (ind: Indicator) => {
     setActiveIndicators((prev) => {
@@ -127,407 +108,250 @@ export function PriceChart() {
     })
   }
 
-  const drawChart = useCallback(() => {
-    const canvas = canvasRef.current
-    const container = containerRef.current
-    if (!canvas || !container || candles.length === 0) return
+  // Create chart once
+  useEffect(() => {
+    if (!chartContainerRef.current) return
 
-    const rect = container.getBoundingClientRect()
-    const dpr = window.devicePixelRatio || 1
-    canvas.width = rect.width * dpr
-    canvas.height = rect.height * dpr
-    canvas.style.width = `${rect.width}px`
-    canvas.style.height = `${rect.height}px`
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: "transparent" },
+        textColor: "#848e9c",
+        fontSize: 11,
+      },
+      grid: {
+        vertLines: { color: "rgba(42, 46, 57, 0.5)" },
+        horzLines: { color: "rgba(42, 46, 57, 0.5)" },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: "rgba(255, 255, 255, 0.2)", width: 1, style: 3, labelBackgroundColor: "#2a2e39" },
+        horzLine: { color: "rgba(255, 255, 255, 0.2)", width: 1, style: 3, labelBackgroundColor: "#2a2e39" },
+      },
+      timeScale: {
+        borderColor: "rgba(42, 46, 57, 0.8)",
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 5,
+        barSpacing: 8,
+      },
+      rightPriceScale: {
+        borderColor: "rgba(42, 46, 57, 0.8)",
+        scaleMargins: { top: 0.1, bottom: 0.25 },
+      },
+      handleScroll: { vertTouchDrag: false },
+    })
 
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
-    ctx.scale(dpr, dpr)
-    const w = rect.width
-    const h = rect.height
+    chartRef.current = chart
 
-    // Background
-    ctx.fillStyle = "hsl(220, 18%, 7%)"
-    ctx.fillRect(0, 0, w, h)
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect
+      chart.applyOptions({ width, height })
+    })
+    ro.observe(chartContainerRef.current)
 
-    const hasSubChart = activeIndicators.has("RSI") || activeIndicators.has("MACD")
-    const padding = { top: 20, right: 65, bottom: hasSubChart ? 80 : 40, left: 10 }
-    const volH = activeIndicators.has("VOL") ? 50 : 0
-    const chartH = h - padding.top - padding.bottom - volH - (hasSubChart ? 0 : 0)
-    const chartW = w - padding.left - padding.right
-
-    let minPrice = Infinity, maxPrice = -Infinity, maxVol = 0
-    for (const c of candles) {
-      if (c.low < minPrice) minPrice = c.low
-      if (c.high > maxPrice) maxPrice = c.high
-      if (c.volume > maxVol) maxVol = c.volume
+    return () => {
+      ro.disconnect()
+      chart.remove()
+      chartRef.current = null
+      candleSeriesRef.current = null
+      volumeSeriesRef.current = null
+      indicatorSeriesRef.current = []
     }
-    const pricePad = (maxPrice - minPrice) * 0.06
-    minPrice -= pricePad
-    maxPrice += pricePad
-    const totalRange = maxPrice - minPrice
+  }, [])
 
-    const candleWidth = chartW / candles.length
-    const bodyWidth = Math.max(candleWidth * 0.6, 1.5)
-    const priceToY = (p: number) => padding.top + ((maxPrice - p) / totalRange) * chartH
+  // Update data and indicators
+  const updateChart = useCallback(() => {
+    const chart = chartRef.current
+    if (!chart || candles.length === 0) return
 
-    // Grid lines
-    ctx.strokeStyle = "hsla(220, 14%, 18%, 0.4)"
-    ctx.lineWidth = 0.5
-    const gridLines = 6
-    for (let i = 0; i <= gridLines; i++) {
-      const y = padding.top + (i / gridLines) * chartH
-      ctx.beginPath()
-      ctx.moveTo(padding.left, y)
-      ctx.lineTo(w - padding.right, y)
-      ctx.stroke()
-
-      const price = maxPrice - (i / gridLines) * totalRange
-      ctx.fillStyle = "hsl(215, 12%, 40%)"
-      ctx.font = "10px monospace"
-      ctx.textAlign = "left"
-      ctx.fillText(price.toFixed(price >= 1000 ? 0 : 2), w - padding.right + 6, y + 3)
+    // Remove old series
+    if (candleSeriesRef.current) {
+      try { chart.removeSeries(candleSeriesRef.current) } catch { /* ignore */ }
+      candleSeriesRef.current = null
     }
-
-    // Time axis labels
-    ctx.fillStyle = "hsl(215, 12%, 35%)"
-    ctx.font = "9px monospace"
-    ctx.textAlign = "center"
-    const labelInterval = Math.max(Math.floor(candles.length / 8), 1)
-    for (let i = 0; i < candles.length; i += labelInterval) {
-      const x = padding.left + i * candleWidth + candleWidth / 2
-      const d = new Date(candles[i].time * 1000)
-      const label = activeTimeframe.includes("D") || activeTimeframe.includes("W")
-        ? `${d.getMonth() + 1}/${d.getDate()}`
-        : `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`
-      ctx.fillText(label, x, h - (hasSubChart ? 70 : padding.bottom - 25))
+    if (volumeSeriesRef.current) {
+      try { chart.removeSeries(volumeSeriesRef.current) } catch { /* ignore */ }
+      volumeSeriesRef.current = null
     }
+    indicatorSeriesRef.current.forEach((s) => {
+      try { chart.removeSeries(s) } catch { /* ignore */ }
+    })
+    indicatorSeriesRef.current = []
 
-    const closes = candles.map((c) => c.close)
-
-    // Draw Bollinger Bands
-    if (activeIndicators.has("BOLL")) {
-      const boll = calcBollinger(closes, 20, 2)
-      // Fill between bands
-      ctx.fillStyle = "hsla(210, 60%, 50%, 0.04)"
-      ctx.beginPath()
-      let started = false
-      for (let i = 0; i < candles.length; i++) {
-        if (boll.upper[i] === null) continue
-        const x = padding.left + i * candleWidth + candleWidth / 2
-        if (!started) { ctx.moveTo(x, priceToY(boll.upper[i]!)); started = true }
-        else ctx.lineTo(x, priceToY(boll.upper[i]!))
-      }
-      for (let i = candles.length - 1; i >= 0; i--) {
-        if (boll.lower[i] === null) continue
-        ctx.lineTo(padding.left + i * candleWidth + candleWidth / 2, priceToY(boll.lower[i]!))
-      }
-      ctx.closePath()
-      ctx.fill()
-
-      // Draw band lines
-      for (const [line, color] of [[boll.upper, "hsla(210, 60%, 60%, 0.5)"], [boll.middle, "hsla(210, 60%, 60%, 0.4)"], [boll.lower, "hsla(210, 60%, 60%, 0.5)"]] as const) {
-        ctx.strokeStyle = color
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        let s = false
-        for (let i = 0; i < candles.length; i++) {
-          if (line[i] === null) continue
-          const x = padding.left + i * candleWidth + candleWidth / 2
-          if (!s) { ctx.moveTo(x, priceToY(line[i]!)); s = true }
-          else ctx.lineTo(x, priceToY(line[i]!))
-        }
-        ctx.stroke()
-      }
-    }
-
-    // Draw MA lines
-    if (activeIndicators.has("MA")) {
-      const ma7 = calcSMA(closes, 7)
-      const ma25 = calcSMA(closes, 25)
-      const ma99 = calcSMA(closes, 99)
-      for (const [line, color] of [[ma7, "hsl(45, 90%, 60%)"], [ma25, "hsl(280, 70%, 65%)"], [ma99, "hsl(190, 80%, 55%)"]] as const) {
-        ctx.strokeStyle = color
-        ctx.lineWidth = 1.2
-        ctx.beginPath()
-        let s = false
-        for (let i = 0; i < candles.length; i++) {
-          if (line[i] === null) continue
-          const x = padding.left + i * candleWidth + candleWidth / 2
-          if (!s) { ctx.moveTo(x, priceToY(line[i]!)); s = true }
-          else ctx.lineTo(x, priceToY(line[i]!))
-        }
-        ctx.stroke()
-      }
-    }
-
-    // Draw EMA lines
-    if (activeIndicators.has("EMA")) {
-      const ema9 = calcEMA(closes, 9)
-      const ema21 = calcEMA(closes, 21)
-      for (const [line, color] of [[ema9, "hsl(30, 90%, 60%)"], [ema21, "hsl(330, 70%, 60%)"]] as const) {
-        ctx.strokeStyle = color
-        ctx.lineWidth = 1.2
-        ctx.setLineDash([4, 2])
-        ctx.beginPath()
-        let s = false
-        for (let i = 0; i < candles.length; i++) {
-          if (line[i] === null) continue
-          const x = padding.left + i * candleWidth + candleWidth / 2
-          if (!s) { ctx.moveTo(x, priceToY(line[i]!)); s = true }
-          else ctx.lineTo(x, priceToY(line[i]!))
-        }
-        ctx.stroke()
-        ctx.setLineDash([])
-      }
-    }
-
-    // Draw candles or line
+    // Candlestick series
     if (chartType === "Candles") {
-      for (let i = 0; i < candles.length; i++) {
-        const c = candles[i]
-        const x = padding.left + i * candleWidth + candleWidth / 2
-        const isGreen = c.close >= c.open
-        const color = isGreen ? "hsl(142, 72%, 50%)" : "hsl(0, 72%, 51%)"
-
-        // Wick
-        ctx.strokeStyle = color
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.moveTo(x, priceToY(c.high))
-        ctx.lineTo(x, priceToY(c.low))
-        ctx.stroke()
-
-        // Body
-        ctx.fillStyle = color
-        const oY = priceToY(c.open)
-        const cY = priceToY(c.close)
-        ctx.fillRect(x - bodyWidth / 2, Math.min(oY, cY), bodyWidth, Math.max(Math.abs(cY - oY), 1))
-      }
+      const cs = chart.addCandlestickSeries({
+        upColor: "#0ecb81",
+        downColor: "#f6465d",
+        borderUpColor: "#0ecb81",
+        borderDownColor: "#f6465d",
+        wickUpColor: "#0ecb81",
+        wickDownColor: "#f6465d",
+      })
+      cs.setData(candles)
+      candleSeriesRef.current = cs
     } else {
-      // Line chart
-      ctx.strokeStyle = "hsl(210, 80%, 60%)"
-      ctx.lineWidth = 1.5
-      ctx.beginPath()
-      for (let i = 0; i < candles.length; i++) {
-        const x = padding.left + i * candleWidth + candleWidth / 2
-        const y = priceToY(candles[i].close)
-        if (i === 0) ctx.moveTo(x, y)
-        else ctx.lineTo(x, y)
-      }
-      ctx.stroke()
-
-      // Area fill
-      const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH)
-      gradient.addColorStop(0, "hsla(210, 80%, 60%, 0.15)")
-      gradient.addColorStop(1, "hsla(210, 80%, 60%, 0)")
-      ctx.fillStyle = gradient
-      ctx.beginPath()
-      for (let i = 0; i < candles.length; i++) {
-        const x = padding.left + i * candleWidth + candleWidth / 2
-        if (i === 0) ctx.moveTo(x, priceToY(candles[i].close))
-        else ctx.lineTo(x, priceToY(candles[i].close))
-      }
-      ctx.lineTo(padding.left + (candles.length - 1) * candleWidth + candleWidth / 2, padding.top + chartH)
-      ctx.lineTo(padding.left + candleWidth / 2, padding.top + chartH)
-      ctx.closePath()
-      ctx.fill()
+      const ls = chart.addCandlestickSeries({
+        upColor: "#f7a600",
+        downColor: "#f7a600",
+        borderUpColor: "#f7a600",
+        borderDownColor: "#f7a600",
+        wickUpColor: "#f7a600",
+        wickDownColor: "#f7a600",
+      })
+      ls.setData(candles)
+      candleSeriesRef.current = ls
     }
 
-    // Volume bars
+    // Volume
     if (activeIndicators.has("VOL")) {
-      const volTop = padding.top + chartH + 5
-      for (let i = 0; i < candles.length; i++) {
-        const c = candles[i]
-        const x = padding.left + i * candleWidth + candleWidth / 2
-        const isGreen = c.close >= c.open
-        const barH = (c.volume / maxVol) * (volH - 5)
-        ctx.fillStyle = isGreen ? "hsla(142, 72%, 50%, 0.25)" : "hsla(0, 72%, 51%, 0.25)"
-        ctx.fillRect(x - bodyWidth / 2, volTop + volH - 5 - barH, bodyWidth, barH)
+      const vs = chart.addHistogramSeries({
+        priceFormat: { type: "volume" },
+        priceScaleId: "vol",
+      })
+      chart.priceScale("vol").applyOptions({
+        scaleMargins: { top: 0.82, bottom: 0 },
+      })
+      const volData: HistogramData<Time>[] = candles.map((c) => ({
+        time: c.time,
+        value: (c as unknown as { volume: number }).volume ?? 0,
+        color: c.close >= c.open ? "rgba(14, 203, 129, 0.25)" : "rgba(246, 70, 93, 0.25)",
+      }))
+      vs.setData(volData)
+      volumeSeriesRef.current = vs
+    }
+
+    // MA indicators
+    if (activeIndicators.has("MA")) {
+      const colors = ["#f7a600", "#e84393", "#00cec9"]
+      const periods = [7, 25, 99]
+      periods.forEach((p, i) => {
+        const data = calcMA(candles, p)
+        if (data.length > 0) {
+          const s = chart.addLineSeries({ color: colors[i], lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+          s.setData(data)
+          indicatorSeriesRef.current.push(s)
+        }
+      })
+    }
+
+    // EMA indicators
+    if (activeIndicators.has("EMA")) {
+      const colors = ["#74b9ff", "#fd79a8"]
+      const periods = [9, 21]
+      periods.forEach((p, i) => {
+        const data = calcEMA(candles, p)
+        if (data.length > 0) {
+          const s = chart.addLineSeries({ color: colors[i], lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+          s.setData(data)
+          indicatorSeriesRef.current.push(s)
+        }
+      })
+    }
+
+    // Bollinger Bands
+    if (activeIndicators.has("BOLL")) {
+      const { upper, middle, lower } = calcBollinger(candles)
+      if (middle.length > 0) {
+        const su = chart.addLineSeries({ color: "rgba(99, 110, 114, 0.6)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+        su.setData(upper)
+        const sm = chart.addLineSeries({ color: "#636e72", lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+        sm.setData(middle)
+        const sl = chart.addLineSeries({ color: "rgba(99, 110, 114, 0.6)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+        sl.setData(lower)
+        indicatorSeriesRef.current.push(su, sm, sl)
       }
     }
 
-    // RSI sub-chart
-    if (activeIndicators.has("RSI")) {
-      const rsi = calcRSI(closes, 14)
-      const rsiTop = h - padding.bottom
-      const rsiH = padding.bottom - 10
-
-      // RSI grid
-      ctx.strokeStyle = "hsla(220, 14%, 18%, 0.3)"
-      ctx.lineWidth = 0.5
-      for (const level of [30, 50, 70]) {
-        const y = rsiTop + (1 - level / 100) * rsiH
-        ctx.beginPath()
-        ctx.moveTo(padding.left, y)
-        ctx.lineTo(w - padding.right, y)
-        ctx.stroke()
-        ctx.fillStyle = "hsl(215, 12%, 30%)"
-        ctx.font = "8px monospace"
-        ctx.textAlign = "left"
-        ctx.fillText(String(level), w - padding.right + 6, y + 3)
+    // Crosshair move for OHLC display
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time || !candleSeriesRef.current) {
+        setOhlc(null)
+        return
       }
-
-      // RSI line
-      ctx.strokeStyle = "hsl(280, 70%, 65%)"
-      ctx.lineWidth = 1.2
-      ctx.beginPath()
-      let s = false
-      for (let i = 0; i < candles.length; i++) {
-        if (rsi[i] === null) continue
-        const x = padding.left + i * candleWidth + candleWidth / 2
-        const y = rsiTop + (1 - rsi[i]! / 100) * rsiH
-        if (!s) { ctx.moveTo(x, y); s = true }
-        else ctx.lineTo(x, y)
+      const d = param.seriesData.get(candleSeriesRef.current) as CandlestickData<Time> | undefined
+      const v = volumeSeriesRef.current ? (param.seriesData.get(volumeSeriesRef.current) as HistogramData<Time> | undefined) : undefined
+      if (d) {
+        setOhlc({ o: d.open, h: d.high, l: d.low, c: d.close, v: v?.value ?? 0, t: d.time as number })
       }
-      ctx.stroke()
-    }
+    })
 
-    // Crosshair
-    if (mousePos) {
-      ctx.strokeStyle = "hsla(215, 12%, 55%, 0.3)"
-      ctx.lineWidth = 0.5
-      ctx.setLineDash([3, 3])
-      ctx.beginPath()
-      ctx.moveTo(mousePos.x, padding.top)
-      ctx.lineTo(mousePos.x, h - 10)
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.moveTo(padding.left, mousePos.y)
-      ctx.lineTo(w - padding.right, mousePos.y)
-      ctx.stroke()
-      ctx.setLineDash([])
-
-      if (mousePos.y >= padding.top && mousePos.y <= padding.top + chartH) {
-        const price = maxPrice - ((mousePos.y - padding.top) / chartH) * totalRange
-        ctx.fillStyle = "hsl(220, 14%, 14%)"
-        ctx.fillRect(w - padding.right, mousePos.y - 10, padding.right, 20)
-        ctx.strokeStyle = "hsl(215, 12%, 30%)"
-        ctx.lineWidth = 1
-        ctx.strokeRect(w - padding.right, mousePos.y - 10, padding.right, 20)
-        ctx.fillStyle = "hsl(210, 20%, 90%)"
-        ctx.font = "10px monospace"
-        ctx.textAlign = "left"
-        ctx.fillText(price.toFixed(2), w - padding.right + 5, mousePos.y + 4)
-      }
-    }
-
-    // Current price line
-    const last = candles[candles.length - 1]
-    const lastY = priceToY(last.close)
-    const isLastGreen = last.close >= last.open
-    const priceColor = isLastGreen ? "hsl(142, 72%, 50%)" : "hsl(0, 72%, 51%)"
-    ctx.strokeStyle = priceColor
-    ctx.lineWidth = 0.5
-    ctx.setLineDash([2, 3])
-    ctx.beginPath()
-    ctx.moveTo(padding.left, lastY)
-    ctx.lineTo(w - padding.right, lastY)
-    ctx.stroke()
-    ctx.setLineDash([])
-
-    // Price label
-    ctx.fillStyle = priceColor
-    const labelW = padding.right
-    ctx.fillRect(w - labelW, lastY - 10, labelW, 20)
-    ctx.fillStyle = isLastGreen ? "hsl(0, 0%, 5%)" : "hsl(0, 0%, 100%)"
-    ctx.font = "bold 10px monospace"
-    ctx.textAlign = "left"
-    ctx.fillText(last.close.toFixed(2), w - labelW + 5, lastY + 4)
-  }, [candles, mousePos, chartType, activeIndicators, activeTimeframe])
+    chart.timeScale().fitContent()
+  }, [candles, activeIndicators, chartType])
 
   useEffect(() => {
-    drawChart()
-    const onResize = () => drawChart()
-    window.addEventListener("resize", onResize)
-    return () => window.removeEventListener("resize", onResize)
-  }, [drawChart])
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current
-    const container = containerRef.current
-    if (!canvas || !container) return
-    const rect = canvas.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    setMousePos({ x, y })
-
-    const cr = container.getBoundingClientRect()
-    const padding = { left: 10, right: 65 }
-    const chartW = cr.width - padding.left - padding.right
-    const candleWidth = chartW / candles.length
-    const idx = Math.floor((x - padding.left) / candleWidth)
-    if (idx >= 0 && idx < candles.length) setHoveredCandle(candles[idx])
-  }
+    updateChart()
+  }, [updateChart])
 
   const lastCandle = candles[candles.length - 1]
-  const displayCandle = hoveredCandle || lastCandle
-  const isGreen = displayCandle ? displayCandle.close >= displayCandle.open : change24h >= 0
+  const prevCandle = candles.length > 1 ? candles[candles.length - 2] : lastCandle
+  const isUp = lastCandle && prevCandle ? lastCandle.close >= prevCandle.close : true
+  const display = ohlc || (lastCandle ? { o: lastCandle.open, h: lastCandle.high, l: lastCandle.low, c: lastCandle.close, v: 0, t: 0 } : null)
 
   return (
     <div className="flex h-full flex-col">
-      {/* Top info bar */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-base font-bold text-foreground">BTC/USDT</span>
-            <span className={`text-xs font-semibold ${isGreen ? "text-success" : "text-destructive"}`}>
-              {change24h >= 0 ? "+" : ""}{change24h.toFixed(2)}%
-            </span>
-            {currentPrice > 0 && (
-              <span className={`font-mono text-base font-bold ${isGreen ? "text-success" : "text-destructive"}`}>
-                ${formatPrice(currentPrice)}
-              </span>
-            )}
-          </div>
-          <div className="hidden items-center gap-5 lg:flex">
-            {[
-              { label: "24h High", value: high24h ? formatPrice(high24h) : "-" },
-              { label: "24h Low", value: low24h ? formatPrice(low24h) : "-" },
-              { label: "24h Vol", value: btcData ? `${(btcData.volume / 1e9).toFixed(2)}B` : "-" },
-            ].map((s) => (
-              <div key={s.label}>
-                <div className="text-[9px] text-muted-foreground">{s.label}</div>
-                <div className="font-mono text-[11px] text-foreground">{s.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-1">
+      {/* Top bar: Timeframes, Chart type, Indicators */}
+      <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
         <div className="flex items-center gap-1">
           {/* Timeframes */}
           {timeframes.map((tf) => (
-            <button key={tf} onClick={() => setActiveTimeframe(tf)}
-              className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${activeTimeframe === tf ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
-              {tf}
+            <button
+              key={tf.value}
+              onClick={() => setActiveTimeframe(tf.value)}
+              className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                activeTimeframe === tf.value
+                  ? "bg-[#f7a600]/10 text-[#f7a600]"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tf.label}
             </button>
           ))}
-          <div className="mx-1 h-3 w-px bg-border" />
+
+          <div className="mx-1 h-4 w-px bg-border" />
+
           {/* Chart type */}
-          {chartTypes.map((ct) => (
-            <button key={ct} onClick={() => setChartType(ct)}
-              className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${chartType === ct ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-              {ct}
+          {(["Candles", "Line"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setChartType(t)}
+              className={`rounded px-2 py-1 text-[11px] font-medium ${
+                chartType === t ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t}
             </button>
           ))}
-          <div className="mx-1 h-3 w-px bg-border" />
+
+          <div className="mx-1 h-4 w-px bg-border" />
+
           {/* Indicators */}
           <div className="relative">
-            <button onClick={() => setShowIndicatorMenu(!showIndicatorMenu)}
-              className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground">
-              Indicators ({activeIndicators.size})
+            <button
+              onClick={() => setShowIndicatorMenu(!showIndicatorMenu)}
+              className="flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+            >
+              Indicators
+              {activeIndicators.size > 0 && (
+                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#f7a600] text-[8px] font-bold text-[#0a0e17]">
+                  {activeIndicators.size}
+                </span>
+              )}
             </button>
             {showIndicatorMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowIndicatorMenu(false)} />
-                <div className="absolute left-0 top-full z-50 mt-1 w-44 rounded-lg border border-border bg-card p-1 shadow-xl">
-                  {indicators.map((ind) => (
-                    <button key={ind} onClick={() => toggleIndicator(ind)}
-                      className="flex w-full items-center justify-between rounded px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">
-                      <span>{ind === "MA" ? "MA (7,25,99)" : ind === "EMA" ? "EMA (9,21)" : ind === "BOLL" ? "Bollinger Bands" : ind === "VOL" ? "Volume" : ind === "RSI" ? "RSI (14)" : "MACD"}</span>
-                      {activeIndicators.has(ind) && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                <div className="absolute left-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-card p-1 shadow-xl">
+                  {indicatorList.map((ind) => (
+                    <button
+                      key={ind}
+                      onClick={() => toggleIndicator(ind)}
+                      className="flex w-full items-center justify-between rounded px-3 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    >
+                      <span>
+                        {ind === "MA" ? "MA (7, 25, 99)" : ind === "EMA" ? "EMA (9, 21)" : ind === "BOLL" ? "Bollinger Bands" : "Volume"}
+                      </span>
+                      {activeIndicators.has(ind) && <span className="h-2 w-2 rounded-full bg-[#f7a600]" />}
                     </button>
                   ))}
                 </div>
@@ -537,45 +361,45 @@ export function PriceChart() {
         </div>
 
         {/* OHLCV display */}
-        {displayCandle && (
-          <div className="hidden items-center gap-3 md:flex">
-            {[
-              { l: "O", v: displayCandle.open.toFixed(2), c: "" },
-              { l: "H", v: displayCandle.high.toFixed(2), c: "" },
-              { l: "L", v: displayCandle.low.toFixed(2), c: "" },
-              { l: "C", v: displayCandle.close.toFixed(2), c: isGreen ? "text-success" : "text-destructive" },
-            ].map((d) => (
-              <span key={d.l} className="text-[9px] text-muted-foreground">
-                {d.l} <span className={`font-mono ${d.c || "text-foreground"}`}>{d.v}</span>
-              </span>
-            ))}
+        {display && (
+          <div className="hidden items-center gap-3 lg:flex">
+            <span className="text-[10px] text-muted-foreground">
+              O <span className="font-mono text-foreground">{display.o.toFixed(2)}</span>
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              H <span className="font-mono text-foreground">{display.h.toFixed(2)}</span>
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              L <span className="font-mono text-foreground">{display.l.toFixed(2)}</span>
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              C <span className={`font-mono ${isUp ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>{display.c.toFixed(2)}</span>
+            </span>
           </div>
         )}
       </div>
 
-      {/* Canvas */}
-      <div ref={containerRef} className="relative min-h-[400px] flex-1">
-        {candles.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
+      {/* Chart canvas */}
+      <div className="relative flex-1">
+        {candles.length === 0 && !candleError && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
             <div className="flex flex-col items-center gap-2">
-              {candleError ? (
-                <>
-                  <span className="text-xs text-destructive">Failed to load chart data</span>
-                  <button onClick={() => window.location.reload()} className="text-xs text-primary hover:underline">Retry</button>
-                </>
-              ) : (
-                <>
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                  <span className="text-xs text-muted-foreground">Loading chart data...</span>
-                </>
-              )}
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#f7a600] border-t-transparent" />
+              <span className="text-xs text-muted-foreground">Loading chart...</span>
             </div>
           </div>
-        ) : (
-          <canvas ref={canvasRef} className="absolute inset-0 cursor-crosshair"
-            onMouseMove={handleMouseMove}
-            onMouseLeave={() => { setMousePos(null); setHoveredCandle(null) }} />
         )}
+        {candleError && candles.length === 0 && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-xs text-destructive">Failed to load chart data</span>
+              <button onClick={() => window.location.reload()} className="rounded bg-secondary px-3 py-1 text-xs text-foreground hover:bg-secondary/80">
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+        <div ref={chartContainerRef} className="h-full w-full" />
       </div>
     </div>
   )
