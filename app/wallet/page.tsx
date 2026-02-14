@@ -4,7 +4,7 @@ import { useState } from "react"
 import useSWR from "swr"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { DEPOSIT_ADDRESSES, type CoinDepositConfig } from "@/lib/deposit-addresses"
+import { DEPOSIT_ADDRESSES as FALLBACK_ADDRESSES, type CoinDepositConfig } from "@/lib/deposit-addresses"
 import {
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight, History,
   Copy, Check, X, AlertTriangle, Search, Eye, EyeOff,
@@ -174,6 +174,8 @@ function OverviewTab({ bals, pm, show, search, setSearch, hideSmall, setHideSmal
 
 /* ===== Deposit ===== */
 function DepositTab({ mutTx, mutBal }: any) {
+  const { data: addrData } = useSWR("/api/deposit-addresses", fetcher)
+  const DEPOSIT_ADDRESSES: CoinDepositConfig[] = addrData?.addresses ?? FALLBACK_ADDRESSES
   const [coin, setCoin] = useState("USDT")
   const [netIdx, setNetIdx] = useState(0)
   const [copied, setCopied] = useState(false)
@@ -183,7 +185,7 @@ function DepositTab({ mutTx, mutBal }: any) {
   const [done, setDone] = useState(false)
 
   const cd = DEPOSIT_ADDRESSES.find(c => c.symbol === coin) || DEPOSIT_ADDRESSES[0]
-  const net = cd.networks[netIdx] || cd.networks[0]
+  const net = cd?.networks?.[netIdx] || cd?.networks?.[0]
 
   const copy = () => { navigator.clipboard.writeText(net.address); setCopied(true); setTimeout(() => setCopied(false), 2000) }
 
