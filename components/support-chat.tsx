@@ -25,7 +25,7 @@ export function SupportChat() {
 
   // Get or find existing "live_chat" ticket
   const { data: ticketsData } = useSWR(
-    user && open ? "/api/support" : null, fetcher, { refreshInterval: 3000 }
+    user && open ? "/api/support" : null, fetcher, { refreshInterval: 4000, dedupingInterval: 2000 }
   )
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export function SupportChat() {
 
   // Get messages for active ticket
   const { data: detailData } = useSWR(
-    activeTicket ? `/api/support?ticket_id=${activeTicket}` : null, fetcher, { refreshInterval: 2000 }
+    activeTicket ? `/api/support?ticket_id=${activeTicket}` : null, fetcher, { refreshInterval: 3000, dedupingInterval: 1500 }
   )
   const messages = detailData?.messages ?? []
 
