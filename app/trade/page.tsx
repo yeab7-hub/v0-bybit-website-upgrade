@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Header } from "@/components/header"
 import { PriceChart } from "@/components/trading/price-chart"
 import { OrderBook } from "@/components/trading/order-book"
@@ -9,6 +10,8 @@ import { OpenOrders } from "@/components/trading/open-orders"
 import { PairSelector } from "@/components/trading/pair-selector"
 
 export default function TradePage() {
+  const [selectedPair, setSelectedPair] = useState("BTCUSDT")
+
   return (
     <div className="flex h-screen flex-col bg-background">
       <Header />
@@ -17,7 +20,7 @@ export default function TradePage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Pair Selector */}
         <div className="hidden w-[240px] shrink-0 border-r border-border lg:block">
-          <PairSelector />
+          <PairSelector onSelectPair={setSelectedPair} activePair={selectedPair} />
         </div>
 
         {/* Center: Chart + Bottom panels */}
@@ -26,16 +29,14 @@ export default function TradePage() {
           <div className="flex flex-1 overflow-hidden">
             {/* Chart */}
             <div className="flex-1 border-r border-border">
-              <PriceChart />
+              <PriceChart symbol={selectedPair} />
             </div>
 
-            {/* Right sidebar: Order Book + Order Form */}
+            {/* Right sidebar: Order Book + Trade History */}
             <div className="hidden w-[280px] shrink-0 flex-col md:flex lg:w-[300px]">
-              {/* Order Book */}
               <div className="h-1/2 border-b border-border">
                 <OrderBook />
               </div>
-              {/* Trade History */}
               <div className="h-1/2">
                 <TradeHistory />
               </div>
@@ -57,30 +58,19 @@ export default function TradePage() {
       {/* Trademark bar */}
       <div className="flex h-6 shrink-0 items-center justify-center border-t border-border bg-card">
         <p className="text-[10px] text-muted-foreground">
-          Bybit&trade; 2026. All rights reserved.
+          {'Bybit\u2122 2026. All rights reserved.'}
         </p>
       </div>
 
-      {/* Mobile Order Form Floating Button */}
+      {/* Mobile Trade Buttons */}
       <div className="fixed bottom-4 left-4 right-4 flex gap-2 xl:hidden">
-        <MobileTradeButton side="buy" />
-        <MobileTradeButton side="sell" />
+        <button className="flex-1 rounded-lg bg-[#0ecb81] py-3 text-sm font-semibold text-white">
+          Buy
+        </button>
+        <button className="flex-1 rounded-lg bg-[#f6465d] py-3 text-sm font-semibold text-white">
+          Sell
+        </button>
       </div>
     </div>
-  )
-}
-
-function MobileTradeButton({ side }: { side: "buy" | "sell" }) {
-  const isBuy = side === "buy"
-  return (
-    <button
-      className={`flex-1 rounded-lg py-3 text-sm font-semibold xl:hidden ${
-        isBuy
-          ? "bg-success text-success-foreground"
-          : "bg-destructive text-destructive-foreground"
-      }`}
-    >
-      {isBuy ? "Buy" : "Sell"}
-    </button>
   )
 }
