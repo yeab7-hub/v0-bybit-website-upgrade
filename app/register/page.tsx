@@ -80,9 +80,12 @@ export default function RegisterPage() {
       return
     }
 
+    // Notify admin of new signup
+    fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
+
     // Auto-confirm trigger runs on DB, so try signing in immediately
     if (data.session) {
-      router.push("/trade")
+      router.push("/dashboard")
       router.refresh()
     } else {
       // Wait for auto-confirm trigger to fire, then sign in

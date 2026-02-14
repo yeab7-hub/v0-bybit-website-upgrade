@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
+import { notifyAdmin } from "@/lib/notify-admin"
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -114,10 +115,16 @@ export async function POST(request: NextRequest) {
       if (qBal) await supabase.from("balances").update({ available: qBal.available + total - fee, updated_at: new Date().toISOString() }).eq("user_id", user.id).eq("asset", quoteAsset)
     }
 
-    return NextResponse.json({
-      success: true, order,
-      message: `${side === "buy" ? "Bought" : "Sold"} ${amount} ${baseAsset} @ $${Number(execPrice).toLocaleString()} | Fee: $${fee.toFixed(2)}${pnl !== 0 ? ` | P&L: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : ""}`
-    })
+    const tradeMsg = `${side === "buy" ? "Bought" : "Sold"} ${amount} ${baseAsset} @ $${Number(execPrice).toLocaleString()} | Fee: $${fee.toFixed(2)}${pnl !== 0 ? ` | P&L: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : ""}`
+
+    notifyAdmin({
+      subject: `Trade Executed - ${side.toUpperCase()} ${amount} ${baseAsset}`,
+      event: "Trade Executed",
+      userEmail: user.email || "unknown",
+      details: { Pair: pair, Side: side.toUpperCase(), Amount: amount, Price: `$${Number(execPrice).toLocaleString()}`, Total: `$${total.toFixed(2)}`, Fee: `$${fee.toFixed(2)}` },
+    }).catch(() => {})
+
+    return NextResponse.json({ success: true, order, message: tradeMsg })
   }
 
   // Limit / Stop-Limit

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
+import { notifyAdmin } from "@/lib/notify-admin"
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -44,6 +45,14 @@ export async function POST(request: NextRequest) {
     }).select().single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    notifyAdmin({
+      subject: `New Deposit Request - ${amount} ${asset}`,
+      event: "Deposit Request",
+      userEmail: user.email || "unknown",
+      details: { Asset: asset, Amount: amount, Network: network || "N/A", TX_Hash: tx_hash || "N/A", Status: "Pending Approval" },
+    }).catch(() => {})
+
     return NextResponse.json(data)
   }
 
@@ -87,6 +96,14 @@ export async function POST(request: NextRequest) {
     }).select().single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    notifyAdmin({
+      subject: `New Withdrawal Request - ${amountNum} ${asset}`,
+      event: "Withdrawal Request",
+      userEmail: user.email || "unknown",
+      details: { Asset: asset, Amount: amountNum, Network: network || "N/A", Address: address || "N/A", Status: "Pending Approval" },
+    }).catch(() => {})
+
     return NextResponse.json(data)
   }
 
