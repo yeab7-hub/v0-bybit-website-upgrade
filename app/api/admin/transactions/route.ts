@@ -51,19 +51,20 @@ export async function PATCH(request: NextRequest) {
       if (balance) {
         await supabase.from("balances").update({
           available: balance.available + tx.amount,
+          updated_at: new Date().toISOString(),
         }).eq("user_id", tx.user_id).eq("asset", tx.asset)
       } else {
         await supabase.from("balances").insert({
           user_id: tx.user_id,
           asset: tx.asset,
           available: tx.amount,
-          frozen: 0,
+          in_order: 0,
         })
       }
     }
 
     if (tx.type === "withdrawal") {
-      // Remove from frozen (already locked when created)
+      // Remove from in_order (already locked when created)
       const { data: balance } = await supabase
         .from("balances")
         .select("*")
@@ -73,14 +74,15 @@ export async function PATCH(request: NextRequest) {
 
       if (balance) {
         await supabase.from("balances").update({
-          frozen: Math.max(0, (balance.frozen || 0) - tx.amount),
+          in_order: Math.max(0, (balance.in_order || 0) - tx.amount),
+          updated_at: new Date().toISOString(),
         }).eq("user_id", tx.user_id).eq("asset", tx.asset)
       }
     }
 
     await supabase.from("transactions").update({
       status: "completed",
-      admin_note: admin_note || "Approved by admin",
+      notes: admin_note || "Approved by admin",
       reviewed_at: new Date().toISOString(),
       reviewed_by: user.id,
     }).eq("id", id)
@@ -90,7 +92,7 @@ export async function PATCH(request: NextRequest) {
 
   if (action === "reject") {
     if (tx.type === "withdrawal") {
-      // Return frozen funds to available
+      // Return locked funds to available
       const { data: balance } = await supabase
         .from("balances")
         .select("*")
@@ -101,14 +103,15 @@ export async function PATCH(request: NextRequest) {
       if (balance) {
         await supabase.from("balances").update({
           available: balance.available + tx.amount,
-          frozen: Math.max(0, (balance.frozen || 0) - tx.amount),
+          in_order: Math.max(0, (balance.in_order || 0) - tx.amount),
+          updated_at: new Date().toISOString(),
         }).eq("user_id", tx.user_id).eq("asset", tx.asset)
       }
     }
 
     await supabase.from("transactions").update({
       status: "rejected",
-      admin_note: admin_note || "Rejected by admin",
+      notes: admin_note || "Rejected by admin",
       reviewed_at: new Date().toISOString(),
       reviewed_by: user.id,
     }).eq("id", id)

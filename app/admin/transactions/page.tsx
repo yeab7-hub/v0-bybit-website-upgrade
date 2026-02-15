@@ -206,7 +206,7 @@ export default function AdminTransactionsPage() {
                           )}
                         </div>
                       ) : (
-                        <p className="text-center text-[10px] text-muted-foreground">{t.admin_note || "-"}</p>
+                        <p className="text-center text-[10px] text-muted-foreground">{t.notes || "-"}</p>
                       )}
                     </td>
                   </tr>

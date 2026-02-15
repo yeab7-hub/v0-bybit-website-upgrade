@@ -5,7 +5,6 @@ import { Header } from "@/components/header"
 import { PriceChart } from "@/components/trading/price-chart"
 import { OrderBook } from "@/components/trading/order-book"
 import { OrderForm } from "@/components/trading/order-form"
-import { TradeHistory } from "@/components/trading/trade-history"
 import { OpenOrders } from "@/components/trading/open-orders"
 import { PairSelector } from "@/components/trading/pair-selector"
 import { ChevronDown, X } from "lucide-react"
@@ -84,7 +83,7 @@ export default function TradePage() {
 
             {/* Order Book */}
             <div className="w-[240px] shrink-0 border-l border-border">
-              <OrderBook />
+              <OrderBook symbol={selectedPair} />
             </div>
 
             {/* Order Form (Buy / Sell) */}
@@ -109,7 +108,7 @@ export default function TradePage() {
         )}
         {mobileTab === "book" && (
           <div className="flex-1 overflow-hidden">
-            <OrderBook />
+            <OrderBook symbol={selectedPair} />
           </div>
         )}
         {mobileTab === "order" && (

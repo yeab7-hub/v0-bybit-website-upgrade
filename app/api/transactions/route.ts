@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     // Check balance
     const { data: balance } = await supabase
       .from("balances")
-      .select("available, frozen")
+      .select("available, in_order")
       .eq("user_id", user.id)
       .eq("asset", asset)
       .single()
@@ -72,12 +72,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Insufficient balance" }, { status: 400 })
     }
 
-    // Lock the funds (move from available to frozen)
+    // Lock the funds (move from available to in_order)
     const { error: lockErr } = await supabase
       .from("balances")
       .update({
         available: balance.available - amountNum,
-        frozen: (balance.frozen || 0) + amountNum,
+        in_order: (balance.in_order || 0) + amountNum,
+        updated_at: new Date().toISOString(),
       })
       .eq("user_id", user.id)
       .eq("asset", asset)
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
       network: network || null,
       amount: amountNum,
       address: address || null,
-      memo: memo || null,
+      notes: memo || null,
       status: "pending",
     }).select().single()
 
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
       asset,
       amount: amountNum,
       status: "completed",
-      admin_note: `${from_account} -> ${to_account}`,
+      notes: `${from_account} -> ${to_account}`,
     }).select().single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

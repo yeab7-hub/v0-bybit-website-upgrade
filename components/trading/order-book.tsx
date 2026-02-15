@@ -12,8 +12,10 @@ interface OrderLevel {
 function generateLevels(basePrice: number, count: number, side: "ask" | "bid"): OrderLevel[] {
   const levels: OrderLevel[] = []
   let cumTotal = 0
+  // Scale the offset based on the price magnitude
+  const spread = basePrice * 0.0002
   for (let i = 0; i < count; i++) {
-    const offset = (i + 1) * (2 + Math.random() * 8)
+    const offset = (i + 1) * (spread + Math.random() * spread * 4)
     const price = side === "ask" ? basePrice + offset : basePrice - offset
     const amount = 0.001 + Math.random() * 2.5
     cumTotal += amount
@@ -28,19 +30,33 @@ function generateLevels(basePrice: number, count: number, side: "ask" | "bid"): 
 
 type ViewMode = "both" | "bids" | "asks"
 
-export function OrderBook() {
+interface OrderBookProps {
+  symbol?: string
+}
+
+export function OrderBook({ symbol = "BTCUSDT" }: OrderBookProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("both")
+  const baseAsset = symbol.replace("USDT", "")
   const { crypto } = useLivePrices(5000)
-  const btcPrice = crypto.find((c) => c.symbol === "BTC")?.price ?? 97432.5
+  const livePrice = crypto.find((c) => c.symbol === baseAsset)?.price ?? 0
 
   const [asks, setAsks] = useState<OrderLevel[]>([])
   const [bids, setBids] = useState<OrderLevel[]>([])
+  const [lastPrice, setLastPrice] = useState(0)
 
-  // Regenerate order book levels when btcPrice changes significantly
+  // Regenerate order book levels when symbol changes or first valid price arrives
   useEffect(() => {
-    setAsks(generateLevels(btcPrice, 15, "ask"))
-    setBids(generateLevels(btcPrice, 15, "bid"))
-  }, [btcPrice])
+    if (livePrice > 0) {
+      setAsks(generateLevels(livePrice, 15, "ask"))
+      setBids(generateLevels(livePrice, 15, "bid"))
+      setLastPrice(livePrice)
+    }
+  }, [symbol, livePrice > 0 ? Math.round(livePrice / 100) : 0]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update last price whenever live price changes
+  useEffect(() => {
+    if (livePrice > 0) setLastPrice(livePrice)
+  }, [livePrice])
 
   // Simulate order flow
   useEffect(() => {
@@ -100,7 +116,7 @@ export function OrderBook() {
 
       <div className="grid grid-cols-3 border-b border-border px-3 py-1.5">
         <span className="text-[10px] text-muted-foreground">{"Price(USDT)"}</span>
-        <span className="text-right text-[10px] text-muted-foreground">{"Amount(BTC)"}</span>
+        <span className="text-right text-[10px] text-muted-foreground">{`Amount(${baseAsset})`}</span>
         <span className="text-right text-[10px] text-muted-foreground">Total</span>
       </div>
 
@@ -121,12 +137,12 @@ export function OrderBook() {
         {/* Spread / Last price */}
         <div className="flex items-center justify-between border-y border-border bg-secondary/20 px-3 py-2">
           <span className="font-mono text-sm font-bold text-success">
-            {formatPrice(btcPrice)}
+            {lastPrice > 0 ? formatPrice(lastPrice) : "--"}
           </span>
           <span className="text-[10px] text-muted-foreground">
             {"Spread: "}
             {asks.length > 0 && bids.length > 0
-              ? ((asks[0].price - bids[0].price) / btcPrice * 100).toFixed(3)
+              ? ((asks[0].price - bids[0].price) / (lastPrice || 1) * 100).toFixed(3)
               : "0.01"}%
           </span>
         </div>
