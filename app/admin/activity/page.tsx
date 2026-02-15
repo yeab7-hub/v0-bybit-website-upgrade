@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Activity, ChevronLeft, ChevronRight, Filter } from "lucide-react"
-import { AdminSidebar } from "@/components/admin/sidebar"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
@@ -62,18 +61,15 @@ export default function AdminActivityPage() {
   const totalPages = Math.ceil(total / pageSize)
 
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
+    <div>
+      <div className="border-b border-border bg-card/50 px-4 py-5 lg:px-8">
+        <h1 className="text-xl font-bold text-foreground">Activity Logs</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Audit trail of all admin actions on the platform
+        </p>
+      </div>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="border-b border-border bg-card/50 px-8 py-5">
-          <h1 className="text-xl font-bold text-foreground">Activity Logs</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Audit trail of all admin actions on the platform
-          </p>
-        </div>
-
-        <div className="px-8 py-6">
+      <div className="px-4 py-6 lg:px-8">
           {/* Filter */}
           <div className="mb-6 flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
@@ -193,8 +189,7 @@ export default function AdminActivityPage() {
               </div>
             )}
           </div>
-        </div>
-      </main>
+      </div>
     </div>
   )
 }

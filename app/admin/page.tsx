@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import {
   Users,
-  Shield,
   Activity,
   TrendingUp,
   UserCheck,
@@ -12,7 +10,6 @@ import {
   Clock,
   AlertTriangle,
 } from "lucide-react"
-import { AdminSidebar } from "@/components/admin/sidebar"
 import { createClient } from "@/lib/supabase/client"
 
 interface Stats {
@@ -25,8 +22,6 @@ interface Stats {
 }
 
 export default function AdminOverview() {
-  const router = useRouter()
-  const [authorized, setAuthorized] = useState(false)
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     pendingKYC: 0,
@@ -41,15 +36,6 @@ export default function AdminOverview() {
 
   useEffect(() => {
     const supabase = createClient()
-
-    const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push("/login?redirect=/admin"); return }
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-      if (profile?.role !== "admin") { router.push("/"); return }
-      setAuthorized(true)
-    }
-    checkAdmin()
 
     const fetchStats = async () => {
       const { count: totalUsers } = await supabase
@@ -176,32 +162,18 @@ export default function AdminOverview() {
     }
   }
 
-  if (!authorized) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Verifying access...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
+    <div>
+      <div className="border-b border-border bg-card/50 px-4 py-5 lg:px-8">
+        <h1 className="text-xl font-bold text-foreground">
+          Admin Overview
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Platform statistics and recent activity
+        </p>
+      </div>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="border-b border-border bg-card/50 px-8 py-5">
-          <h1 className="text-xl font-bold text-foreground">
-            Admin Overview
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Platform statistics and recent activity
-          </p>
-        </div>
-
-        <div className="px-8 py-6">
+      <div className="px-4 py-6 lg:px-8">
           {/* Stats grid */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
             {statCards.map((card) => (
@@ -302,7 +274,6 @@ export default function AdminOverview() {
             </div>
           </div>
         </div>
-      </main>
     </div>
   )
 }

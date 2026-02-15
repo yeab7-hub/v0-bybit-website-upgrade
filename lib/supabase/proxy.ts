@@ -41,20 +41,26 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    // Protected routes - redirect to login if not authenticated
-    const protectedPaths = ['/wallet', '/kyc', '/admin', '/support', '/dashboard']
-    const isProtected = protectedPaths.some((path) =>
-      request.nextUrl.pathname.startsWith(path),
-    )
+    const pathname = request.nextUrl.pathname
 
-    if (isProtected && !user) {
+    // Admin routes -- redirect to admin login if not authenticated
+    const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login'
+    if (isAdminRoute && !user) {
       const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      url.searchParams.set('redirect', request.nextUrl.pathname)
+      url.pathname = '/admin/login'
       return NextResponse.redirect(url)
     }
 
-    // Admin role check is handled client-side in admin pages
+    // User protected routes -- redirect to user login if not authenticated
+    const protectedPaths = ['/wallet', '/kyc', '/support', '/dashboard']
+    const isProtected = protectedPaths.some((path) => pathname.startsWith(path))
+    if (isProtected && !user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(url)
+    }
+
     return supabaseResponse
   } catch {
     // If Supabase connection fails, allow the request through

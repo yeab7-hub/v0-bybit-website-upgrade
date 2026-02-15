@@ -46,9 +46,13 @@ export function SupportChat() {
     endRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  const [error, setError] = useState<string | null>(null)
+
   const startChat = async () => {
     if (!user) return
+    if (!message.trim()) { setError("Please type a message"); return }
     setSending(true)
+    setError(null)
     try {
       const res = await fetch("/api/support", {
         method: "POST",
@@ -58,31 +62,48 @@ export function SupportChat() {
           subject: "Live Chat Support",
           category: "live_chat",
           priority: "high",
-          message: message || "Hi, I need help.",
+          message: message.trim(),
         }),
       })
       const data = await res.json()
-      if (data.success) {
+      if (!res.ok || data.error) {
+        setError(data.error || "Failed to start chat")
+      } else if (data.success) {
         setActiveTicket(data.ticket.id)
         setMessage("")
         globalMutate("/api/support")
       }
-    } catch { /* ignore */ }
+    } catch (e) {
+      setError("Network error - please try again")
+    }
     setSending(false)
   }
 
   const sendMessage = async () => {
     if (!message.trim() || !activeTicket) return
+    const msgText = message.trim()
     setSending(true)
+    setError(null)
+    // Optimistic: clear input immediately
+    setMessage("")
     try {
-      await fetch("/api/support", {
+      const res = await fetch("/api/support", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reply", ticket_id: activeTicket, message }),
+        body: JSON.stringify({ action: "reply", ticket_id: activeTicket, message: msgText }),
       })
-      setMessage("")
-      globalMutate(`/api/support?ticket_id=${activeTicket}`)
-    } catch { /* ignore */ }
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setError(data.error || "Failed to send message")
+        setMessage(msgText) // Restore message on error
+      } else {
+        // Revalidate messages
+        globalMutate(`/api/support?ticket_id=${activeTicket}`)
+      }
+    } catch (e) {
+      setError("Network error - please try again")
+      setMessage(msgText) // Restore message on error
+    }
     setSending(false)
   }
 
@@ -198,6 +219,9 @@ export function SupportChat() {
 
       {/* Input */}
       <div className="border-t border-border p-3">
+        {error && (
+          <div className="mb-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>
+        )}
         <div className="flex items-end gap-2">
           <textarea
             value={message}

@@ -34,13 +34,17 @@ export default function WalletPage() {
   const balArr: any[] = Array.isArray(balances) ? balances : (balances?.balances ?? [])
   const txArr: any[] = Array.isArray(transactions) ? transactions : []
   const pm: Record<string, number> = { USDT: 1 }
-  if (prices && !prices.error) Object.entries(prices).forEach(([k, v]: [string, any]) => { pm[k.replace("USDT", "")] = v?.lastPrice || 0 })
+  if (prices && !prices.error && prices.crypto) {
+    for (const c of prices.crypto) {
+      if (c.symbol && c.price) pm[c.symbol] = c.price
+    }
+  }
 
-  const totalUsd = balArr.reduce((s, b) => s + (Number(b.available) + Number(b.frozen || b.in_order || 0)) * (pm[b.asset] || 0), 0)
+  const totalUsd = balArr.reduce((s: number, b: any) => s + (Number(b.available) + Number(b.in_order || 0)) * (pm[b.asset] || 0), 0)
   const btcVal = pm["BTC"] > 0 ? totalUsd / pm["BTC"] : 0
 
-  const filteredBal = balArr.filter(b => {
-    const total = Number(b.available) + Number(b.frozen || b.in_order || 0)
+  const filteredBal = balArr.filter((b: any) => {
+    const total = Number(b.available) + Number(b.in_order || 0)
     if (hideZero && total === 0) return false
     if (hideSmall && total * (pm[b.asset] || 0) < 1) return false
     if (search && !b.asset.toLowerCase().includes(search.toLowerCase())) return false
@@ -130,7 +134,7 @@ function OverviewTab({ bals, pm, show, search, setSearch, hideSmall, setHideSmal
             <tr className="border-b border-border text-xs text-muted-foreground">
               <th className="px-4 py-3 text-left font-medium">Coin</th>
               <th className="px-4 py-3 text-right font-medium">Available</th>
-              <th className="px-4 py-3 text-right font-medium">Frozen</th>
+              <th className="px-4 py-3 text-right font-medium">In Order</th>
               <th className="px-4 py-3 text-right font-medium">USD Value</th>
               <th className="px-4 py-3 text-right font-medium">Actions</th>
             </tr>
@@ -139,7 +143,8 @@ function OverviewTab({ bals, pm, show, search, setSearch, hideSmall, setHideSmal
             {bals.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">No assets found</td></tr>
             ) : bals.map((b: any) => {
-              const total = Number(b.available) + Number(b.frozen || b.in_order || 0)
+              const inOrder = Number(b.in_order || 0)
+              const total = Number(b.available) + inOrder
               const usd = total * (pm[b.asset] || 0)
               return (
                 <tr key={b.asset} className="border-b border-border/50 transition hover:bg-secondary/20">
@@ -153,7 +158,7 @@ function OverviewTab({ bals, pm, show, search, setSearch, hideSmall, setHideSmal
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-sm text-foreground">{show ? Number(b.available).toFixed(b.asset === "USDT" ? 2 : 6) : "****"}</td>
-                  <td className="px-4 py-3 text-right font-mono text-sm text-muted-foreground">{show ? Number(b.frozen || b.in_order || 0).toFixed(b.asset === "USDT" ? 2 : 6) : "****"}</td>
+                  <td className="px-4 py-3 text-right font-mono text-sm text-muted-foreground">{show ? inOrder.toFixed(b.asset === "USDT" ? 2 : 6) : "****"}</td>
                   <td className="px-4 py-3 text-right font-mono text-sm text-muted-foreground">{show ? `$${usd.toFixed(2)}` : "****"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-1">
@@ -278,6 +283,8 @@ function DepositTab({ mutTx, mutBal }: any) {
 
 /* ===== Withdraw ===== */
 function WithdrawTab({ bals, mutTx, mutBal }: any) {
+  const { data: addrData } = useSWR("/api/deposit-addresses", fetcher)
+  const WITHDRAW_ADDRESSES: CoinDepositConfig[] = addrData?.addresses ?? FALLBACK_ADDRESSES
   const [coin, setCoin] = useState("USDT")
   const [netIdx, setNetIdx] = useState(0)
   const [address, setAddress] = useState("")
@@ -287,7 +294,7 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
   const [done, setDone] = useState(false)
   const [error, setError] = useState("")
 
-  const cd = DEPOSIT_ADDRESSES.find(c => c.symbol === coin) || DEPOSIT_ADDRESSES[0]
+  const cd = WITHDRAW_ADDRESSES.find(c => c.symbol === coin) || WITHDRAW_ADDRESSES[0]
   const net = cd.networks[netIdx] || cd.networks[0]
   const bal = bals.find((b: any) => b.asset === coin)
   const avail = Number(bal?.available || 0)
@@ -317,7 +324,7 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
       <div className="mb-4">
         <label className="mb-1.5 block text-xs text-muted-foreground">Coin</label>
         <div className="flex flex-wrap gap-2">
-          {DEPOSIT_ADDRESSES.map(c => (
+          {WITHDRAW_ADDRESSES.map(c => (
             <button key={c.symbol} onClick={() => { setCoin(c.symbol); setNetIdx(0) }}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${coin === c.symbol ? "bg-[#f7a600] text-[#0a0e17]" : "bg-secondary text-muted-foreground"}`}>{c.symbol}</button>
           ))}
@@ -492,7 +499,7 @@ function HistoryTab({ txs }: { txs: any[] }) {
                 <td className="px-4 py-3 text-right font-mono text-sm text-foreground">{t.amount}</td>
                 <td className="px-4 py-3"><div className="flex items-center gap-1.5">{statusIcon(t.status)}<span className="text-xs capitalize text-muted-foreground">{t.status}</span></div></td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString()} {new Date(t.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">{t.admin_note || "-"}</td>
+                <td className="px-4 py-3 text-xs text-muted-foreground">{t.notes || "-"}</td>
               </tr>
             ))}
           </tbody>

@@ -1,34 +1,20 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { AdminSidebar } from "@/components/admin/sidebar"
-import { createClient } from "@/lib/supabase/client"
 import useSWR, { mutate as globalMutate } from "swr"
 import { Send, Loader2, MessageCircle, User, Clock, CheckCircle2, XCircle } from "lucide-react"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 export default function AdminChatPage() {
-  const [authorized, setAuthorized] = useState(false)
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null)
   const [reply, setReply] = useState("")
   const [sending, setSending] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const supabase = createClient()
-    const check = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-      if (profile?.role === "admin") setAuthorized(true)
-    }
-    check()
-  }, [])
-
   // Fetch all support tickets
   const { data: allTickets } = useSWR(
-    authorized ? "/api/admin/chat" : null, fetcher, { refreshInterval: 3000 }
+    "/api/admin/chat", fetcher, { refreshInterval: 3000 }
   )
   const tickets = allTickets?.tickets ?? []
 
@@ -67,25 +53,15 @@ export default function AdminChatPage() {
     globalMutate(`/api/support?ticket_id=${ticketId}`)
   }
 
-  if (!authorized) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    )
-  }
-
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
-      <div className="flex flex-1 overflow-hidden">
-        {/* Ticket list */}
-        <div className="w-[320px] shrink-0 border-r border-border">
+    <div className="flex h-full overflow-hidden">
+      {/* Ticket list */}
+      <div className="w-[320px] shrink-0 border-r border-border">
           <div className="border-b border-border px-4 py-3">
             <h2 className="text-sm font-bold text-foreground">Live Chats & Tickets</h2>
             <p className="text-[10px] text-muted-foreground">{tickets.length} total</p>
           </div>
-          <div className="overflow-y-auto" style={{ height: "calc(100vh - 56px)" }}>
+          <div className="flex-1 overflow-y-auto">
             {tickets.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <MessageCircle className="mb-2 h-8 w-8 text-muted-foreground/20" />
@@ -215,7 +191,6 @@ export default function AdminChatPage() {
             </>
           )}
         </div>
-      </div>
     </div>
   )
 }
