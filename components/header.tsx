@@ -77,7 +77,7 @@ export function Header() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false)
+
 
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null
@@ -98,7 +98,7 @@ export function Header() {
               .select("role")
               .eq("id", currentUser.id)
               .single()
-            setIsAdmin(profile?.role === "admin")
+      
           }
         } catch {
           // Auth not available yet
@@ -108,7 +108,7 @@ export function Header() {
 
       const { data } = supabase.auth.onAuthStateChange((_event, session) => {
         setUser(session?.user ?? null)
-        if (!session?.user) setIsAdmin(false)
+        if (!session?.user) { /* logged out */ }
       })
       subscription = data.subscription
     } catch {
@@ -276,16 +276,7 @@ export function Header() {
                           <Settings className="h-4 w-4" />
                           Settings
                         </Link>
-                        {isAdmin && (
-                          <Link
-                            href="/admin"
-                            onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
-                          >
-                            <Shield className="h-4 w-4" />
-                            Admin Panel
-                          </Link>
-                        )}
+
                         <button
                           onClick={handleSignOut}
                           className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
