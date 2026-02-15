@@ -175,7 +175,6 @@ export default function AdminKYCPage() {
               ))
             )}
           </div>
-        </div>
       </div>
 
       {/* Detail Modal */}

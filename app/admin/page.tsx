@@ -165,15 +165,15 @@ export default function AdminOverview() {
   return (
     <div>
       <div className="border-b border-border bg-card/50 px-4 py-5 lg:px-8">
-          <h1 className="text-xl font-bold text-foreground">
-            Admin Overview
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Platform statistics and recent activity
-          </p>
-        </div>
+        <h1 className="text-xl font-bold text-foreground">
+          Admin Overview
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Platform statistics and recent activity
+        </p>
+      </div>
 
-        <div className="px-4 py-6 lg:px-8">
+      <div className="px-4 py-6 lg:px-8">
           {/* Stats grid */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
             {statCards.map((card) => (

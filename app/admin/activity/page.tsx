@@ -189,7 +189,6 @@ export default function AdminActivityPage() {
               </div>
             )}
           </div>
-        </div>
       </div>
     </div>
   )
