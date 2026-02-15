@@ -16,11 +16,31 @@ export function OpenOrders() {
   const [lastTradeCount, setLastTradeCount] = useState(0)
   const [flashTrade, setFlashTrade] = useState<string | null>(null)
 
-  const { crypto } = useLivePrices(5000)
+  const { crypto } = useLivePrices(3000)
 
   const orders = ordersData?.orders ?? []
   const trades = tradesData?.trades ?? []
   const balances = balData?.balances ?? []
+
+  // Periodically check if open limit orders should be filled
+  useEffect(() => {
+    if (orders.length === 0) return
+    const checkFills = async () => {
+      try {
+        const res = await fetch("/api/trade/fill")
+        const data = await res.json()
+        if (data.filled > 0) {
+          // Orders were filled! Refresh everything
+          globalMutate("/api/trade?type=orders")
+          globalMutate("/api/trade?type=trades")
+          globalMutate("/api/trade?type=balances")
+        }
+      } catch { /* ignore */ }
+    }
+    checkFills() // Check immediately
+    const iv = setInterval(checkFills, 8000) // Then every 8s
+    return () => clearInterval(iv)
+  }, [orders.length])
 
   // Flash new trades - switch to trades tab and highlight
   useEffect(() => {
