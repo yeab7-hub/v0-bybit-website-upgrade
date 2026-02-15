@@ -1,12 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
-import { NextResponse, type NextRequest } from "next/server"
+import { NextResponse } from "next/server"
 
 /**
  * GET /api/trade/fill
  * Checks all open limit orders and fills them if current market price crosses the limit.
- * Called by the OpenOrders component every 10s to simulate a matching engine.
+ * Called by the OpenOrders component every 8s to simulate a matching engine.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -22,14 +22,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ filled: 0 })
   }
 
-  // Get current prices
-  let prices: Record<string, number> = {}
+  // Get current prices directly from Binance (not self-calling)
+  const uniquePairs = [...new Set(openOrders.map(o => o.pair.split("/")[0]))]
+  const prices: Record<string, number> = {}
   try {
-    const res = await fetch(`${request.nextUrl.origin}/api/prices`)
-    const data = await res.json()
-    if (data.crypto) {
-      for (const c of data.crypto) {
-        prices[c.symbol] = c.price
+    const symbols = uniquePairs.map(s => `"${s}USDT"`).join(",")
+    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=[${symbols}]`, { cache: "no-store" })
+    if (res.ok) {
+      const data: { symbol: string; price: string }[] = await res.json()
+      for (const d of data) {
+        const base = d.symbol.replace("USDT", "")
+        prices[base] = parseFloat(d.price) || 0
       }
     }
   } catch {
