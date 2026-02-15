@@ -17,10 +17,14 @@ export function SupportChat() {
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
-      if (u) setUser({ id: u.id, email: u.email ?? undefined })
-    })
+    try {
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data: { user: u } }) => {
+        if (u) setUser({ id: u.id, email: u.email ?? undefined })
+      }).catch(() => {})
+    } catch {
+      // Supabase not configured
+    }
   }, [])
 
   // Get or find existing "live_chat" ticket
