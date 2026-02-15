@@ -24,16 +24,33 @@ export default function AdminLogin() {
       return
     }
 
-    // Verify admin role
+    // Verify admin role using server-side API (bypasses RLS with service role)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError("Authentication failed"); setLoading(false); return }
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (profile?.role !== "admin") {
-      await supabase.auth.signOut()
-      setError("Access denied. Admin credentials required.")
-      setLoading(false)
-      return
+    try {
+      const res = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      })
+      const result = await res.json()
+
+      if (!result.isAdmin) {
+        await supabase.auth.signOut()
+        setError(`Access denied. ${result.role ? `Your role is "${result.role}".` : ""} Admin credentials required.`)
+        setLoading(false)
+        return
+      }
+    } catch {
+      // Fallback: try direct client-side check
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+      if (profile?.role !== "admin") {
+        await supabase.auth.signOut()
+        setError("Access denied. Admin credentials required.")
+        setLoading(false)
+        return
+      }
     }
 
     router.push("/admin")

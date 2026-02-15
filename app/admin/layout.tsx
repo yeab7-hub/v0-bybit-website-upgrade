@@ -28,11 +28,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         router.push("/admin/login")
         return
       }
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-      if (profile?.role !== "admin") {
-        router.push("/admin/login")
-        return
+
+      // Use server-side API with service role key (bypasses RLS)
+      try {
+        const res = await fetch("/api/admin/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id }),
+        })
+        const result = await res.json()
+        if (!result.isAdmin) {
+          router.push("/admin/login")
+          return
+        }
+      } catch {
+        // Fallback: direct client check
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+        if (profile?.role !== "admin") {
+          router.push("/admin/login")
+          return
+        }
       }
+
       setAuthorized(true)
       setChecking(false)
     }
