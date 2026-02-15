@@ -55,8 +55,8 @@ export default function AdminChatPage() {
 
   return (
     <div className="flex h-full overflow-hidden">
-        {/* Ticket list */}
-        <div className="w-[320px] shrink-0 border-r border-border">
+      {/* Ticket list */}
+      <div className="w-[320px] shrink-0 border-r border-border">
           <div className="border-b border-border px-4 py-3">
             <h2 className="text-sm font-bold text-foreground">Live Chats & Tickets</h2>
             <p className="text-[10px] text-muted-foreground">{tickets.length} total</p>
