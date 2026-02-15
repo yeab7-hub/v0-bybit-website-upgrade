@@ -63,42 +63,56 @@ function LoginContent() {
     setLoading(true)
     setError(null)
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (authError) {
-      if (authError.message.includes("Email not confirmed")) {
-        // Auto-confirm trigger may not have fired yet, retry after a moment
-        await new Promise((r) => setTimeout(r, 1500))
-        const { error: retryError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-        if (retryError) {
-          setError("Your email is not confirmed yet. Please wait a moment and try again.")
+      if (authError) {
+        if (authError.message === "Supabase not configured") {
+          setError("Service is temporarily unavailable. Please try again later.")
           setLoading(false)
           return
         }
-        // Retry succeeded
-        router.push(redirectTo)
-        router.refresh()
+        if (authError.message.includes("Email not confirmed")) {
+          // Auto-confirm trigger may not have fired yet, retry after a moment
+          await new Promise((r) => setTimeout(r, 1500))
+          const { error: retryError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          })
+          if (retryError) {
+            setError("Your email is not confirmed yet. Please wait a moment and try again.")
+            setLoading(false)
+            return
+          }
+          // Retry succeeded
+          router.push(redirectTo)
+          router.refresh()
+          return
+        } else if (authError.message.includes("Invalid login credentials")) {
+          setError("Invalid email or password. Please check your credentials or sign up for a new account.")
+        } else {
+          setError(authError.message)
+        }
+        setLoading(false)
         return
-      } else if (authError.message.includes("Invalid login credentials")) {
-        setError("Invalid email or password. Please check your credentials or sign up for a new account.")
+      }
+
+      // Notify admin of login
+      fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
+
+      router.push(redirectTo)
+      router.refresh()
+    } catch (err: any) {
+      if (err?.message?.includes("fetch") || err?.message?.includes("network") || err?.name === "TypeError") {
+        setError("Unable to connect to authentication service. Please check that the site is properly configured.")
       } else {
-        setError(authError.message)
+        setError(err?.message || "An unexpected error occurred. Please try again.")
       }
       setLoading(false)
-      return
     }
-
-    // Notify admin of login
-    fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
-
-    router.push(redirectTo)
-    router.refresh()
   }
 
   const handleOAuthLogin = async (provider: "google" | "apple") => {

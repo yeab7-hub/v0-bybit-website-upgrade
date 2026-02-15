@@ -56,21 +56,41 @@ export default function RegisterPage() {
       return
     }
 
-    const { data, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-          `${window.location.origin}/auth/callback`,
-        data: {
-          full_name: fullName,
-          referral_code: referral || null,
+    let data
+    let authError
+
+    try {
+      const result = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+            `${window.location.origin}/auth/callback`,
+          data: {
+            full_name: fullName,
+            referral_code: referral || null,
+          },
         },
-      },
-    })
+      })
+      data = result.data
+      authError = result.error
+    } catch (err: any) {
+      if (err?.message?.includes("fetch") || err?.message?.includes("network") || err?.name === "TypeError") {
+        setError("Unable to connect to authentication service. Please check that the site is properly configured.")
+      } else {
+        setError(err?.message || "An unexpected error occurred. Please try again.")
+      }
+      setLoading(false)
+      return
+    }
 
     if (authError) {
+      if (authError.message === "Supabase not configured") {
+        setError("Service is temporarily unavailable. Please try again later.")
+        setLoading(false)
+        return
+      }
       if (authError.message.includes("already registered")) {
         setError("This email is already registered. Please log in instead.")
       } else {
