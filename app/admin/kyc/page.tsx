@@ -13,7 +13,6 @@ import {
   Clock,
   X,
 } from "lucide-react"
-import { AdminSidebar } from "@/components/admin/sidebar"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
@@ -93,18 +92,15 @@ export default function AdminKYCPage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
+    <div>
+      <div className="border-b border-border bg-card/50 px-4 py-5 lg:px-8">
+        <h1 className="text-xl font-bold text-foreground">KYC Review</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Review and approve or reject identity verification submissions
+        </p>
+      </div>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="border-b border-border bg-card/50 px-8 py-5">
-          <h1 className="text-xl font-bold text-foreground">KYC Review</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Review and approve or reject identity verification submissions
-          </p>
-        </div>
-
-        <div className="px-8 py-6">
+      <div className="px-4 py-6 lg:px-8">
           {/* Filter tabs */}
           <div className="mb-6 flex items-center gap-2">
             {["pending", "approved", "rejected", "all"].map((f) => (
@@ -180,7 +176,7 @@ export default function AdminKYCPage() {
             )}
           </div>
         </div>
-      </main>
+      </div>
 
       {/* Detail Modal */}
       {viewRecord && (

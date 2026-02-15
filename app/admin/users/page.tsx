@@ -11,7 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
-import { AdminSidebar } from "@/components/admin/sidebar"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
@@ -126,18 +125,15 @@ export default function AdminUsersPage() {
   const totalPages = Math.ceil(total / pageSize)
 
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
+    <div>
+      <div className="border-b border-border bg-card/50 px-4 py-5 lg:px-8">
+        <h1 className="text-xl font-bold text-foreground">User Management</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          View, search, and manage all platform users
+        </p>
+      </div>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="border-b border-border bg-card/50 px-8 py-5">
-          <h1 className="text-xl font-bold text-foreground">User Management</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            View, search, and manage all platform users
-          </p>
-        </div>
-
-        <div className="px-8 py-6">
+      <div className="px-4 py-6 lg:px-8">
           {/* Filters */}
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
@@ -330,7 +326,7 @@ export default function AdminUsersPage() {
             )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

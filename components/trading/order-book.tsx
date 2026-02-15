@@ -1,31 +1,12 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
 
 interface OrderLevel {
   price: number
   amount: number
   total: number
-}
-
-function generateLevels(basePrice: number, count: number, side: "ask" | "bid"): OrderLevel[] {
-  const levels: OrderLevel[] = []
-  let cumTotal = 0
-  // Scale the offset based on the price magnitude
-  const spread = basePrice * 0.0002
-  for (let i = 0; i < count; i++) {
-    const offset = (i + 1) * (spread + Math.random() * spread * 4)
-    const price = side === "ask" ? basePrice + offset : basePrice - offset
-    const amount = 0.001 + Math.random() * 2.5
-    cumTotal += amount
-    levels.push({
-      price: Math.round(price * 100) / 100,
-      amount: Math.round(amount * 10000) / 10000,
-      total: Math.round(cumTotal * 10000) / 10000,
-    })
-  }
-  return levels
 }
 
 type ViewMode = "both" | "bids" | "asks"
@@ -43,39 +24,74 @@ export function OrderBook({ symbol = "BTCUSDT" }: OrderBookProps) {
   const [asks, setAsks] = useState<OrderLevel[]>([])
   const [bids, setBids] = useState<OrderLevel[]>([])
   const [lastPrice, setLastPrice] = useState(0)
+  const [connected, setConnected] = useState(false)
+  const wsRef = useRef<WebSocket | null>(null)
 
-  // Regenerate order book levels when symbol changes or first valid price arrives
+  // Connect to Binance WebSocket for real depth data
   useEffect(() => {
-    if (livePrice > 0) {
-      setAsks(generateLevels(livePrice, 15, "ask"))
-      setBids(generateLevels(livePrice, 15, "bid"))
-      setLastPrice(livePrice)
+    if (wsRef.current) {
+      wsRef.current.close()
+      wsRef.current = null
     }
-  }, [symbol, livePrice > 0 ? Math.round(livePrice / 100) : 0]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    setAsks([])
+    setBids([])
+    setConnected(false)
+
+    const pair = symbol.toLowerCase()
+    const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${pair}@depth20@1000ms`)
+    wsRef.current = ws
+
+    ws.onopen = () => setConnected(true)
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data.asks && data.bids) {
+          // Parse asks (sellers) - lowest price first
+          let cumAsk = 0
+          const newAsks: OrderLevel[] = data.asks.slice(0, 20).map((a: [string, string]) => {
+            const amount = parseFloat(a[1])
+            cumAsk += amount
+            return {
+              price: parseFloat(a[0]),
+              amount,
+              total: cumAsk,
+            }
+          })
+
+          // Parse bids (buyers) - highest price first
+          let cumBid = 0
+          const newBids: OrderLevel[] = data.bids.slice(0, 20).map((b: [string, string]) => {
+            const amount = parseFloat(b[1])
+            cumBid += amount
+            return {
+              price: parseFloat(b[0]),
+              amount,
+              total: cumBid,
+            }
+          })
+
+          setAsks(newAsks)
+          setBids(newBids)
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+
+    ws.onclose = () => setConnected(false)
+    ws.onerror = () => setConnected(false)
+
+    return () => {
+      ws.close()
+    }
+  }, [symbol])
 
   // Update last price whenever live price changes
   useEffect(() => {
     if (livePrice > 0) setLastPrice(livePrice)
   }, [livePrice])
-
-  // Simulate order flow
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAsks((prev) =>
-        prev.map((l) => ({
-          ...l,
-          amount: Math.max(0.001, l.amount + (Math.random() - 0.5) * 0.2),
-        }))
-      )
-      setBids((prev) =>
-        prev.map((l) => ({
-          ...l,
-          amount: Math.max(0.001, l.amount + (Math.random() - 0.5) * 0.2),
-        }))
-      )
-    }, 1500)
-    return () => clearInterval(interval)
-  }, [])
 
   const maxTotal = useMemo(
     () => Math.max(...asks.map((a) => a.total), ...bids.map((b) => b.total), 1),
@@ -85,10 +101,28 @@ export function OrderBook({ symbol = "BTCUSDT" }: OrderBookProps) {
   const displayAsks = viewMode === "bids" ? [] : asks.slice(0, viewMode === "both" ? 12 : 24)
   const displayBids = viewMode === "asks" ? [] : bids.slice(0, viewMode === "both" ? 12 : 24)
 
+  // Format price based on magnitude
+  const fmtPrice = (p: number) => {
+    if (p >= 1000) return p.toFixed(2)
+    if (p >= 1) return p.toFixed(4)
+    return p.toFixed(6)
+  }
+
+  const fmtAmount = (a: number) => {
+    if (a >= 100) return a.toFixed(2)
+    if (a >= 1) return a.toFixed(4)
+    return a.toFixed(6)
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="text-xs font-semibold text-foreground">Order Book</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-foreground">Order Book</span>
+          {connected && (
+            <span className="flex h-1.5 w-1.5 rounded-full bg-success" title="Live" />
+          )}
+        </div>
         <div className="flex items-center gap-1">
           {(["both", "bids", "asks"] as ViewMode[]).map((mode) => (
             <button
@@ -126,9 +160,9 @@ export function OrderBook({ symbol = "BTCUSDT" }: OrderBookProps) {
             {displayAsks.map((level, i) => (
               <div key={`ask-${i}`} className="group relative grid cursor-pointer grid-cols-3 px-3 py-0.5 hover:bg-secondary/30">
                 <div className="pointer-events-none absolute inset-y-0 right-0 bg-destructive/10" style={{ width: `${(level.total / maxTotal) * 100}%` }} />
-                <span className="relative font-mono text-xs text-destructive">{level.price.toFixed(2)}</span>
-                <span className="relative text-right font-mono text-xs text-foreground">{level.amount.toFixed(4)}</span>
-                <span className="relative text-right font-mono text-xs text-muted-foreground">{level.total.toFixed(4)}</span>
+                <span className="relative font-mono text-xs text-destructive">{fmtPrice(level.price)}</span>
+                <span className="relative text-right font-mono text-xs text-foreground">{fmtAmount(level.amount)}</span>
+                <span className="relative text-right font-mono text-xs text-muted-foreground">{fmtAmount(level.total)}</span>
               </div>
             ))}
           </div>
@@ -143,18 +177,26 @@ export function OrderBook({ symbol = "BTCUSDT" }: OrderBookProps) {
             {"Spread: "}
             {asks.length > 0 && bids.length > 0
               ? ((asks[0].price - bids[0].price) / (lastPrice || 1) * 100).toFixed(3)
-              : "0.01"}%
+              : "0.000"}%
           </span>
         </div>
 
         {displayBids.map((level, i) => (
           <div key={`bid-${i}`} className="group relative grid cursor-pointer grid-cols-3 px-3 py-0.5 hover:bg-secondary/30">
             <div className="pointer-events-none absolute inset-y-0 right-0 bg-success/10" style={{ width: `${(level.total / maxTotal) * 100}%` }} />
-            <span className="relative font-mono text-xs text-success">{level.price.toFixed(2)}</span>
-            <span className="relative text-right font-mono text-xs text-foreground">{level.amount.toFixed(4)}</span>
-            <span className="relative text-right font-mono text-xs text-muted-foreground">{level.total.toFixed(4)}</span>
+            <span className="relative font-mono text-xs text-success">{fmtPrice(level.price)}</span>
+            <span className="relative text-right font-mono text-xs text-foreground">{fmtAmount(level.amount)}</span>
+            <span className="relative text-right font-mono text-xs text-muted-foreground">{fmtAmount(level.total)}</span>
           </div>
         ))}
+
+        {/* Loading state when no data yet */}
+        {asks.length === 0 && bids.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-[#f7a600]" />
+            <p className="mt-2 text-[10px] text-muted-foreground">Connecting to Binance...</p>
+          </div>
+        )}
       </div>
     </div>
   )

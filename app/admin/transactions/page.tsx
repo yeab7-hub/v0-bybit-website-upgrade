@@ -1,10 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState } from "react"
 import useSWR from "swr"
-import { AdminSidebar } from "@/components/admin/sidebar"
-import { createClient } from "@/lib/supabase/client"
 import {
   CheckCircle2, XCircle, Clock, ArrowDownLeft, ArrowUpRight,
   ArrowLeftRight, MessageSquare, Loader2, User, Search, X,
@@ -13,8 +10,6 @@ import {
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 export default function AdminTransactionsPage() {
-  const router = useRouter()
-  const [authorized, setAuthorized] = useState(false)
   const [filter, setFilter] = useState("pending")
   const [typeFilter, setTypeFilter] = useState("all")
   const [search, setSearch] = useState("")
@@ -23,18 +18,6 @@ export default function AdminTransactionsPage() {
   const [note, setNote] = useState("")
 
   const { data: txs, mutate } = useSWR("/api/admin/transactions", fetcher, { refreshInterval: 5000 })
-
-  useEffect(() => {
-    const supabase = createClient()
-    const check = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push("/login?redirect=/admin/transactions"); return }
-      const { data: p } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-      if (p?.role !== "admin") { router.push("/"); return }
-      setAuthorized(true)
-    }
-    check()
-  }, [router])
 
   const handleAction = async (id: string, action: "approve" | "reject") => {
     setProcessing(id)
@@ -76,23 +59,13 @@ export default function AdminTransactionsPage() {
     return <ArrowLeftRight className="h-4 w-4 text-primary" />
   }
 
-  if (!authorized) return (
-    <div className="flex h-screen items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#f7a600] border-t-transparent" />
-        <p className="text-sm text-muted-foreground">Verifying access...</p>
-      </div>
-    </div>
-  )
-
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
-      <main className="flex-1 overflow-auto p-6">
-        <div className="mb-6 flex items-center justify-between">
+    <div>
+      <div className="border-b border-border bg-card/50 px-4 py-5 lg:px-8">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
-            <p className="text-sm text-muted-foreground">Manage deposits, withdrawals, and transfers</p>
+            <h1 className="text-xl font-bold text-foreground">Transactions</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Manage deposits, withdrawals, and transfers</p>
           </div>
           {pendingCount > 0 && (
             <div className="flex items-center gap-2 rounded-lg bg-[#f7a600]/10 px-4 py-2">
@@ -101,7 +74,9 @@ export default function AdminTransactionsPage() {
             </div>
           )}
         </div>
+      </div>
 
+      <div className="px-4 py-6 lg:px-8">
         {/* Filters */}
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex gap-2">
@@ -215,7 +190,7 @@ export default function AdminTransactionsPage() {
             </table>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { AdminSidebar } from "@/components/admin/sidebar"
 import { createClient } from "@/lib/supabase/client"
 import useSWR, { mutate as globalMutate } from "swr"
 import {
@@ -83,12 +82,9 @@ export default function AdminSupportPage() {
   const inProgressCount = allTickets.filter((t: { status: string }) => t.status === "in_progress").length
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <AdminSidebar />
-
-      <main className="flex-1 overflow-hidden">
-        {/* Header bar */}
-        <div className="border-b border-border bg-card px-6 py-4">
+    <div className="flex h-full flex-col">
+      {/* Header bar */}
+      <div className="border-b border-border bg-card/50 px-4 py-4 lg:px-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-foreground">Support Tickets</h1>
@@ -107,7 +103,7 @@ export default function AdminSupportPage() {
           </div>
         </div>
 
-        <div className="flex h-[calc(100vh-73px)]">
+        <div className="flex flex-1 overflow-hidden">
           {/* Ticket list panel */}
           <div className="w-96 flex-shrink-0 border-r border-border overflow-y-auto">
             {/* Filter tabs */}
@@ -220,7 +216,7 @@ export default function AdminSupportPage() {
             )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }
