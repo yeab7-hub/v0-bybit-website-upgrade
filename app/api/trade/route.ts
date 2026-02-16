@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
 import { notifyAdmin } from "@/lib/notify-admin"
 
@@ -15,7 +15,7 @@ async function getLivePrice(baseAsset: string): Promise<number> {
   }
 }
 
-async function ensureBalance(supabase: ReturnType<Awaited<typeof createClient>>, userId: string, asset: string) {
+async function ensureBalance(supabase: any, userId: string, asset: string) {
   const { data } = await supabase.from("balances").select("*").eq("user_id", userId).eq("asset", asset).single()
   if (data) return data
   const { data: created } = await supabase
@@ -32,20 +32,21 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const adminSupabase = await createAdminClient()
   const type = request.nextUrl.searchParams.get("type") ?? "orders"
 
   if (type === "balances") {
-    const { data } = await supabase.from("balances").select("*").eq("user_id", user.id)
+    const { data } = await adminSupabase.from("balances").select("*").eq("user_id", user.id)
     return NextResponse.json({ balances: data ?? [] })
   }
 
   if (type === "trades") {
-    const { data } = await supabase.from("trades").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50)
+    const { data } = await adminSupabase.from("trades").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50)
     return NextResponse.json({ trades: data ?? [] })
   }
 
   // Open + partially_filled orders
-  const { data } = await supabase
+  const { data } = await adminSupabase
     .from("orders")
     .select("*")
     .eq("user_id", user.id)
@@ -59,6 +60,9 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  // Use admin client for DB operations to bypass RLS constraints
+  const adminSupabase = await createAdminClient()
 
   const body = await request.json()
   const { pair, side, order_type, price, stop_price, amount } = body
@@ -117,7 +121,7 @@ export async function POST(request: NextRequest) {
 
   /* Check balance */
   if (side === "buy") {
-    const bal = await ensureBalance(supabase, user.id, quoteAsset)
+    const bal = await ensureBalance(adminSupabase, user.id, quoteAsset)
     const needed = shouldFillNow ? total + fee : total + fee
     if (!bal || bal.available < needed) {
       return NextResponse.json({
@@ -125,7 +129,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
   } else {
-    const bal = await ensureBalance(supabase, user.id, baseAsset)
+    const bal = await ensureBalance(adminSupabase, user.id, baseAsset)
     if (!bal || bal.available < amount) {
       return NextResponse.json({
         error: `Insufficient ${baseAsset}. Need ${amount}, have ${(bal?.available ?? 0).toFixed(6)}`
@@ -136,7 +140,7 @@ export async function POST(request: NextRequest) {
   /* ---------- FILL NOW ---------- */
   if (shouldFillNow) {
     // Insert order as filled
-    const { data: order, error: orderErr } = await supabase.from("orders").insert({
+    const { data: order, error: orderErr } = await adminSupabase.from("orders").insert({
       user_id: user.id, pair, side, order_type,
       price: execPrice, amount, filled: amount,
       total, status: "filled"
@@ -147,7 +151,7 @@ export async function POST(request: NextRequest) {
     // Calculate P&L for sells
     let pnl = 0
     if (side === "sell") {
-      const { data: prevBuys } = await supabase
+      const { data: prevBuys } = await adminSupabase
         .from("trades")
         .select("price, amount")
         .eq("user_id", user.id)
@@ -164,7 +168,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert trade record
-    await supabase.from("trades").insert({
+    await adminSupabase.from("trades").insert({
       user_id: user.id, order_id: order.id, pair, side,
       price: execPrice, amount, total, fee, pnl
     })
@@ -172,29 +176,29 @@ export async function POST(request: NextRequest) {
     // Update balances
     if (side === "buy") {
       // Deduct quote
-      const qBal = await ensureBalance(supabase, user.id, quoteAsset)
-      await supabase.from("balances").update({
+      const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
+      await adminSupabase.from("balances").update({
         available: Math.max(0, qBal.available - total - fee),
         updated_at: new Date().toISOString()
       }).eq("user_id", user.id).eq("asset", quoteAsset)
 
       // Credit base
-      const bBal = await ensureBalance(supabase, user.id, baseAsset)
-      await supabase.from("balances").update({
+      const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
+      await adminSupabase.from("balances").update({
         available: bBal.available + amount,
         updated_at: new Date().toISOString()
       }).eq("user_id", user.id).eq("asset", baseAsset)
     } else {
       // Deduct base
-      const bBal = await ensureBalance(supabase, user.id, baseAsset)
-      await supabase.from("balances").update({
+      const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
+      await adminSupabase.from("balances").update({
         available: Math.max(0, bBal.available - amount),
         updated_at: new Date().toISOString()
       }).eq("user_id", user.id).eq("asset", baseAsset)
 
       // Credit quote
-      const qBal = await ensureBalance(supabase, user.id, quoteAsset)
-      await supabase.from("balances").update({
+      const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
+      await adminSupabase.from("balances").update({
         available: qBal.available + total - fee,
         updated_at: new Date().toISOString()
       }).eq("user_id", user.id).eq("asset", quoteAsset)
@@ -214,7 +218,7 @@ export async function POST(request: NextRequest) {
 
   /* ---------- PLACE AS OPEN (non-marketable limit / untriggered stop) ---------- */
   const lockTotal = price * amount
-  const { data: order, error } = await supabase.from("orders").insert({
+  const { data: order, error } = await adminSupabase.from("orders").insert({
     user_id: user.id, pair, side, order_type,
     price, stop_price: stop_price || null,
     amount, filled: 0, total: lockTotal, status: "open"
@@ -224,15 +228,15 @@ export async function POST(request: NextRequest) {
 
   // Lock balance
   if (side === "buy") {
-    const qBal = await ensureBalance(supabase, user.id, quoteAsset)
-    await supabase.from("balances").update({
+    const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
+    await adminSupabase.from("balances").update({
       available: Math.max(0, qBal.available - lockTotal - (lockTotal * 0.001)),
       in_order: (qBal.in_order || 0) + lockTotal + (lockTotal * 0.001),
       updated_at: new Date().toISOString()
     }).eq("user_id", user.id).eq("asset", quoteAsset)
   } else {
-    const bBal = await ensureBalance(supabase, user.id, baseAsset)
-    await supabase.from("balances").update({
+    const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
+    await adminSupabase.from("balances").update({
       available: Math.max(0, bBal.available - amount),
       in_order: (bBal.in_order || 0) + amount,
       updated_at: new Date().toISOString()
@@ -253,16 +257,17 @@ export async function DELETE(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const adminSupabase = await createAdminClient()
   const orderId = request.nextUrl.searchParams.get("id")
   if (!orderId) return NextResponse.json({ error: "Order ID required" }, { status: 400 })
 
-  const { data: order } = await supabase.from("orders").select("*").eq("id", orderId).eq("user_id", user.id).single()
+  const { data: order } = await adminSupabase.from("orders").select("*").eq("id", orderId).eq("user_id", user.id).single()
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 })
   if (order.status !== "open" && order.status !== "partially_filled") {
     return NextResponse.json({ error: "Cannot cancel this order" }, { status: 400 })
   }
 
-  await supabase.from("orders").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", orderId)
+  await adminSupabase.from("orders").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", orderId)
 
   const baseAsset = order.pair.split("/")[0]
   const quoteAsset = order.pair.split("/")[1] || "USDT"
@@ -271,15 +276,15 @@ export async function DELETE(request: NextRequest) {
   // Unlock balance
   if (order.side === "buy") {
     const locked = order.price * remaining + (order.price * remaining * 0.001)
-    const qBal = await ensureBalance(supabase, user.id, quoteAsset)
-    await supabase.from("balances").update({
+    const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
+    await adminSupabase.from("balances").update({
       available: qBal.available + locked,
       in_order: Math.max(0, (qBal.in_order || 0) - locked),
       updated_at: new Date().toISOString()
     }).eq("user_id", user.id).eq("asset", quoteAsset)
   } else {
-    const bBal = await ensureBalance(supabase, user.id, baseAsset)
-    await supabase.from("balances").update({
+    const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
+    await adminSupabase.from("balances").update({
       available: bBal.available + remaining,
       in_order: Math.max(0, (bBal.in_order || 0) - remaining),
       updated_at: new Date().toISOString()

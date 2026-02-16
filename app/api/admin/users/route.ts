@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
 export async function GET() {
@@ -6,20 +6,20 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const adminSupabase = await createAdminClient()
+
+  const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
   if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   // Fetch all users with their profiles
-  const { data: profiles, error } = await supabase
+  const { data: profiles, error } = await adminSupabase
     .from("profiles")
-    .select("id, full_name, role, kyc_status, created_at")
+    .select("id, full_name, email, role, kyc_status, created_at")
     .order("created_at", { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Get emails from auth.users via a service-role approach
-  // Since we can't query auth.users from client, we'll use the profile data
-  // and get emails from a separate admin endpoint
+  // Get emails from auth.users via service-role
   const { createClient: createServiceClient } = await import("@supabase/supabase-js")
   const serviceClient = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,7 +32,7 @@ export async function GET() {
 
   const users = (profiles || []).map(p => ({
     ...p,
-    email: emailMap[p.id] || "unknown",
+    email: emailMap[p.id] || p.email || "unknown",
   }))
 
   return NextResponse.json({ users })
@@ -43,7 +43,9 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const adminSupabase = await createAdminClient()
+
+  const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
   if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const body = await request.json()
@@ -52,8 +54,10 @@ export async function POST(request: Request) {
   // ---- Toggle Ban ----
   if (action === "toggle_ban") {
     const { userId, banned } = body
-    const newRole = banned ? "banned" : "user"
-    const { error } = await supabase.from("profiles").update({ role: newRole }).eq("id", userId)
+    const updateData: Record<string, unknown> = banned
+      ? { is_banned: true, ban_reason: body.reason || "Banned by admin" }
+      : { is_banned: false, ban_reason: null }
+    const { error } = await adminSupabase.from("profiles").update(updateData).eq("id", userId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })
   }
@@ -61,7 +65,7 @@ export async function POST(request: Request) {
   // ---- Promote / Demote Admin ----
   if (action === "set_role") {
     const { userId, role } = body
-    const { error } = await supabase.from("profiles").update({ role }).eq("id", userId)
+    const { error } = await adminSupabase.from("profiles").update({ role }).eq("id", userId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })
   }
@@ -69,7 +73,7 @@ export async function POST(request: Request) {
   // ---- Get User Balances ----
   if (action === "get_balances") {
     const { userId } = body
-    const { data, error } = await supabase
+    const { data, error } = await adminSupabase
       .from("balances")
       .select("asset, available, in_order")
       .eq("user_id", userId)
@@ -86,8 +90,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 })
     }
 
-    // Check if balance row exists
-    const { data: existing } = await supabase
+    const { data: existing } = await adminSupabase
       .from("balances")
       .select("available")
       .eq("user_id", userId)
@@ -95,11 +98,10 @@ export async function POST(request: Request) {
       .single()
 
     if (!existing) {
-      // Create balance row
       if (adjustAction === "subtract") {
         return NextResponse.json({ error: "Cannot subtract from zero balance" }, { status: 400 })
       }
-      const { error } = await supabase.from("balances").insert({
+      const { error } = await adminSupabase.from("balances").insert({
         user_id: userId,
         asset,
         available: numAmount,
@@ -121,14 +123,25 @@ export async function POST(request: Request) {
       }
     }
 
-    const { error } = await supabase
+    const { error } = await adminSupabase
       .from("balances")
-      .update({ available: newBalance })
+      .update({ available: newBalance, updated_at: new Date().toISOString() })
       .eq("user_id", userId)
       .eq("asset", asset)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, newBalance })
+  }
+
+  // ---- Update KYC Status ----
+  if (action === "update_kyc") {
+    const { userId, kycStatus } = body
+    const { error } = await adminSupabase
+      .from("profiles")
+      .update({ kyc_status: kycStatus, updated_at: new Date().toISOString() })
+      .eq("id", userId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 })

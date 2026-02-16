@@ -97,6 +97,21 @@
   background: hsl(220 14% 28%);
 }
 
+/* Prevent iOS Safari zoom on input focus — inputs must be >=16px */
+@media screen and (max-width: 768px) {
+  input, select, textarea, button {
+    font-size: 16px !important;
+  }
+  /* Fix iOS overscroll / elastic scrolling which feels jarring */
+  html, body {
+    overscroll-behavior: none;
+  }
+  /* Larger touch targets on mobile */
+  button, a, [role="button"] {
+    min-height: 44px;
+  }
+}
+
 /* Smooth transitions for interactive elements only */
 button, a, input, select, textarea {
   transition-property: background-color, border-color, color, opacity, box-shadow;

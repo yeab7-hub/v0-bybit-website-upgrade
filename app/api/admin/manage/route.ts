@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
 
 /**
@@ -11,18 +11,17 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const adminSupabase = await createAdminClient()
+  const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
   if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-  // Get all admins
-  const { data: admins } = await supabase
+  const { data: admins } = await adminSupabase
     .from("profiles")
     .select("id, email, full_name, role, created_at")
     .eq("role", "admin")
     .order("created_at", { ascending: true })
 
-  // Get all users (for promote dropdown)
-  const { data: allUsers } = await supabase
+  const { data: allUsers } = await adminSupabase
     .from("profiles")
     .select("id, email, full_name, role, created_at")
     .order("created_at", { ascending: false })
@@ -35,7 +34,8 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const adminSupabase = await createAdminClient()
+  const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
   if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const body = await request.json()
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const { email } = body
     if (!email) return NextResponse.json({ error: "Email is required" }, { status: 400 })
 
-    const { data: target, error } = await supabase
+    const { data: target, error } = await adminSupabase
       .from("profiles")
       .update({ role: "admin" })
       .eq("email", email)
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     if (!target_id) return NextResponse.json({ error: "Target ID required" }, { status: 400 })
     if (target_id === user.id) return NextResponse.json({ error: "You cannot demote yourself" }, { status: 400 })
 
-    const { error } = await supabase
+    const { error } = await adminSupabase
       .from("profiles")
       .update({ role: "user" })
       .eq("id", target_id)
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     if (authError) return NextResponse.json({ error: authError.message }, { status: 500 })
 
     // Also update in profiles table
-    await supabase.from("profiles").update({ email: new_email }).eq("id", user.id)
+    await adminSupabase.from("profiles").update({ email: new_email }).eq("id", user.id)
 
     return NextResponse.json({ success: true, message: `Email change requested. Check ${new_email} for confirmation.` })
   }

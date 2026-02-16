@@ -13,7 +13,6 @@ import {
   Clock,
   X,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
 interface KYCRecord {
@@ -37,18 +36,13 @@ export default function AdminKYCPage() {
   const [processing, setProcessing] = useState(false)
 
   const fetchRecords = useCallback(async () => {
-    const supabase = createClient()
-    let query = supabase
-      .from("kyc_documents")
-      .select("*, profiles(email, full_name)")
-      .order("created_at", { ascending: false })
-
-    if (filter !== "all") {
-      query = query.eq("status", filter)
+    try {
+      const res = await fetch(`/api/admin/kyc?filter=${filter}`)
+      const data = await res.json()
+      if (data.records) setRecords(data.records as KYCRecord[])
+    } catch (err) {
+      console.error("Failed to fetch KYC records:", err)
     }
-
-    const { data } = await query
-    if (data) setRecords(data as KYCRecord[])
   }, [filter])
 
   useEffect(() => {
@@ -61,18 +55,19 @@ export default function AdminKYCPage() {
     action: "approved" | "rejected"
   ) => {
     setProcessing(true)
-    const supabase = createClient()
-
-    await supabase
-      .from("kyc_documents")
-      .update({ status: action, reviewed_at: new Date().toISOString() })
-      .eq("id", recordId)
-
-    await supabase
-      .from("profiles")
-      .update({ kyc_status: action })
-      .eq("id", userId)
-
+    try {
+      const res = await fetch("/api/admin/kyc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ record_id: recordId, user_id: userId, action }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        console.error("KYC review failed:", data.error)
+      }
+    } catch (err) {
+      console.error("KYC review error:", err)
+    }
     setViewRecord(null)
     setProcessing(false)
     fetchRecords()
