@@ -89,10 +89,15 @@ export function OrderForm({ pair = "BTC/USDT" }: { pair?: string }) {
         globalMutate("/api/trade?type=orders")
         globalMutate("/api/trade?type=trades")
       } else {
-        setFeedback({ type: "error", msg: data.error || "Order failed" })
+        const errorMsg = data.error || "Order failed"
+        if (errorMsg.includes("market price")) {
+          setFeedback({ type: "error", msg: "Price service temporarily unavailable. Please try again in a moment." })
+        } else {
+          setFeedback({ type: "error", msg: errorMsg })
+        }
       }
     } catch {
-      setFeedback({ type: "error", msg: "Network error" })
+      setFeedback({ type: "error", msg: "Network error. Please check your connection." })
     } finally {
       setSubmitting(false)
       setTimeout(() => setFeedback(null), 5000)

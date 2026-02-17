@@ -4,15 +4,61 @@ import { notifyAdmin } from "@/lib/notify-admin"
 
 /* ---------- helpers ---------- */
 async function getLivePrice(baseAsset: string): Promise<number> {
+  const symbol = `${baseAsset}USDT`
+
+  // Try Binance first
   try {
-    const symbol = `${baseAsset}USDT`
-    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`, { cache: "no-store" })
-    if (!res.ok) return 0
-    const data = await res.json()
-    return parseFloat(data.price) || 0
-  } catch {
-    return 0
-  }
+    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const price = parseFloat(data.price)
+      if (price > 0) return price
+    }
+  } catch { /* Binance failed, try fallback */ }
+
+  // Fallback: CoinGecko
+  try {
+    const idMap: Record<string, string> = {
+      BTC: "bitcoin", ETH: "ethereum", SOL: "solana", XRP: "ripple",
+      BNB: "binancecoin", ADA: "cardano", DOGE: "dogecoin", AVAX: "avalanche-2",
+      DOT: "polkadot", LINK: "chainlink", UNI: "uniswap", MATIC: "matic-network",
+      TRX: "tron", TON: "the-open-network", SHIB: "shiba-inu",
+    }
+    const cgId = idMap[baseAsset]
+    if (cgId) {
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const price = data[cgId]?.usd
+        if (price > 0) return price
+      }
+    }
+  } catch { /* CoinGecko failed too */ }
+
+  // Last resort: fetch from our own /api/prices (internal call)
+  try {
+    const { headers } = await import("next/headers")
+    const headersList = await headers()
+    const host = headersList.get("host") || "localhost:3000"
+    const protocol = host.includes("localhost") ? "http" : "https"
+    const res = await fetch(`${protocol}://${host}/api/prices`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const coin = data.crypto?.find((c: { symbol: string }) => c.symbol === baseAsset)
+      if (coin?.price > 0) return coin.price
+    }
+  } catch { /* all failed */ }
+
+  return 0
 }
 
 async function ensureBalance(supabase: any, userId: string, asset: string) {

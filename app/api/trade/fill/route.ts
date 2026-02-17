@@ -25,12 +25,17 @@ export async function GET() {
     return NextResponse.json({ filled: 0 })
   }
 
-  // Get current prices directly from Binance
+  // Get current prices - try Binance first, then fallback to our /api/prices
   const uniquePairs = [...new Set(openOrders.map(o => o.pair.split("/")[0]))]
   const prices: Record<string, number> = {}
+
+  // Try Binance
   try {
     const symbols = uniquePairs.map(s => `"${s}USDT"`).join(",")
-    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=[${symbols}]`, { cache: "no-store" })
+    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=[${symbols}]`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    })
     if (res.ok) {
       const data: { symbol: string; price: string }[] = await res.json()
       for (const d of data) {
@@ -38,8 +43,32 @@ export async function GET() {
         prices[base] = parseFloat(d.price) || 0
       }
     }
-  } catch {
-    return NextResponse.json({ error: "Could not fetch prices" }, { status: 500 })
+  } catch { /* Binance failed */ }
+
+  // Fallback: use our own prices API
+  if (Object.keys(prices).length === 0) {
+    try {
+      const { headers } = await import("next/headers")
+      const headersList = await headers()
+      const host = headersList.get("host") || "localhost:3000"
+      const protocol = host.includes("localhost") ? "http" : "https"
+      const res = await fetch(`${protocol}://${host}/api/prices`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        for (const coin of data.crypto ?? []) {
+          if (uniquePairs.includes(coin.symbol)) {
+            prices[coin.symbol] = coin.price
+          }
+        }
+      }
+    } catch { /* all failed */ }
+  }
+
+  if (Object.keys(prices).length === 0) {
+    return NextResponse.json({ filled: 0, message: "Could not fetch prices" })
   }
 
   let filledCount = 0

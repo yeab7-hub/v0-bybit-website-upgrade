@@ -107,48 +107,40 @@ export default function KYCPage() {
     setSubmitting(true)
     setError(null)
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    try {
+      const res = await fetch("/api/kyc/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          document_type: idType,
+          document_data: {
+            first_name: firstName,
+            last_name: lastName,
+            date_of_birth: dateOfBirth,
+            country,
+            address,
+            city,
+            postal_code: postalCode,
+            id_front: idFrontName,
+            id_back: idBackName,
+            selfie: selfieName,
+          },
+        }),
+      })
 
-    if (!user) {
-      setError("You must be logged in.")
-      setSubmitting(false)
-      return
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        setError(data.error || "Failed to submit KYC documents")
+        setSubmitting(false)
+        return
+      }
+
+      setKycStatus("pending")
+    } catch {
+      setError("Network error. Please try again.")
     }
 
-    // Insert KYC document record
-    const { error: docError } = await supabase.from("kyc_documents").insert({
-      user_id: user.id,
-      document_type: idType,
-      document_data: {
-        first_name: firstName,
-        last_name: lastName,
-        date_of_birth: dateOfBirth,
-        country,
-        address,
-        city,
-        postal_code: postalCode,
-        id_front: idFrontName,
-        id_back: idBackName,
-        selfie: selfieName,
-      },
-      status: "pending",
-    })
-
-    if (docError) {
-      setError(docError.message)
-      setSubmitting(false)
-      return
-    }
-
-    // Update profile KYC status
-    await supabase
-      .from("profiles")
-      .update({ kyc_status: "pending" })
-      .eq("id", user.id)
-
-    setKycStatus("pending")
     setSubmitting(false)
   }
 
