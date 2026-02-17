@@ -9,7 +9,7 @@ async function verifyAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
     .select("role")
     .eq("id", user.id)
     .single()
-  if (!profile || profile.role !== "admin") return null
+  if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) return null
   return user
 }
 

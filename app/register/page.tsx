@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
+import { TermsModal } from "@/components/terms-modal"
 
 const passwordRequirements = [
   { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
@@ -41,6 +42,7 @@ export default function RegisterPage() {
   const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showTerms, setShowTerms] = useState(false)
 
   const supabase = createClient()
 
@@ -56,21 +58,41 @@ export default function RegisterPage() {
       return
     }
 
-    const { data, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-          `${window.location.origin}/auth/callback`,
-        data: {
-          full_name: fullName,
-          referral_code: referral || null,
+    let data
+    let authError
+
+    try {
+      const result = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+            `${window.location.origin}/auth/callback`,
+          data: {
+            full_name: fullName,
+            referral_code: referral || null,
+          },
         },
-      },
-    })
+      })
+      data = result.data
+      authError = result.error
+    } catch (err: any) {
+      if (err?.message?.includes("fetch") || err?.message?.includes("network") || err?.name === "TypeError") {
+        setError("Unable to connect to authentication service. Please check that the site is properly configured.")
+      } else {
+        setError(err?.message || "An unexpected error occurred. Please try again.")
+      }
+      setLoading(false)
+      return
+    }
 
     if (authError) {
+      if (authError.message === "Supabase not configured") {
+        setError("Service is temporarily unavailable. Please try again later.")
+        setLoading(false)
+        return
+      }
       if (authError.message.includes("already registered")) {
         setError("This email is already registered. Please log in instead.")
       } else {
@@ -345,24 +367,27 @@ export default function RegisterPage() {
             )}
 
             {/* Agreement */}
-            <label className="mb-6 flex cursor-pointer items-start gap-2">
+            <div className="mb-6 flex items-start gap-2">
               <input
                 type="checkbox"
                 checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
+                readOnly
                 className="mt-0.5 rounded border-border"
               />
               <span className="text-xs text-muted-foreground">
                 I agree to Bybit&apos;s{" "}
-                <Link href="#" className="text-primary hover:underline">
-                  Terms of Service
-                </Link>{" "}
-                and{" "}
-                <Link href="#" className="text-primary hover:underline">
-                  Privacy Policy
-                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowTerms(true)}
+                  className="text-primary hover:underline"
+                >
+                  Terms of Service & Privacy Policy
+                </button>
+                {!agreed && (
+                  <span className="ml-1 text-[10px] text-primary">(click to read & accept)</span>
+                )}
               </span>
-            </label>
+            </div>
 
             <Button
               type="submit"
@@ -452,6 +477,15 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
+
+      <TermsModal
+        open={showTerms}
+        onClose={() => setShowTerms(false)}
+        onAccept={() => {
+          setAgreed(true)
+          setShowTerms(false)
+        }}
+      />
     </div>
   )
 }

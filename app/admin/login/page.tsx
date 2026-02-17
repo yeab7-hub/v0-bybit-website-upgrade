@@ -17,9 +17,27 @@ export default function AdminLogin() {
     setError(null)
 
     const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+
+    let authError
+    try {
+      const result = await supabase.auth.signInWithPassword({ email, password })
+      authError = result.error
+    } catch (err: any) {
+      if (err?.message?.includes("fetch") || err?.message?.includes("network") || err?.name === "TypeError") {
+        setError("Unable to connect to authentication service. Please check that the site is properly configured.")
+      } else {
+        setError(err?.message || "An unexpected error occurred.")
+      }
+      setLoading(false)
+      return
+    }
+
     if (authError) {
-      setError(authError.message)
+      if (authError.message === "Supabase not configured") {
+        setError("Service is temporarily unavailable. Please try again later.")
+      } else {
+        setError(authError.message)
+      }
       setLoading(false)
       return
     }
@@ -45,7 +63,7 @@ export default function AdminLogin() {
     } catch {
       // Fallback: try direct client-side check
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-      if (profile?.role !== "admin") {
+      if (profile?.role !== "admin" && profile?.role !== "super_admin") {
         await supabase.auth.signOut()
         setError("Access denied. Admin credentials required.")
         setLoading(false)

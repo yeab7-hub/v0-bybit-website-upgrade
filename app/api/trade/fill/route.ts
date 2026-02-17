@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
 /**
@@ -11,8 +11,11 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  // Use admin client for DB operations to bypass RLS
+  const adminSupabase = await createAdminClient()
+
   // Get user's open orders
-  const { data: openOrders } = await supabase
+  const { data: openOrders } = await adminSupabase
     .from("orders")
     .select("*")
     .eq("user_id", user.id)
@@ -22,7 +25,7 @@ export async function GET() {
     return NextResponse.json({ filled: 0 })
   }
 
-  // Get current prices directly from Binance (not self-calling)
+  // Get current prices directly from Binance
   const uniquePairs = [...new Set(openOrders.map(o => o.pair.split("/")[0]))]
   const prices: Record<string, number> = {}
   try {
@@ -50,16 +53,13 @@ export async function GET() {
     const remaining = order.amount - order.filled
     if (remaining <= 0) continue
 
-    // Check if this order should fill
     let shouldFill = false
     let fillPrice = currentPrice
 
     if (order.order_type === "limit") {
-      // Buy limit fills when market drops to or below limit price
       if (order.side === "buy" && currentPrice <= order.price) shouldFill = true
-      // Sell limit fills when market rises to or above limit price
       if (order.side === "sell" && currentPrice >= order.price) shouldFill = true
-      fillPrice = order.price // Fill at the limit price (better for user)
+      fillPrice = order.price
     } else if (order.order_type === "stop_limit") {
       if (order.side === "buy" && currentPrice >= order.stop_price && currentPrice >= order.price) shouldFill = true
       if (order.side === "sell" && currentPrice <= order.stop_price && currentPrice <= order.price) shouldFill = true
@@ -71,10 +71,9 @@ export async function GET() {
     const total = fillPrice * remaining
     const fee = total * 0.001
 
-    // Calculate P&L for sells
     let pnl = 0
     if (order.side === "sell") {
-      const { data: prevBuys } = await supabase
+      const { data: prevBuys } = await adminSupabase
         .from("trades")
         .select("price, amount")
         .eq("user_id", user.id)
@@ -91,14 +90,14 @@ export async function GET() {
     }
 
     // Update order to filled
-    await supabase.from("orders").update({
+    await adminSupabase.from("orders").update({
       filled: order.amount,
       status: "filled",
       updated_at: new Date().toISOString()
     }).eq("id", order.id)
 
     // Create trade record
-    await supabase.from("trades").insert({
+    await adminSupabase.from("trades").insert({
       user_id: user.id,
       order_id: order.id,
       pair: order.pair,
@@ -112,41 +111,37 @@ export async function GET() {
 
     // Update balances
     if (order.side === "buy") {
-      // Release locked quote funds + credit base asset
-      const { data: qBal } = await supabase.from("balances").select("*").eq("user_id", user.id).eq("asset", quoteAsset).single()
+      const { data: qBal } = await adminSupabase.from("balances").select("*").eq("user_id", user.id).eq("asset", quoteAsset).single()
       if (qBal) {
         const lockedAmount = order.price * remaining + (order.price * remaining * 0.001)
-        await supabase.from("balances").update({
+        await adminSupabase.from("balances").update({
           in_order: Math.max(0, (qBal.in_order || 0) - lockedAmount),
-          // If fill price is better than limit price, return the difference
           available: qBal.available + Math.max(0, (order.price - fillPrice) * remaining),
           updated_at: new Date().toISOString()
         }).eq("user_id", user.id).eq("asset", quoteAsset)
       }
 
-      // Credit base
-      const { data: bBal } = await supabase.from("balances").select("*").eq("user_id", user.id).eq("asset", baseAsset).single()
+      const { data: bBal } = await adminSupabase.from("balances").select("*").eq("user_id", user.id).eq("asset", baseAsset).single()
       if (bBal) {
-        await supabase.from("balances").update({
+        await adminSupabase.from("balances").update({
           available: bBal.available + remaining,
           updated_at: new Date().toISOString()
         }).eq("user_id", user.id).eq("asset", baseAsset)
       } else {
-        await supabase.from("balances").insert({ user_id: user.id, asset: baseAsset, available: remaining, in_order: 0 })
+        await adminSupabase.from("balances").insert({ user_id: user.id, asset: baseAsset, available: remaining, in_order: 0 })
       }
     } else {
-      // Sell: release locked base + credit quote
-      const { data: bBal } = await supabase.from("balances").select("*").eq("user_id", user.id).eq("asset", baseAsset).single()
+      const { data: bBal } = await adminSupabase.from("balances").select("*").eq("user_id", user.id).eq("asset", baseAsset).single()
       if (bBal) {
-        await supabase.from("balances").update({
+        await adminSupabase.from("balances").update({
           in_order: Math.max(0, (bBal.in_order || 0) - remaining),
           updated_at: new Date().toISOString()
         }).eq("user_id", user.id).eq("asset", baseAsset)
       }
 
-      const { data: qBal } = await supabase.from("balances").select("*").eq("user_id", user.id).eq("asset", quoteAsset).single()
+      const { data: qBal } = await adminSupabase.from("balances").select("*").eq("user_id", user.id).eq("asset", quoteAsset).single()
       if (qBal) {
-        await supabase.from("balances").update({
+        await adminSupabase.from("balances").update({
           available: qBal.available + total - fee,
           updated_at: new Date().toISOString()
         }).eq("user_id", user.id).eq("asset", quoteAsset)

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   // Admin: all tickets
   if (isAdmin) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (profile?.role !== "admin" && profile?.role !== "super_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const { data: tickets } = await supabase.from("support_tickets").select("*, profiles(full_name, email)").order("created_at", { ascending: false })
     return NextResponse.json({ tickets: tickets ?? [] })
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   if (action === "update_status") {
     const { ticket_id, status } = body
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (profile?.role !== "admin" && profile?.role !== "super_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     await supabase.from("support_tickets").update({ status, updated_at: new Date().toISOString() }).eq("id", ticket_id)
     return NextResponse.json({ success: true })

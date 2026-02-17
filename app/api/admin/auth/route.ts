@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      isAdmin: profile.role === "admin",
+      isAdmin: profile.role === "admin" || profile.role === "super_admin",
+      isSuperAdmin: profile.role === "super_admin",
       role: profile.role,
       name: profile.full_name,
     })

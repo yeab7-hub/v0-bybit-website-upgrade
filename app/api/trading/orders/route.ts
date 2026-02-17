@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 
 export async function GET() {
@@ -6,7 +6,8 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { data: orders, error } = await supabase
+  const adminSupabase = await createAdminClient()
+  const { data: orders, error } = await adminSupabase
     .from("orders")
     .select("*")
     .eq("user_id", user.id)
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const adminSupabase = await createAdminClient()
   const body = await request.json()
   const { pair, side, order_type, price, amount, stop_price } = body
 
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
   const checkAsset = side === "buy" ? quoteAsset : baseAsset
   const requiredAmount = side === "buy" ? total : numAmount
 
-  const { data: balance } = await supabase
+  const { data: balance } = await adminSupabase
     .from("balances")
     .select("available")
     .eq("user_id", user.id)
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Deduct balance (move to in_order)
-  await supabase
+  await adminSupabase
     .from("balances")
     .update({
       available: balance.available - requiredAmount,
@@ -62,8 +64,7 @@ export async function POST(request: NextRequest) {
 
   // For market orders, execute immediately
   if (order_type === "Market") {
-    // Insert order as filled
-    const { data: order, error: orderError } = await supabase
+    const { data: order, error: orderError } = await adminSupabase
       .from("orders")
       .insert({
         user_id: user.id,
@@ -81,11 +82,9 @@ export async function POST(request: NextRequest) {
 
     if (orderError) return NextResponse.json({ error: orderError.message }, { status: 500 })
 
-    // Calculate fee (0.1%)
     const fee = total * 0.001
 
-    // Insert trade record
-    await supabase.from("trades").insert({
+    await adminSupabase.from("trades").insert({
       user_id: user.id,
       order_id: order.id,
       pair,
@@ -97,11 +96,10 @@ export async function POST(request: NextRequest) {
       pnl: 0,
     })
 
-    // Credit the asset received
     const receiveAsset = side === "buy" ? baseAsset : quoteAsset
     const receiveAmount = side === "buy" ? numAmount : (total - fee)
 
-    const { data: existingBalance } = await supabase
+    const { data: existingBalance } = await adminSupabase
       .from("balances")
       .select("*")
       .eq("user_id", user.id)
@@ -109,7 +107,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existingBalance) {
-      await supabase
+      await adminSupabase
         .from("balances")
         .update({
           available: existingBalance.available + receiveAmount,
@@ -118,7 +116,7 @@ export async function POST(request: NextRequest) {
         .eq("user_id", user.id)
         .eq("asset", receiveAsset)
     } else {
-      await supabase.from("balances").insert({
+      await adminSupabase.from("balances").insert({
         user_id: user.id,
         asset: receiveAsset,
         available: receiveAmount,
@@ -126,8 +124,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Release in_order back to 0 for the spent asset
-    const { data: spentBalance } = await supabase
+    const { data: spentBalance } = await adminSupabase
       .from("balances")
       .select("*")
       .eq("user_id", user.id)
@@ -135,7 +132,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (spentBalance) {
-      await supabase
+      await adminSupabase
         .from("balances")
         .update({
           in_order: Math.max(0, spentBalance.in_order - requiredAmount),
@@ -149,7 +146,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Limit / Stop-Limit: insert as open
-  const { data: order, error: orderError } = await supabase
+  const { data: order, error: orderError } = await adminSupabase
     .from("orders")
     .insert({
       user_id: user.id,
@@ -175,12 +172,12 @@ export async function DELETE(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const adminSupabase = await createAdminClient()
   const { searchParams } = new URL(request.url)
   const orderId = searchParams.get("id")
   if (!orderId) return NextResponse.json({ error: "Missing order id" }, { status: 400 })
 
-  // Get order
-  const { data: order } = await supabase
+  const { data: order } = await adminSupabase
     .from("orders")
     .select("*")
     .eq("id", orderId)
@@ -190,13 +187,12 @@ export async function DELETE(request: NextRequest) {
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 })
   if (order.status !== "open") return NextResponse.json({ error: "Order not cancelable" }, { status: 400 })
 
-  // Refund balance
   const quoteAsset = order.pair.split("/")[1] || "USDT"
   const baseAsset = order.pair.split("/")[0] || "BTC"
   const refundAsset = order.side === "buy" ? quoteAsset : baseAsset
   const refundAmount = order.side === "buy" ? order.total : order.amount
 
-  const { data: balance } = await supabase
+  const { data: balance } = await adminSupabase
     .from("balances")
     .select("*")
     .eq("user_id", user.id)
@@ -204,7 +200,7 @@ export async function DELETE(request: NextRequest) {
     .single()
 
   if (balance) {
-    await supabase
+    await adminSupabase
       .from("balances")
       .update({
         available: balance.available + refundAmount,
@@ -215,8 +211,7 @@ export async function DELETE(request: NextRequest) {
       .eq("asset", refundAsset)
   }
 
-  // Cancel order
-  await supabase
+  await adminSupabase
     .from("orders")
     .update({ status: "cancelled", updated_at: new Date().toISOString() })
     .eq("id", orderId)
