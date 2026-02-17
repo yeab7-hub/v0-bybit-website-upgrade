@@ -9,7 +9,7 @@ export async function GET() {
   const adminSupabase = await createAdminClient()
 
   const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
-  if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (profile?.role !== "admin" && profile?.role !== "super_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const { data, error } = await adminSupabase
     .from("transactions")
@@ -29,7 +29,7 @@ export async function PATCH(request: NextRequest) {
   const adminSupabase = await createAdminClient()
 
   const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
-  if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (profile?.role !== "admin" && profile?.role !== "super_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const { id, action, admin_note } = await request.json()
 

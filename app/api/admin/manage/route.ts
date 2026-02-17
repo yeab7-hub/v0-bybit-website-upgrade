@@ -13,12 +13,18 @@ export async function GET() {
 
   const adminSupabase = await createAdminClient()
   const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
-  if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  const isAdmin = profile?.role === "admin" || profile?.role === "super_admin"
+  if (!isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+  // Only super_admin can see the admin management page
+  if (profile.role !== "super_admin") {
+    return NextResponse.json({ error: "Only the master admin can manage admins" }, { status: 403 })
+  }
 
   const { data: admins } = await adminSupabase
     .from("profiles")
     .select("id, email, full_name, role, created_at")
-    .eq("role", "admin")
+    .in("role", ["admin", "super_admin"])
     .order("created_at", { ascending: true })
 
   const { data: allUsers } = await adminSupabase
@@ -26,7 +32,7 @@ export async function GET() {
     .select("id, email, full_name, role, created_at")
     .order("created_at", { ascending: false })
 
-  return NextResponse.json({ admins: admins ?? [], users: allUsers ?? [] })
+  return NextResponse.json({ admins: admins ?? [], users: allUsers ?? [], callerRole: profile.role })
 }
 
 export async function POST(request: NextRequest) {
@@ -36,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   const adminSupabase = await createAdminClient()
   const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
-  if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (profile?.role !== "super_admin") return NextResponse.json({ error: "Only master admin can manage admins" }, { status: 403 })
 
   const body = await request.json()
   const { action } = body

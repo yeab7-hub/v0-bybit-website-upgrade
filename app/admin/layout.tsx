@@ -10,8 +10,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname()
   const [authorized, setAuthorized] = useState(false)
   const [checking, setChecking] = useState(true)
+  const [adminRole, setAdminRole] = useState<string>("admin")
 
-  // Skip auth check on admin login page
   const isLoginPage = pathname === "/admin/login"
 
   useEffect(() => {
@@ -29,7 +29,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return
       }
 
-      // Use server-side API with service role key (bypasses RLS)
       try {
         const res = await fetch("/api/admin/auth", {
           method: "POST",
@@ -41,13 +40,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           router.push("/admin/login")
           return
         }
+        setAdminRole(result.role)
       } catch {
-        // Fallback: direct client check
         const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-        if (profile?.role !== "admin") {
+        if (profile?.role !== "admin" && profile?.role !== "super_admin") {
           router.push("/admin/login")
           return
         }
+        setAdminRole(profile.role)
       }
 
       setAuthorized(true)
@@ -57,7 +57,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     checkAdmin()
   }, [pathname, isLoginPage, router])
 
-  // Admin login page renders without sidebar/shell
   if (isLoginPage) {
     return <>{children}</>
   }
@@ -75,15 +74,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Desktop sidebar */}
       <div className="hidden lg:block">
-        <AdminSidebar />
+        <AdminSidebar role={adminRole} />
       </div>
-
-      {/* Mobile header */}
-      <MobileAdminHeader />
-
-      {/* Main content */}
+      <MobileAdminHeader role={adminRole} />
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         {children}
       </main>
@@ -91,17 +85,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   )
 }
 
-function MobileAdminHeader() {
+function MobileAdminHeader({ role }: { role: string }) {
   const [open, setOpen] = useState(false)
 
   return (
     <>
-      {/* Mobile top bar */}
       <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
         <div className="flex items-center gap-2">
           <img src="/images/bybit-logo.png" alt="Bybit" className="h-5" />
           <div className="h-4 w-px bg-border" />
-          <span className="text-[10px] font-semibold tracking-wider text-[#f7a600]">ADMIN</span>
+          <span className="text-[10px] font-semibold tracking-wider text-[#f7a600]">
+            {role === "super_admin" ? "MASTER" : "ADMIN"}
+          </span>
         </div>
         <button onClick={() => setOpen(!open)} className="text-muted-foreground" aria-label="Menu">
           {open ? (
@@ -112,12 +107,11 @@ function MobileAdminHeader() {
         </button>
       </div>
 
-      {/* Mobile slide-out */}
       {open && (
         <>
           <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setOpen(false)} />
           <div className="fixed inset-y-0 left-0 z-50 w-64 lg:hidden">
-            <AdminSidebar />
+            <AdminSidebar role={role} />
           </div>
         </>
       )}

@@ -5,7 +5,6 @@ import {
   Search, UserCheck, UserX, Shield, Ban, MoreVertical,
   ChevronLeft, ChevronRight, Wallet, Plus, Minus, X,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
 interface UserProfile {
@@ -26,13 +25,13 @@ interface UserBalance {
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([])
+  const [callerRole, setCallerRole] = useState<string>("admin")
   const [search, setSearch] = useState("")
   const [filterKYC, setFilterKYC] = useState<string>("all")
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(0)
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
 
-  // Balance management modal
   const [balanceUser, setBalanceUser] = useState<UserProfile | null>(null)
   const [balances, setBalances] = useState<UserBalance[]>([])
   const [balanceLoading, setBalanceLoading] = useState(false)
@@ -44,38 +43,47 @@ export default function AdminUsersPage() {
   const pageSize = 15
 
   const fetchUsers = useCallback(async () => {
-    const supabase = createClient()
-    let query = supabase
-      .from("profiles")
-      .select("*", { count: "exact" })
-      .order("created_at", { ascending: false })
-      .range(page * pageSize, (page + 1) * pageSize - 1)
-
-    if (filterKYC !== "all") query = query.eq("kyc_status", filterKYC)
-    if (search) query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
-
-    const { data, count } = await query
-    if (data) setUsers(data)
-    if (count !== null) setTotal(count)
+    try {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+      if (filterKYC !== "all") params.set("kyc_status", filterKYC)
+      if (search) params.set("search", search)
+      const res = await fetch(`/api/admin/users?${params}`)
+      const data = await res.json()
+      if (data.users) setUsers(data.users)
+      if (data.total !== undefined) setTotal(data.total)
+      if (data.callerRole) setCallerRole(data.callerRole)
+    } catch (err) {
+      console.error("Failed to fetch users:", err)
+    }
   }, [page, filterKYC, search])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
 
+  // Filter out super_admin from non-super_admin view
+  const visibleUsers = callerRole === "super_admin"
+    ? users
+    : users.filter((u) => u.role !== "super_admin")
+
   const updateUserRole = async (userId: string, role: string) => {
-    const supabase = createClient()
-    await supabase.from("profiles").update({ role }).eq("id", userId)
+    await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update_role", user_id: userId, role }),
+    })
     setActiveMenu(null)
     fetchUsers()
   }
 
   const toggleBan = async (userId: string, isBanned: boolean) => {
-    const supabase = createClient()
-    await supabase.from("profiles").update({ is_banned: !isBanned }).eq("id", userId)
+    await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "toggle_ban", user_id: userId, is_banned: !isBanned }),
+    })
     setActiveMenu(null)
     fetchUsers()
   }
 
-  // Fetch user balances for modal
   const openBalanceModal = async (user: UserProfile) => {
     setBalanceUser(user)
     setBalanceLoading(true)
@@ -84,18 +92,16 @@ export default function AdminUsersPage() {
     setAdjustAction("add")
     setAdjustMsg("")
 
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("balances")
-      .select("asset, available, in_order")
-      .eq("user_id", user.id)
-      .order("asset")
-
-    setBalances(data ?? [])
+    try {
+      const res = await fetch(`/api/admin/users?action=balances&user_id=${user.id}`)
+      const data = await res.json()
+      setBalances(data.balances ?? [])
+    } catch {
+      setBalances([])
+    }
     setBalanceLoading(false)
   }
 
-  // Adjust user balance
   const handleAdjustBalance = async () => {
     if (!balanceUser || !adjustAsset || !adjustAmount) return
     const amount = parseFloat(adjustAmount)
@@ -104,49 +110,33 @@ export default function AdminUsersPage() {
     setBalanceLoading(true)
     setAdjustMsg("")
 
-    const supabase = createClient()
-
-    // Get current balance
-    const { data: current } = await supabase
-      .from("balances")
-      .select("available")
-      .eq("user_id", balanceUser.id)
-      .eq("asset", adjustAsset)
-      .single()
-
-    const currentAvailable = current?.available ?? 0
-    const newAmount = adjustAction === "add"
-      ? currentAvailable + amount
-      : Math.max(0, currentAvailable - amount)
-
-    if (!current) {
-      // Create new balance row
-      const { error } = await supabase.from("balances").insert({
-        user_id: balanceUser.id,
-        asset: adjustAsset,
-        available: adjustAction === "add" ? amount : 0,
-        in_order: 0,
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "adjust_balance",
+          user_id: balanceUser.id,
+          asset: adjustAsset,
+          amount,
+          adjust_action: adjustAction,
+        }),
       })
-      if (error) { setAdjustMsg(`Error: ${error.message}`); setBalanceLoading(false); return }
-    } else {
-      const { error } = await supabase
-        .from("balances")
-        .update({ available: newAmount })
-        .eq("user_id", balanceUser.id)
-        .eq("asset", adjustAsset)
-      if (error) { setAdjustMsg(`Error: ${error.message}`); setBalanceLoading(false); return }
+      const data = await res.json()
+      if (data.error) {
+        setAdjustMsg(`Error: ${data.error}`)
+      } else {
+        setAdjustMsg(`${adjustAction === "add" ? "Added" : "Subtracted"} ${amount} ${adjustAsset} successfully`)
+        setAdjustAmount("")
+      }
+
+      // Refresh balances
+      const bRes = await fetch(`/api/admin/users?action=balances&user_id=${balanceUser.id}`)
+      const bData = await bRes.json()
+      setBalances(bData.balances ?? [])
+    } catch {
+      setAdjustMsg("Error: Failed to adjust balance")
     }
-
-    setAdjustMsg(`${adjustAction === "add" ? "Added" : "Subtracted"} ${amount} ${adjustAsset} successfully`)
-    setAdjustAmount("")
-
-    // Refresh balances
-    const { data: refreshed } = await supabase
-      .from("balances")
-      .select("asset, available, in_order")
-      .eq("user_id", balanceUser.id)
-      .order("asset")
-    setBalances(refreshed ?? [])
     setBalanceLoading(false)
   }
 
@@ -162,6 +152,7 @@ export default function AdminUsersPage() {
   }
 
   const getRoleBadge = (role: string) => {
+    if (role === "super_admin") return <span className="rounded-full bg-[#f7a600]/10 px-2 py-0.5 text-[10px] font-medium text-[#f7a600]">Master</span>
     if (role === "admin") return <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Admin</span>
     return <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground">User</span>
   }
@@ -177,7 +168,6 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="px-4 py-6 lg:px-8">
-        {/* Filters */}
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
             <Search className="h-4 w-4 text-muted-foreground" />
@@ -202,7 +192,6 @@ export default function AdminUsersPage() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="rounded-xl border border-border bg-card">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -218,12 +207,12 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.length === 0 ? (
+                {visibleUsers.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-5 py-8 text-center text-sm text-muted-foreground">No users found</td>
                   </tr>
                 ) : (
-                  users.map((u) => (
+                  visibleUsers.map((u) => (
                     <tr key={u.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
@@ -243,48 +232,54 @@ export default function AdminUsersPage() {
                       </td>
                       <td className="px-5 py-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
                       <td className="px-5 py-3">
-                        <div className="relative">
-                          <button
-                            onClick={() => setActiveMenu(activeMenu === u.id ? null : u.id)}
-                            className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </button>
-                          {activeMenu === u.id && (
-                            <>
-                              <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
-                              <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-card p-1 shadow-xl">
-                                <button
-                                  onClick={() => { openBalanceModal(u); setActiveMenu(null) }}
-                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
-                                >
-                                  <Wallet className="h-3.5 w-3.5" /> Manage Balance
-                                </button>
-                                {u.role !== "admin" ? (
+                        {u.role === "super_admin" ? (
+                          <span className="text-[10px] text-muted-foreground">Protected</span>
+                        ) : (
+                          <div className="relative">
+                            <button
+                              onClick={() => setActiveMenu(activeMenu === u.id ? null : u.id)}
+                              className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                            {activeMenu === u.id && (
+                              <>
+                                <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
+                                <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-card p-1 shadow-xl">
                                   <button
-                                    onClick={() => updateUserRole(u.id, "admin")}
+                                    onClick={() => { openBalanceModal(u); setActiveMenu(null) }}
                                     className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
                                   >
-                                    <Shield className="h-3.5 w-3.5" /> Make Admin
+                                    <Wallet className="h-3.5 w-3.5" /> Manage Balance
                                   </button>
-                                ) : (
+                                  {callerRole === "super_admin" && (
+                                    u.role !== "admin" ? (
+                                      <button
+                                        onClick={() => updateUserRole(u.id, "admin")}
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                      >
+                                        <Shield className="h-3.5 w-3.5" /> Make Admin
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => updateUserRole(u.id, "user")}
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                      >
+                                        <UserCheck className="h-3.5 w-3.5" /> Remove Admin
+                                      </button>
+                                    )
+                                  )}
                                   <button
-                                    onClick={() => updateUserRole(u.id, "user")}
-                                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                    onClick={() => toggleBan(u.id, u.is_banned)}
+                                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
                                   >
-                                    <UserCheck className="h-3.5 w-3.5" /> Remove Admin
+                                    <Ban className="h-3.5 w-3.5" /> {u.is_banned ? "Unban User" : "Ban User"}
                                   </button>
-                                )}
-                                <button
-                                  onClick={() => toggleBan(u.id, u.is_banned)}
-                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
-                                >
-                                  <Ban className="h-3.5 w-3.5" /> {u.is_banned ? "Unban User" : "Ban User"}
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -293,7 +288,6 @@ export default function AdminUsersPage() {
             </table>
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-border px-5 py-3">
               <span className="text-xs text-muted-foreground">{total} total users - Page {page + 1} of {totalPages}</span>
@@ -314,7 +308,6 @@ export default function AdminUsersPage() {
       {balanceUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={() => setBalanceUser(null)}>
           <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-foreground">Manage Balance</h3>
@@ -325,7 +318,6 @@ export default function AdminUsersPage() {
               </button>
             </div>
 
-            {/* Current Balances */}
             <div className="mt-4 rounded-xl border border-border bg-secondary/10 p-4">
               <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current Balances</h4>
               {balances.length === 0 ? (
@@ -347,7 +339,6 @@ export default function AdminUsersPage() {
               )}
             </div>
 
-            {/* Adjust Balance */}
             <div className="mt-4 rounded-xl border border-border p-4">
               <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Adjust Balance</h4>
               <div className="flex gap-2">

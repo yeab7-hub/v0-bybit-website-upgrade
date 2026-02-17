@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
+import { TermsModal } from "@/components/terms-modal"
 
 const passwordRequirements = [
   { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
@@ -41,6 +42,7 @@ export default function RegisterPage() {
   const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showTerms, setShowTerms] = useState(false)
 
   const supabase = createClient()
 
@@ -365,24 +367,27 @@ export default function RegisterPage() {
             )}
 
             {/* Agreement */}
-            <label className="mb-6 flex cursor-pointer items-start gap-2">
+            <div className="mb-6 flex items-start gap-2">
               <input
                 type="checkbox"
                 checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
+                readOnly
                 className="mt-0.5 rounded border-border"
               />
               <span className="text-xs text-muted-foreground">
                 I agree to Bybit&apos;s{" "}
-                <Link href="#" className="text-primary hover:underline">
-                  Terms of Service
-                </Link>{" "}
-                and{" "}
-                <Link href="#" className="text-primary hover:underline">
-                  Privacy Policy
-                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowTerms(true)}
+                  className="text-primary hover:underline"
+                >
+                  Terms of Service & Privacy Policy
+                </button>
+                {!agreed && (
+                  <span className="ml-1 text-[10px] text-primary">(click to read & accept)</span>
+                )}
               </span>
-            </label>
+            </div>
 
             <Button
               type="submit"
@@ -472,6 +477,15 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
+
+      <TermsModal
+        open={showTerms}
+        onClose={() => setShowTerms(false)}
+        onAccept={() => {
+          setAgreed(true)
+          setShowTerms(false)
+        }}
+      />
     </div>
   )
 }

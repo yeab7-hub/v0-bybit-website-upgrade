@@ -63,7 +63,7 @@ export default function AdminLogin() {
     } catch {
       // Fallback: try direct client-side check
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-      if (profile?.role !== "admin") {
+      if (profile?.role !== "admin" && profile?.role !== "super_admin") {
         await supabase.auth.signOut()
         setError("Access denied. Admin credentials required.")
         setLoading(false)

@@ -16,19 +16,28 @@ import {
   Bell,
   X,
   Headphones,
+  TrendingUp,
 } from "lucide-react"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-const navLinks = [
+interface NavLink {
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  superAdminOnly?: boolean
+}
+
+const navLinks: NavLink[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/trades", label: "Trade Management", icon: TrendingUp },
   { href: "/admin/transactions", label: "Transactions", icon: ArrowLeftRight },
   { href: "/admin/kyc", label: "KYC Review", icon: Shield },
   { href: "/admin/chat", label: "Live Chat", icon: Headphones },
   { href: "/admin/support", label: "Support Tickets", icon: MessageCircle },
   { href: "/admin/activity", label: "Activity Logs", icon: Activity },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
+  { href: "/admin/settings", label: "Settings", icon: Settings, superAdminOnly: true },
 ]
 
 interface Notification {
@@ -41,7 +50,7 @@ interface Notification {
   created_at: string
 }
 
-export function AdminSidebar() {
+export function AdminSidebar({ role }: { role?: string }) {
   const pathname = usePathname()
   const [bellOpen, setBellOpen] = useState(false)
   const { data: notifData, mutate } = useSWR<{ notifications: Notification[] }>(
@@ -51,6 +60,11 @@ export function AdminSidebar() {
   )
   const notifications = notifData?.notifications ?? []
   const unread = notifications.filter((n) => !n.read).length
+
+  const isSuperAdmin = role === "super_admin"
+  const filteredLinks = navLinks.filter(
+    (link) => !link.superAdminOnly || isSuperAdmin
+  )
 
   const markRead = async (id: string) => {
     await fetch("/api/admin/notifications", {
@@ -72,7 +86,9 @@ export function AdminSidebar() {
         <div className="flex items-center gap-3">
           <img src="/images/bybit-logo.png" alt="Bybit" className="h-5" />
           <div className="h-4 w-px bg-border" />
-          <p className="text-xs font-medium text-muted-foreground">Admin</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            {isSuperAdmin ? "Master Admin" : "Admin"}
+          </p>
         </div>
         <div className="relative">
           <button
@@ -132,7 +148,7 @@ export function AdminSidebar() {
       {/* Nav */}
       <nav className="flex-1 px-3 py-4">
         <div className="flex flex-col gap-1">
-          {navLinks.map((link) => {
+          {filteredLinks.map((link) => {
             const isActive =
               link.href === "/admin"
                 ? pathname === "/admin"
