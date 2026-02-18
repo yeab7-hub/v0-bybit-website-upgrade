@@ -8,6 +8,7 @@ import {
   ChevronRight, ArrowRight, BadgeCheck, Coins, Wallet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { MarketAsset } from "@/components/market-asset"
 
 const products = [
   {
@@ -183,7 +184,7 @@ export default function EarnPage() {
                       <tr key={a.coin} className="border-b border-border last:border-0 hover:bg-secondary/20">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-bold text-foreground">{a.coin.charAt(0)}</div>
+                            <MarketAsset symbol={a.coin} size={32} />
                             <div>
                               <div className="text-sm font-semibold text-foreground">{a.coin}</div>
                               <div className="text-[10px] text-muted-foreground">{a.name}</div>

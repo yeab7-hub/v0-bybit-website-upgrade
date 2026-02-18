@@ -7,6 +7,7 @@ import {
   Check, X, UserMinus, UserPlus, Lock, Mail, Eye, EyeOff, Users,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { MarketAsset } from "@/components/market-asset"
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -332,7 +333,7 @@ function WalletAddressManager() {
                 <tr key={a.id} className={`border-b border-border/50 transition hover:bg-secondary/20 ${!a.active ? "opacity-50" : ""}`}>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f7a600]/10 text-[10px] font-bold text-[#f7a600]">{a.symbol.slice(0, 2)}</div>
+                      <MarketAsset symbol={a.symbol} size={28} />
                       <div>
                         <p className="text-xs font-semibold text-foreground">{a.symbol}</p>
                         <p className="text-[9px] text-muted-foreground">{a.name}</p>

@@ -10,6 +10,7 @@ import {
   Copy, Check, X, AlertTriangle, Search, Eye, EyeOff,
   Clock, CheckCircle2, XCircle, Loader2,
 } from "lucide-react"
+import { MarketAsset } from "@/components/market-asset"
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -150,7 +151,7 @@ function OverviewTab({ bals, pm, show, search, setSearch, hideSmall, setHideSmal
                 <tr key={b.asset} className="border-b border-border/50 transition hover:bg-secondary/20">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7a600]/10 text-xs font-bold text-[#f7a600]">{b.asset.slice(0, 2)}</div>
+                      <MarketAsset symbol={b.asset} size={32} />
                       <div>
                         <p className="text-sm font-semibold text-foreground">{b.asset}</p>
                         <p className="text-[10px] text-muted-foreground">{COIN_NAMES[b.asset] || b.asset}</p>

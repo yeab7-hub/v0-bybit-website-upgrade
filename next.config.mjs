@@ -8,6 +8,7 @@ const nextConfig = {
       { protocol: "https", hostname: "logo.clearbit.com" },
       { protocol: "https", hostname: "assets.coingecko.com" },
       { protocol: "https", hostname: "coin-images.coingecko.com" },
+      { protocol: "https", hostname: "raw.githubusercontent.com" },
     ],
   },
 }

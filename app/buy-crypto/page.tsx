@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
+import { MarketAsset } from "@/components/market-asset"
 
 const defaultCryptos = [
   { symbol: "BTC", name: "Bitcoin" },
@@ -131,9 +132,7 @@ export default function BuyCryptoPage() {
                     <div className="relative">
                       <button onClick={() => setCryptoOpen(!cryptoOpen)}
                         className="flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm font-medium text-foreground">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-[9px] font-bold text-primary">
-                          {selectedCrypto.symbol.charAt(0)}
-                        </span>
+                  <MarketAsset symbol={selectedCrypto.symbol} size={20} />
                         {selectedCrypto.symbol}
                         <ChevronDown className="h-3 w-3" />
                       </button>
@@ -145,7 +144,7 @@ export default function BuyCryptoPage() {
                               <button key={c.symbol}
                                 onClick={() => { setSelectedSymbol(c.symbol); setCryptoOpen(false) }}
                                 className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground">
-                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-[9px] font-bold text-foreground">{c.symbol.charAt(0)}</span>
+                                <MarketAsset symbol={c.symbol} size={20} />
                                 {c.symbol} <span className="ml-auto text-[10px] text-muted-foreground">{c.name}</span>
                               </button>
                             ))}
