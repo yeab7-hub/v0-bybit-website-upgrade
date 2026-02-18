@@ -9,7 +9,7 @@ export function createClient(): SupabaseClient {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error(
-      `[v0] Missing Supabase env vars - URL: ${supabaseUrl ? 'SET' : 'MISSING'}, ANON_KEY: ${supabaseAnonKey ? 'SET' : 'MISSING'}`
+      'Missing Supabase environment variables. NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set.'
     )
     // Return a chainable stub that surfaces the real error to the UI
     const notConfiguredError = { message: 'Supabase not configured', status: 500 }
