@@ -27,8 +27,10 @@ export function OrderForm({ pair = "BTC/USDT" }: { pair?: string }) {
   const baseAsset = pair.split("/")[0]
   const quoteAsset = pair.split("/")[1] || "USDT"
 
-  const { crypto } = useLivePrices(5000)
-  const livePrice = crypto.find((c) => c.symbol === baseAsset)?.price ?? 0
+  const { crypto, forex, commodities, stocks } = useLivePrices(5000)
+  const allAssets = [...crypto, ...forex, ...commodities, ...stocks]
+  const livePrice = allAssets.find((a) => a.symbol === baseAsset || a.symbol === pair)?.price
+    ?? crypto.find((c) => c.symbol === baseAsset)?.price ?? 0
 
   const { data: balData } = useSWR(user ? "/api/trade?type=balances" : null, fetcher, { refreshInterval: 5000 })
   const balances = balData?.balances ?? []

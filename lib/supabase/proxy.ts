@@ -43,12 +43,36 @@ export async function updateSession(request: NextRequest) {
 
     const pathname = request.nextUrl.pathname
 
-    // Admin routes -- redirect to admin login if not authenticated
+    // Admin routes -- redirect to admin login if not authenticated or not admin
     const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login'
-    if (isAdminRoute && !user) {
+    const isAdminApi = pathname.startsWith('/api/admin')
+
+    if ((isAdminRoute || isAdminApi) && !user) {
+      if (isAdminApi) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
       const url = request.nextUrl.clone()
       url.pathname = '/admin/login'
       return NextResponse.redirect(url)
+    }
+
+    // For admin routes, also verify the user has admin role
+    if ((isAdminRoute || isAdminApi) && user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
+      if (!isAdmin) {
+        if (isAdminApi) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+        const url = request.nextUrl.clone()
+        url.pathname = '/trade'
+        return NextResponse.redirect(url)
+      }
     }
 
     // User protected routes -- redirect to user login if not authenticated

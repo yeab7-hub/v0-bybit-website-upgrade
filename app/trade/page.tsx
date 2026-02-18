@@ -14,8 +14,11 @@ export default function TradePage() {
   const [showMobilePairs, setShowMobilePairs] = useState(false)
   const [mobileTab, setMobileTab] = useState<"chart" | "book" | "order">("chart")
 
-  const pairDisplay = selectedPair.replace("USDT", "/USDT")
-  const baseAsset = selectedPair.replace("USDT", "")
+  // For crypto: BTCUSDT -> BTC/USDT, base = BTC
+  // For forex/commodities/stocks: EUR/USD stays as is, base = EUR/USD or symbol
+  const isCryptoPair = selectedPair.endsWith("USDT") && !selectedPair.includes("/")
+  const pairDisplay = isCryptoPair ? selectedPair.replace("USDT", "/USDT") : selectedPair
+  const baseAsset = isCryptoPair ? selectedPair.replace("USDT", "") : selectedPair.split("/")[0]
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background">

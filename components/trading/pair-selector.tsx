@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Search, Star } from "lucide-react"
+import { Search, Star, TrendingUp, DollarSign, BarChart3, Landmark } from "lucide-react"
 import { formatPrice } from "@/hooks/use-live-prices"
 
 interface TickerData {
@@ -11,9 +11,12 @@ interface TickerData {
   price: number
   change24h: number
   volume: number
+  category: string
 }
 
-const PAIRS: { symbol: string; base: string; name: string }[] = [
+type AssetCategory = "crypto" | "forex" | "commodities" | "stocks" | "favorites"
+
+const CRYPTO_PAIRS: { symbol: string; base: string; name: string }[] = [
   { symbol: "BTCUSDT", base: "BTC", name: "Bitcoin" },
   { symbol: "ETHUSDT", base: "ETH", name: "Ethereum" },
   { symbol: "SOLUSDT", base: "SOL", name: "Solana" },
@@ -41,6 +44,38 @@ const PAIRS: { symbol: string; base: string; name: string }[] = [
   { symbol: "PEPEUSDT", base: "PEPE", name: "Pepe" },
 ]
 
+const FOREX_PAIRS = [
+  { symbol: "EUR/USD", base: "EUR/USD", name: "Euro / US Dollar" },
+  { symbol: "GBP/USD", base: "GBP/USD", name: "British Pound / US Dollar" },
+  { symbol: "USD/JPY", base: "USD/JPY", name: "US Dollar / Japanese Yen" },
+  { symbol: "AUD/USD", base: "AUD/USD", name: "Australian Dollar / US Dollar" },
+  { symbol: "USD/CHF", base: "USD/CHF", name: "US Dollar / Swiss Franc" },
+]
+
+const COMMODITY_PAIRS = [
+  { symbol: "XAU/USD", base: "XAU/USD", name: "Gold" },
+  { symbol: "XAG/USD", base: "XAG/USD", name: "Silver" },
+  { symbol: "WTI", base: "WTI", name: "Crude Oil WTI" },
+  { symbol: "BRENT", base: "BRENT", name: "Brent Crude" },
+  { symbol: "NG", base: "NG", name: "Natural Gas" },
+]
+
+const STOCK_PAIRS = [
+  { symbol: "AAPL", base: "AAPL", name: "Apple Inc." },
+  { symbol: "MSFT", base: "MSFT", name: "Microsoft" },
+  { symbol: "GOOGL", base: "GOOGL", name: "Alphabet" },
+  { symbol: "AMZN", base: "AMZN", name: "Amazon" },
+  { symbol: "TSLA", base: "TSLA", name: "Tesla" },
+  { symbol: "NVDA", base: "NVDA", name: "NVIDIA" },
+]
+
+const CATEGORY_TABS: { key: AssetCategory; label: string; icon: typeof TrendingUp }[] = [
+  { key: "crypto", label: "Crypto", icon: TrendingUp },
+  { key: "forex", label: "Forex", icon: DollarSign },
+  { key: "commodities", label: "Cmdty", icon: BarChart3 },
+  { key: "stocks", label: "Stocks", icon: Landmark },
+]
+
 interface PairSelectorProps {
   onSelectPair?: (pair: string) => void
   activePair?: string
@@ -50,15 +85,15 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
   const [tickers, setTickers] = useState<Map<string, TickerData>>(new Map())
   const [search, setSearch] = useState("")
   const [favorites, setFavorites] = useState<Set<string>>(new Set(["BTC", "ETH", "SOL"]))
-  const [showFavorites, setShowFavorites] = useState(false)
+  const [activeCategory, setActiveCategory] = useState<AssetCategory>("crypto")
   const wsRef = useRef<WebSocket | null>(null)
   const [connected, setConnected] = useState(false)
 
-  // Fetch initial data from Binance REST API
+  // Fetch initial crypto data from Binance REST API
   useEffect(() => {
     const fetchTickers = async () => {
       try {
-        const symbols = PAIRS.map((p) => `"${p.symbol}"`).join(",")
+        const symbols = CRYPTO_PAIRS.map((p) => `"${p.symbol}"`).join(",")
         const res = await fetch(
           `https://api.binance.com/api/v3/ticker/24hr?symbols=[${symbols}]`
         )
@@ -66,7 +101,7 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
         const data: Record<string, string>[] = await res.json()
         const map = new Map<string, TickerData>()
         for (const t of data) {
-          const pair = PAIRS.find((p) => p.symbol === t.symbol)
+          const pair = CRYPTO_PAIRS.find((p) => p.symbol === t.symbol)
           if (!pair) continue
           const price = parseFloat(t.lastPrice)
           const open = parseFloat(t.openPrice)
@@ -77,12 +112,12 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
             price,
             change24h: open > 0 ? ((price - open) / open) * 100 : 0,
             volume: parseFloat(t.quoteVolume),
+            category: "crypto",
           })
         }
         setTickers(map)
       } catch {
-        // Fallback: fetch individually for top 5
-        for (const pair of PAIRS.slice(0, 5)) {
+        for (const pair of CRYPTO_PAIRS.slice(0, 5)) {
           try {
             const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${pair.symbol}`)
             if (!res.ok) continue
@@ -95,6 +130,7 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
                 symbol: pair.symbol, base: pair.base, name: pair.name, price,
                 change24h: open > 0 ? ((price - open) / open) * 100 : 0,
                 volume: parseFloat(t.quoteVolume),
+                category: "crypto",
               })
               return next
             })
@@ -105,9 +141,55 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
     fetchTickers()
   }, [])
 
-  // Connect to Binance WebSocket for real-time mini ticker updates
+  // Fetch forex/commodities/stocks from our prices API
   useEffect(() => {
-    const streams = PAIRS.map((p) => `${p.symbol.toLowerCase()}@miniTicker`).join("/")
+    const fetchOtherAssets = async () => {
+      try {
+        const res = await fetch("/api/prices")
+        if (!res.ok) return
+        const data = await res.json()
+
+        setTickers((prev) => {
+          const next = new Map(prev)
+          for (const item of data.forex ?? []) {
+            const pair = FOREX_PAIRS.find((p) => p.symbol === item.symbol)
+            if (!pair) continue
+            next.set(pair.symbol, {
+              symbol: pair.symbol, base: pair.base, name: pair.name,
+              price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+              category: "forex",
+            })
+          }
+          for (const item of data.commodities ?? []) {
+            const pair = COMMODITY_PAIRS.find((p) => p.symbol === item.symbol)
+            if (!pair) continue
+            next.set(pair.symbol, {
+              symbol: pair.symbol, base: pair.base, name: pair.name,
+              price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+              category: "commodities",
+            })
+          }
+          for (const item of data.stocks ?? []) {
+            const pair = STOCK_PAIRS.find((p) => p.symbol === item.symbol)
+            if (!pair) continue
+            next.set(pair.symbol, {
+              symbol: pair.symbol, base: pair.base, name: pair.name,
+              price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+              category: "stocks",
+            })
+          }
+          return next
+        })
+      } catch { /* ignore */ }
+    }
+    fetchOtherAssets()
+    const interval = setInterval(fetchOtherAssets, 10000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Connect to Binance WebSocket for real-time crypto updates
+  useEffect(() => {
+    const streams = CRYPTO_PAIRS.map((p) => `${p.symbol.toLowerCase()}@miniTicker`).join("/")
     const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`)
     wsRef.current = ws
 
@@ -117,7 +199,7 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
         const msg = JSON.parse(event.data)
         const d = msg.data
         if (!d || !d.s) return
-        const pair = PAIRS.find((p) => p.symbol === d.s)
+        const pair = CRYPTO_PAIRS.find((p) => p.symbol === d.s)
         if (!pair) return
         const price = parseFloat(d.c)
         const open = parseFloat(d.o)
@@ -127,6 +209,7 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
             symbol: pair.symbol, base: pair.base, name: pair.name, price,
             change24h: open > 0 ? ((price - open) / open) * 100 : 0,
             volume: parseFloat(d.q),
+            category: "crypto",
           })
           return next
         })
@@ -148,13 +231,24 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
     })
   }
 
-  const allPairs = PAIRS.map((p) => tickers.get(p.symbol) || {
-    symbol: p.symbol, base: p.base, name: p.name, price: 0, change24h: 0, volume: 0,
+  const getPairsForCategory = (cat: AssetCategory) => {
+    switch (cat) {
+      case "crypto": return CRYPTO_PAIRS
+      case "forex": return FOREX_PAIRS
+      case "commodities": return COMMODITY_PAIRS
+      case "stocks": return STOCK_PAIRS
+      case "favorites": return [...CRYPTO_PAIRS, ...FOREX_PAIRS, ...COMMODITY_PAIRS, ...STOCK_PAIRS]
+    }
+  }
+
+  const currentPairs = getPairsForCategory(activeCategory)
+  const allPairs = currentPairs.map((p) => tickers.get(p.symbol) || {
+    symbol: p.symbol, base: p.base, name: p.name, price: 0, change24h: 0, volume: 0, category: activeCategory,
   })
 
   const displayPairs = allPairs
     .filter((p) => {
-      if (showFavorites && !favorites.has(p.base)) return false
+      if (activeCategory === "favorites" && !favorites.has(p.base)) return false
       if (search) {
         const q = search.toLowerCase()
         return p.base.toLowerCase().includes(q) || p.name.toLowerCase().includes(q)
@@ -179,26 +273,33 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
+      {/* Category Tabs */}
+      <div className="flex items-center gap-0.5 overflow-x-auto border-b border-border px-1.5 py-1.5">
+        {CATEGORY_TABS.map((tab) => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveCategory(tab.key)}
+              className={`flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                activeCategory === tab.key ? "bg-[#f7a600]/10 text-[#f7a600]" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-3 w-3" />
+              {tab.label}
+            </button>
+          )
+        })}
         <button
-          onClick={() => setShowFavorites(false)}
-          className={`rounded px-2.5 py-1 text-[11px] font-medium transition-colors ${
-            !showFavorites ? "bg-[#f7a600]/10 text-[#f7a600]" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setShowFavorites(true)}
-          className={`flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-medium transition-colors ${
-            showFavorites ? "bg-[#f7a600]/10 text-[#f7a600]" : "text-muted-foreground hover:text-foreground"
+          onClick={() => setActiveCategory("favorites")}
+          className={`flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+            activeCategory === "favorites" ? "bg-[#f7a600]/10 text-[#f7a600]" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <Star className="h-3 w-3" />
           Fav
         </button>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <div className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-[#0ecb81]" : "bg-destructive"}`} />
           <span className="text-[9px] text-muted-foreground">{connected ? "Live" : "..."}</span>
         </div>
@@ -240,7 +341,7 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
                   <div className="flex flex-col overflow-hidden">
                     <span className={`truncate text-xs font-medium ${isActive ? "text-[#f7a600]" : "text-foreground"}`}>
                       {pair.base}
-                      <span className="text-muted-foreground">/USDT</span>
+                      {pair.category === "crypto" && <span className="text-muted-foreground">/USDT</span>}
                     </span>
                     <span className="truncate text-[9px] leading-none text-muted-foreground">{pair.name}</span>
                   </div>

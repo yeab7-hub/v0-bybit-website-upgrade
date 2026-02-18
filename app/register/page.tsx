@@ -371,8 +371,10 @@ export default function RegisterPage() {
               <input
                 type="checkbox"
                 checked={agreed}
-                readOnly
-                className="mt-0.5 rounded border-border"
+                onChange={() => {
+                  if (!agreed) setShowTerms(true)
+                }}
+                className="mt-0.5 h-5 w-5 rounded border-border accent-primary"
               />
               <span className="text-xs text-muted-foreground">
                 I agree to Bybit&apos;s{" "}
