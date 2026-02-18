@@ -172,19 +172,39 @@ function CryptoLogo({ symbol, size, className }: { symbol: string; size: number;
   const dim = `${size}px`
   const colors = CRYPTO_COLORS[symbol] || { color: "text-primary", bg: "bg-primary/15" }
 
-  // Map symbol to CoinGecko ID for logo
-  const cgIdMap: Record<string, string> = {
-    BTC: "bitcoin", ETH: "ethereum", SOL: "solana", XRP: "ripple",
-    BNB: "binancecoin", ADA: "cardano", DOGE: "dogecoin", AVAX: "avalanche-2",
-    DOT: "polkadot", LINK: "chainlink", UNI: "uniswap", MATIC: "matic-network",
-    TRX: "tron", TON: "the-open-network", SHIB: "shiba-inu", LTC: "litecoin",
-    NEAR: "near", APT: "aptos", SUI: "sui", ARB: "arbitrum",
-    OP: "optimism", FIL: "filecoin", ATOM: "cosmos", AAVE: "aave", PEPE: "pepe",
+  // Map symbol to CoinGecko image ID (the numeric ID in their CDN)
+  const cgImgMap: Record<string, string> = {
+    BTC: "1/large/bitcoin.png",
+    ETH: "279/large/ethereum.png",
+    SOL: "4128/large/solana.png",
+    XRP: "44/large/xrp-symbol-white-128.png",
+    BNB: "825/large/bnb-icon2_2x.png",
+    ADA: "975/large/cardano.png",
+    DOGE: "5/large/dogecoin.png",
+    AVAX: "12559/large/Avalanche_Circle_RedWhite_Trans.png",
+    DOT: "12171/large/polkadot.png",
+    LINK: "877/large/chainlink-new-logo.png",
+    UNI: "12504/large/uni.jpg",
+    MATIC: "4713/large/polygon.png",
+    TRX: "1094/large/tron-logo.png",
+    TON: "17980/large/ton_symbol.png",
+    SHIB: "11939/large/shiba.png",
+    LTC: "2/large/litecoin.png",
+    NEAR: "10365/large/near.jpg",
+    APT: "26455/large/aptos_round.png",
+    SUI: "26375/large/sui_asset.jpeg",
+    ARB: "16547/large/photo_2023-03-29_21.11.00.jpeg",
+    OP: "25244/large/Optimism.png",
+    FIL: "12817/large/filecoin.png",
+    ATOM: "1481/large/cosmos_hub.png",
+    AAVE: "12645/large/AAVE.png",
+    PEPE: "29850/large/pepe-token.jpeg",
+    MNT: "30691/large/MNT.png",
   }
 
-  const coinId = cgIdMap[symbol]
+  const imgPath = cgImgMap[symbol]
 
-  if (err || !coinId) {
+  if (err || !imgPath) {
     return (
       <div
         className={`flex items-center justify-center rounded-full ${colors.bg} ${className}`}
@@ -203,7 +223,7 @@ function CryptoLogo({ symbol, size, className }: { symbol: string; size: number;
       style={{ width: dim, height: dim }}
     >
       <Image
-        src={`https://assets.coingecko.com/coins/images/1/small/${coinId === "bitcoin" ? "bitcoin" : coinId}.png`}
+        src={`https://assets.coingecko.com/coins/images/${imgPath}`}
         alt={symbol}
         width={size}
         height={size}
