@@ -89,7 +89,7 @@ export default function RegisterPage() {
 
     if (authError) {
       if (authError.message === "Supabase not configured") {
-        setError("Service is temporarily unavailable. Please try again later.")
+        setError("Authentication service is not configured. Please check environment variables in Settings.")
         setLoading(false)
         return
       }
