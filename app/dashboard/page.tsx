@@ -22,7 +22,7 @@ function getPriceForSymbol(crypto: PriceData[], symbol: string): number {
 
 // Market category tabs
 const MARKET_TABS = ["Favorites", "Hot", "New", "Gainers", "Losers", "Turnover"] as const
-const MARKET_SUB_TABS = ["Spot", "Derivatives", "TradFi"] as const
+const MARKET_SUB_TABS = ["Spot", "Derivatives", "Forex", "Stocks", "Commodities"] as const
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -63,11 +63,14 @@ export default function DashboardPage() {
 
   // Build the market list based on active tab/sub-tab
   const allAssets = useMemo(() => {
-    let list: PriceData[] = []
-    if (subTab === "Spot") list = [...crypto]
-    else if (subTab === "Derivatives") list = [...crypto.slice(0, 15)]
-    else list = [...forex, ...stocks, ...commodities]
-    return list
+    switch (subTab) {
+      case "Spot": return [...crypto]
+      case "Derivatives": return [...crypto.slice(0, 15)]
+      case "Forex": return [...forex]
+      case "Stocks": return [...stocks]
+      case "Commodities": return [...commodities]
+      default: return [...crypto]
+    }
   }, [crypto, forex, stocks, commodities, subTab])
 
   const displayAssets = useMemo(() => {
@@ -99,19 +102,19 @@ export default function DashboardPage() {
 
   // Quick actions (no Card)
   const quickActions = [
-    { label: "P2P Trading", icon: ArrowLeftRight, href: "/trade", color: "text-primary" },
-    { label: "Deposit", icon: ArrowDownLeft, href: "/wallet", color: "text-primary" },
-    { label: "Rewards Hub", icon: Gift, href: "/earn", color: "text-primary" },
-    { label: "Daily Delight", icon: Calendar, href: "/earn", color: "text-primary" },
-    { label: "Bybit Earn", icon: Coins, href: "/earn", color: "text-primary" },
-    { label: "More", icon: MoreHorizontal, href: "/trade", color: "text-primary" },
+    { label: "P2P Trading", icon: ArrowLeftRight, href: "/trade" },
+    { label: "Deposit", icon: ArrowDownLeft, href: "/wallet" },
+    { label: "Rewards Hub", icon: Gift, href: "/earn" },
+    { label: "Daily Delight", icon: Calendar, href: "/earn" },
+    { label: "Bybit Earn", icon: Coins, href: "/earn" },
+    { label: "More", icon: MoreHorizontal, href: "/buy-crypto" },
   ]
 
   // Bottom nav items
   const bottomNav = [
     { label: "Home", icon: Home, href: "/dashboard", active: true },
     { label: "Markets", icon: LineChart, href: "/trade" },
-    { label: "Trade", icon: TrendingUp, href: "/trade" },
+    { label: "Trade", icon: TrendingUp, href: "/trade?pair=BTCUSDT" },
     { label: "Earn", icon: Coins, href: "/earn" },
     { label: "Assets", icon: Wallet, href: "/wallet" },
   ]
@@ -270,7 +273,7 @@ export default function DashboardPage() {
                 </div>
               ))
             : displayAssets.map((asset) => {
-                const isCrypto = asset.category === "crypto"
+                const isCrypto = subTab === "Spot" || subTab === "Derivatives"
                 const pairSymbol = isCrypto ? `${asset.symbol}USDT` : asset.symbol
                 const change = asset.change24h
                 const isPositive = change >= 0
@@ -288,13 +291,17 @@ export default function DashboardPage() {
                     <div className="flex-1 overflow-hidden">
                       <div className="flex items-center gap-1.5">
                         <span className="text-[15px] font-bold text-foreground">{asset.symbol}</span>
-                        {isCrypto && (
+                        {isCrypto ? (
                           <>
                             <span className="text-[13px] text-muted-foreground">/ USDT</span>
                             <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-semibold text-muted-foreground">
                               10x
                             </span>
                           </>
+                        ) : (
+                          <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-semibold text-muted-foreground">
+                            CFD
+                          </span>
                         )}
                       </div>
                       <span className="mt-0.5 block text-[11px] text-muted-foreground">
