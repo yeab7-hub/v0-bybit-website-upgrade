@@ -6,6 +6,36 @@ interface PriceChartProps {
   symbol?: string
 }
 
+// Map non-crypto symbols to TradingView format
+function getTradingViewSymbol(symbol: string): string {
+  // Forex pairs
+  const forexMap: Record<string, string> = {
+    "EUR/USD": "FX:EURUSD",
+    "GBP/USD": "FX:GBPUSD",
+    "USD/JPY": "FX:USDJPY",
+    "AUD/USD": "FX:AUDUSD",
+    "USD/CHF": "FX:USDCHF",
+  }
+  if (forexMap[symbol]) return forexMap[symbol]
+
+  // Commodities
+  const commodityMap: Record<string, string> = {
+    "XAU/USD": "TVC:GOLD",
+    "XAG/USD": "TVC:SILVER",
+    "WTI": "TVC:USOIL",
+    "BRENT": "TVC:UKOIL",
+    "NG": "NYMEX:NG1!",
+  }
+  if (commodityMap[symbol]) return commodityMap[symbol]
+
+  // Stocks
+  const stockSymbols = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA"]
+  if (stockSymbols.includes(symbol)) return `NASDAQ:${symbol}`
+
+  // Default: Binance crypto
+  return `BINANCE:${symbol}`
+}
+
 function TradingViewChart({ symbol = "BTCUSDT" }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const scriptRef = useRef<HTMLScriptElement | null>(null)
@@ -24,13 +54,15 @@ function TradingViewChart({ symbol = "BTCUSDT" }: PriceChartProps) {
     widgetDiv.style.width = "100%"
     container.appendChild(widgetDiv)
 
+    const tvSymbol = getTradingViewSymbol(symbol)
+
     const script = document.createElement("script")
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
     script.type = "text/javascript"
     script.async = true
     script.innerHTML = JSON.stringify({
       autosize: true,
-      symbol: `BINANCE:${symbol}`,
+      symbol: tvSymbol,
       interval: "15",
       timezone: "Etc/UTC",
       theme: "dark",

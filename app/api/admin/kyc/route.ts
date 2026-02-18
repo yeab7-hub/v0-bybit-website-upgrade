@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
 
   const filter = request.nextUrl.searchParams.get("filter") ?? "pending"
 
+  // 1. Fetch actual KYC document submissions
   let query = adminSupabase
     .from("kyc_documents")
     .select("*, profiles(email, full_name)")
@@ -34,10 +35,41 @@ export async function GET(request: NextRequest) {
     query = query.eq("status", filter)
   }
 
-  const { data, error } = await query
+  const { data: docRecords, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ records: data ?? [] })
+  const records = [...(docRecords ?? [])]
+
+  // 2. For "pending" or "all" filter, also include profiles with kyc_status = 'pending'
+  //    that have NO matching kyc_documents row (user is pending but hasn't uploaded docs)
+  if (filter === "pending" || filter === "all") {
+    const { data: pendingProfiles } = await adminSupabase
+      .from("profiles")
+      .select("id, email, full_name, kyc_status, created_at")
+      .eq("kyc_status", "pending")
+      .order("created_at", { ascending: false })
+
+    if (pendingProfiles) {
+      const docUserIds = new Set((docRecords ?? []).map((r: { user_id: string }) => r.user_id))
+      for (const p of pendingProfiles) {
+        if (!docUserIds.has(p.id)) {
+          // Create a synthetic record for display
+          records.push({
+            id: `profile-${p.id}`,
+            user_id: p.id,
+            document_type: "not_submitted",
+            document_data: {},
+            status: "pending",
+            created_at: p.created_at,
+            reviewed_at: null,
+            profiles: { email: p.email, full_name: p.full_name },
+          })
+        }
+      }
+    }
+  }
+
+  return NextResponse.json({ records })
 }
 
 export async function POST(request: NextRequest) {

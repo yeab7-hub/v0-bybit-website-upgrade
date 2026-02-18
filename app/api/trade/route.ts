@@ -3,16 +3,93 @@ import { NextResponse, type NextRequest } from "next/server"
 import { notifyAdmin } from "@/lib/notify-admin"
 
 /* ---------- helpers ---------- */
-async function getLivePrice(baseAsset: string): Promise<number> {
-  try {
-    const symbol = `${baseAsset}USDT`
-    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`, { cache: "no-store" })
-    if (!res.ok) return 0
-    const data = await res.json()
-    return parseFloat(data.price) || 0
-  } catch {
+// Non-crypto assets that use our internal prices API
+const NON_CRYPTO_ASSETS = new Set([
+  "EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "USD/CHF",
+  "XAU/USD", "XAG/USD", "WTI", "BRENT", "NG",
+  "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA",
+])
+
+async function getLivePrice(baseAsset: string, pair?: string): Promise<number> {
+  // For non-crypto assets, use our internal prices API
+  const lookupSymbol = pair?.split("/").length === 2 ? pair : baseAsset
+  if (NON_CRYPTO_ASSETS.has(lookupSymbol) || NON_CRYPTO_ASSETS.has(baseAsset)) {
+    try {
+      const { headers } = await import("next/headers")
+      const headersList = await headers()
+      const host = headersList.get("host") || "localhost:3000"
+      const protocol = host.includes("localhost") ? "http" : "https"
+      const res = await fetch(`${protocol}://${host}/api/prices`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const allAssets = [...(data.forex ?? []), ...(data.commodities ?? []), ...(data.stocks ?? [])]
+        const match = allAssets.find((a: { symbol: string }) =>
+          a.symbol === lookupSymbol || a.symbol === baseAsset
+        )
+        if (match?.price > 0) return match.price
+      }
+    } catch { /* fallback below */ }
     return 0
   }
+
+  const symbol = `${baseAsset}USDT`
+
+  // Try Binance first
+  try {
+    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const price = parseFloat(data.price)
+      if (price > 0) return price
+    }
+  } catch { /* Binance failed, try fallback */ }
+
+  // Fallback: CoinGecko
+  try {
+    const idMap: Record<string, string> = {
+      BTC: "bitcoin", ETH: "ethereum", SOL: "solana", XRP: "ripple",
+      BNB: "binancecoin", ADA: "cardano", DOGE: "dogecoin", AVAX: "avalanche-2",
+      DOT: "polkadot", LINK: "chainlink", UNI: "uniswap", MATIC: "matic-network",
+      TRX: "tron", TON: "the-open-network", SHIB: "shiba-inu",
+    }
+    const cgId = idMap[baseAsset]
+    if (cgId) {
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const price = data[cgId]?.usd
+        if (price > 0) return price
+      }
+    }
+  } catch { /* CoinGecko failed too */ }
+
+  // Last resort: fetch from our own /api/prices (internal call)
+  try {
+    const { headers } = await import("next/headers")
+    const headersList = await headers()
+    const host = headersList.get("host") || "localhost:3000"
+    const protocol = host.includes("localhost") ? "http" : "https"
+    const res = await fetch(`${protocol}://${host}/api/prices`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const coin = data.crypto?.find((c: { symbol: string }) => c.symbol === baseAsset)
+      if (coin?.price > 0) return coin.price
+    }
+  } catch { /* all failed */ }
+
+  return 0
 }
 
 async function ensureBalance(supabase: any, userId: string, asset: string) {
@@ -24,6 +101,30 @@ async function ensureBalance(supabase: any, userId: string, asset: string) {
     .select()
     .single()
   return created
+}
+
+async function getActiveOverride(supabase: any, userId: string, pair: string) {
+  // Check for pair-specific override first
+  const { data: specific } = await supabase
+    .from("trade_overrides")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("pair", pair)
+    .eq("active", true)
+    .limit(1)
+    .single()
+  if (specific) return specific
+
+  // Check for global override (null pair)
+  const { data: global } = await supabase
+    .from("trade_overrides")
+    .select("*")
+    .eq("user_id", userId)
+    .is("pair", null)
+    .eq("active", true)
+    .limit(1)
+    .single()
+  return global || null
 }
 
 /* ---------- GET ---------- */
@@ -73,7 +174,7 @@ export async function POST(request: NextRequest) {
 
   const baseAsset = pair.split("/")[0]
   const quoteAsset = pair.split("/")[1] || "USDT"
-  const marketPrice = await getLivePrice(baseAsset)
+  const marketPrice = await getLivePrice(baseAsset, pair)
 
   if (marketPrice <= 0) {
     return NextResponse.json({ error: "Could not fetch current market price" }, { status: 500 })
@@ -148,7 +249,10 @@ export async function POST(request: NextRequest) {
 
     if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 })
 
-    // Calculate P&L for sells
+    // Check for admin override
+    const override = await getActiveOverride(adminSupabase, user.id, pair)
+
+    // Calculate P&L for sells (or any trade with override)
     let pnl = 0
     if (side === "sell") {
       const { data: prevBuys } = await adminSupabase
@@ -167,6 +271,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Apply override to P&L and settlement
+    let overrideApplied = false
+    let settlementAdjustment = 0
+    if (override) {
+      overrideApplied = true
+      const mult = override.multiplier ?? 1.0
+      if (override.forced_result === "loss") {
+        // Force a loss: user loses a percentage of their trade total
+        const lossAmount = total * mult * 0.1 // 10% * multiplier of trade value
+        pnl = -Math.abs(lossAmount)
+        settlementAdjustment = -Math.abs(lossAmount)
+      } else if (override.forced_result === "win") {
+        // Force a win: user gains a percentage of their trade total
+        const winAmount = total * mult * 0.05 // 5% * multiplier of trade value
+        pnl = Math.abs(winAmount)
+        settlementAdjustment = Math.abs(winAmount)
+      }
+    }
+
     // Insert trade record
     await adminSupabase.from("trades").insert({
       user_id: user.id, order_id: order.id, pair, side,
@@ -178,7 +301,7 @@ export async function POST(request: NextRequest) {
       // Deduct quote
       const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
       await adminSupabase.from("balances").update({
-        available: Math.max(0, qBal.available - total - fee),
+        available: Math.max(0, qBal.available - total - fee + settlementAdjustment),
         updated_at: new Date().toISOString()
       }).eq("user_id", user.id).eq("asset", quoteAsset)
 
@@ -196,15 +319,15 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString()
       }).eq("user_id", user.id).eq("asset", baseAsset)
 
-      // Credit quote
+      // Credit quote (with settlement adjustment from override)
       const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
       await adminSupabase.from("balances").update({
-        available: qBal.available + total - fee,
+        available: Math.max(0, qBal.available + total - fee + settlementAdjustment),
         updated_at: new Date().toISOString()
       }).eq("user_id", user.id).eq("asset", quoteAsset)
     }
 
-    const tradeMsg = `${side === "buy" ? "Bought" : "Sold"} ${amount} ${baseAsset} @ $${Number(execPrice).toLocaleString()} | Fee: $${fee.toFixed(2)}${pnl !== 0 ? ` | P&L: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : ""}`
+    const tradeMsg = `${side === "buy" ? "Bought" : "Sold"} ${amount} ${baseAsset} @ $${Number(execPrice).toLocaleString()} | Fee: $${fee.toFixed(2)}${pnl !== 0 ? ` | P&L: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : ""}${overrideApplied ? " [Override Applied]" : ""}`
 
     notifyAdmin({
       subject: `Trade - ${side.toUpperCase()} ${amount} ${baseAsset}`,

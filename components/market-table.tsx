@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Star, TrendingUp, TrendingDown } from "lucide-react"
 import { useLivePrices, formatPrice, formatVolume, formatMarketCap, type PriceData } from "@/hooks/use-live-prices"
+import { MarketAsset, formatAssetPrice } from "@/components/market-asset"
 
 function MiniChart({ data, positive }: { data: number[]; positive: boolean }) {
   if (!data || data.length < 2) return <div className="h-8 w-20" />
@@ -198,9 +199,7 @@ export function MarketTable() {
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-bold text-foreground">
-                        {asset.symbol.charAt(0)}
-                      </div>
+                      <MarketAsset symbol={asset.symbol} size={32} />
                       <div>
                         <div className="text-sm font-medium text-foreground">
                           {asset.name}
@@ -212,9 +211,7 @@ export function MarketTable() {
                     </div>
                   </td>
                   <td className="px-4 py-4 text-right font-mono text-sm text-foreground">
-                    {asset.category === "forex"
-                      ? asset.price.toFixed(4)
-                      : `$${formatPrice(asset.price)}`}
+                    {formatAssetPrice(asset.price, asset.symbol)}
                   </td>
                   <td className="px-4 py-4 text-right">
                     <div
@@ -251,7 +248,9 @@ export function MarketTable() {
                   )}
                   <td className="px-4 py-4 text-right">
                     <Link
-                      href="/trade"
+                      href={`/trade?pair=${encodeURIComponent(
+                        asset.category === "crypto" ? `${asset.symbol}USDT` : asset.symbol
+                      )}`}
                       className="rounded-md bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
                     >
                       Trade

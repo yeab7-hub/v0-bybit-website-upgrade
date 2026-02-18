@@ -27,8 +27,10 @@ export function OrderForm({ pair = "BTC/USDT" }: { pair?: string }) {
   const baseAsset = pair.split("/")[0]
   const quoteAsset = pair.split("/")[1] || "USDT"
 
-  const { crypto } = useLivePrices(5000)
-  const livePrice = crypto.find((c) => c.symbol === baseAsset)?.price ?? 0
+  const { crypto, forex, commodities, stocks } = useLivePrices(5000)
+  const allAssets = [...crypto, ...forex, ...commodities, ...stocks]
+  const livePrice = allAssets.find((a) => a.symbol === baseAsset || a.symbol === pair)?.price
+    ?? crypto.find((c) => c.symbol === baseAsset)?.price ?? 0
 
   const { data: balData } = useSWR(user ? "/api/trade?type=balances" : null, fetcher, { refreshInterval: 5000 })
   const balances = balData?.balances ?? []
@@ -89,10 +91,15 @@ export function OrderForm({ pair = "BTC/USDT" }: { pair?: string }) {
         globalMutate("/api/trade?type=orders")
         globalMutate("/api/trade?type=trades")
       } else {
-        setFeedback({ type: "error", msg: data.error || "Order failed" })
+        const errorMsg = data.error || "Order failed"
+        if (errorMsg.includes("market price")) {
+          setFeedback({ type: "error", msg: "Price service temporarily unavailable. Please try again in a moment." })
+        } else {
+          setFeedback({ type: "error", msg: errorMsg })
+        }
       }
     } catch {
-      setFeedback({ type: "error", msg: "Network error" })
+      setFeedback({ type: "error", msg: "Network error. Please check your connection." })
     } finally {
       setSubmitting(false)
       setTimeout(() => setFeedback(null), 5000)

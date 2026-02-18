@@ -10,8 +10,6 @@ import {
   Clock,
   AlertTriangle,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-
 interface Stats {
   totalUsers: number
   pendingKYC: number
@@ -35,56 +33,24 @@ export default function AdminOverview() {
   >([])
 
   useEffect(() => {
-    const supabase = createClient()
-
     const fetchStats = async () => {
-      const { count: totalUsers } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-
-      const { count: pendingKYC } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("kyc_status", "pending")
-
-      const { count: approvedKYC } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("kyc_status", "approved")
-
-      const { count: rejectedKYC } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("kyc_status", "rejected")
-
-      const { count: totalTrades } = await supabase
-        .from("trades")
-        .select("*", { count: "exact", head: true })
-
-      const { count: openTickets } = await supabase
-        .from("support_tickets")
-        .select("*", { count: "exact", head: true })
-        .in("status", ["open", "in_progress"])
-
-      setStats({
-        totalUsers: totalUsers || 0,
-        pendingKYC: pendingKYC || 0,
-        approvedKYC: approvedKYC || 0,
-        rejectedKYC: rejectedKYC || 0,
-        totalTrades: totalTrades || 0,
-        openTickets: openTickets || 0,
-      })
-
-      // Recent users
-      const { data: users } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, kyc_status, created_at")
-        .order("created_at", { ascending: false })
-        .limit(8)
-
-      if (users) setRecentUsers(users)
+      try {
+        const res = await fetch("/api/admin/stats")
+        if (!res.ok) return
+        const data = await res.json()
+        setStats({
+          totalUsers: data.totalUsers ?? 0,
+          pendingKYC: data.pendingKYC ?? 0,
+          approvedKYC: data.approvedKYC ?? 0,
+          rejectedKYC: data.rejectedKYC ?? 0,
+          totalTrades: data.totalTrades ?? 0,
+          openTickets: data.openTickets ?? 0,
+        })
+        if (data.recentUsers) setRecentUsers(data.recentUsers)
+      } catch {
+        // Failed to fetch stats
+      }
     }
-
     fetchStats()
   }, [])
 
