@@ -45,7 +45,7 @@ export async function GET(request: Request) {
               user_id: user.id,
               asset: coin,
               available: 0,
-              locked: 0,
+              in_order: 0,
             }))
           )
 

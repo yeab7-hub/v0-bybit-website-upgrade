@@ -64,18 +64,27 @@ function LoginContent() {
     setError(null)
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (authError) {
-        if (authError.message === "Supabase not configured") {
-          setError("Service is temporarily unavailable. Please try again later.")
+        const msg = authError.message || ""
+        if (msg === "Supabase not configured") {
+          // Check if env vars are actually present
+          const hasUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL
+          const hasKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+          if (!hasUrl || !hasKey) {
+            setError("Authentication service is not configured. Please check environment variables in Settings.")
+          } else {
+            // Env vars exist but client didn't pick them up -- try refreshing
+            setError("Connection issue detected. Please refresh the page and try again.")
+          }
           setLoading(false)
           return
         }
-        if (authError.message.includes("Email not confirmed")) {
+        if (msg.includes("Email not confirmed")) {
           // Auto-confirm trigger may not have fired yet, retry after a moment
           await new Promise((r) => setTimeout(r, 1500))
           const { error: retryError } = await supabase.auth.signInWithPassword({
@@ -91,11 +100,17 @@ function LoginContent() {
           router.push(redirectTo)
           router.refresh()
           return
-        } else if (authError.message.includes("Invalid login credentials")) {
+        } else if (msg.includes("Invalid login credentials")) {
           setError("Invalid email or password. Please check your credentials or sign up for a new account.")
         } else {
-          setError(authError.message)
+          setError(msg)
         }
+        setLoading(false)
+        return
+      }
+
+      if (!data?.session) {
+        setError("Login succeeded but no session was created. Please try again.")
         setLoading(false)
         return
       }
@@ -107,7 +122,7 @@ function LoginContent() {
       router.refresh()
     } catch (err: any) {
       if (err?.message?.includes("fetch") || err?.message?.includes("network") || err?.name === "TypeError") {
-        setError("Unable to connect to authentication service. Please check that the site is properly configured.")
+        setError("Unable to connect to authentication service. Please check your network connection.")
       } else {
         setError(err?.message || "An unexpected error occurred. Please try again.")
       }
