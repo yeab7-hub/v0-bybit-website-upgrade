@@ -28,7 +28,10 @@ export async function GET() {
   const { adminSupabase } = auth
 
   // Fetch aggregate stats
-  const [usersRes, tradesRes, overridesRes, balancesRes] = await Promise.all([
+  const [
+    usersRes, tradesRes, overridesRes, balancesRes,
+    pendingKycRes, approvedKycRes, rejectedKycRes, openTicketsRes,
+  ] = await Promise.all([
     adminSupabase.from("profiles").select("id", { count: "exact", head: true }),
     adminSupabase.from("trades").select("id, total, fee, pnl"),
     adminSupabase
@@ -36,6 +39,10 @@ export async function GET() {
       .select("id", { count: "exact", head: true })
       .eq("active", true),
     adminSupabase.from("balances").select("asset, available").eq("asset", "USDT"),
+    adminSupabase.from("profiles").select("id", { count: "exact", head: true }).eq("kyc_status", "pending"),
+    adminSupabase.from("profiles").select("id", { count: "exact", head: true }).eq("kyc_status", "approved"),
+    adminSupabase.from("profiles").select("id", { count: "exact", head: true }).eq("kyc_status", "rejected"),
+    adminSupabase.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
   ])
 
   const totalUsers = usersRes.count ?? 0
@@ -57,6 +64,18 @@ export async function GET() {
     0
   )
 
+  const pendingKYC = pendingKycRes.count ?? 0
+  const approvedKYC = approvedKycRes.count ?? 0
+  const rejectedKYC = rejectedKycRes.count ?? 0
+  const openTickets = openTicketsRes.count ?? 0
+
+  // Recent users for the overview table
+  const { data: recentUsers } = await adminSupabase
+    .from("profiles")
+    .select("id, email, full_name, kyc_status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(8)
+
   return NextResponse.json({
     totalUsers,
     totalTrades,
@@ -64,5 +83,10 @@ export async function GET() {
     totalFees,
     activeOverrides,
     totalUsdtHeld,
+    pendingKYC,
+    approvedKYC,
+    rejectedKYC,
+    openTickets,
+    recentUsers: recentUsers ?? [],
   })
 }

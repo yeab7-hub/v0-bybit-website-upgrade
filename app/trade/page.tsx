@@ -1,16 +1,25 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Header } from "@/components/header"
 import { PriceChart } from "@/components/trading/price-chart"
 import { OrderBook } from "@/components/trading/order-book"
 import { OrderForm } from "@/components/trading/order-form"
 import { OpenOrders } from "@/components/trading/open-orders"
 import { PairSelector } from "@/components/trading/pair-selector"
+import { MarketAsset } from "@/components/market-asset"
 import { ChevronDown, X } from "lucide-react"
 
 export default function TradePage() {
+  const searchParams = useSearchParams()
   const [selectedPair, setSelectedPair] = useState("BTCUSDT")
+
+  // Read initial pair from URL query parameter
+  useEffect(() => {
+    const pairParam = searchParams.get("pair")
+    if (pairParam) setSelectedPair(pairParam)
+  }, [searchParams])
   const [showMobilePairs, setShowMobilePairs] = useState(false)
   const [mobileTab, setMobileTab] = useState<"chart" | "book" | "order">("chart")
 
@@ -30,6 +39,7 @@ export default function TradePage() {
           onClick={() => setShowMobilePairs(true)}
           className="flex items-center gap-1.5 rounded-md bg-secondary/50 px-3 py-1.5 text-sm font-semibold text-foreground"
         >
+          <MarketAsset symbol={isCryptoPair ? baseAsset : selectedPair} size={20} />
           {pairDisplay}
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </button>

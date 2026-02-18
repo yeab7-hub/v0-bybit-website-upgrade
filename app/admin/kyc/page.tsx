@@ -143,7 +143,12 @@ export default function AdminKYCPage() {
                         {record.profiles?.full_name || "Unnamed User"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {record.profiles?.email} - {record.document_type.replace("_", " ")}
+                        {record.profiles?.email} -{" "}
+                        {record.document_type === "not_submitted" ? (
+                          <span className="italic text-yellow-500">No Documents Uploaded</span>
+                        ) : (
+                          record.document_type.replace("_", " ")
+                        )}
                       </p>
                     </div>
                   </div>

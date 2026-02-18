@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Search, Star, TrendingUp, DollarSign, BarChart3, Landmark } from "lucide-react"
 import { formatPrice } from "@/hooks/use-live-prices"
+import { MarketAsset, formatAssetPrice } from "@/components/market-asset"
 
 interface TickerData {
   symbol: string
@@ -338,6 +339,7 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
                       }`}
                     />
                   </button>
+                  <MarketAsset symbol={pair.category === "crypto" ? pair.base : pair.symbol} size={22} />
                   <div className="flex flex-col overflow-hidden">
                     <span className={`truncate text-xs font-medium ${isActive ? "text-[#f7a600]" : "text-foreground"}`}>
                       {pair.base}
@@ -346,8 +348,10 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
                     <span className="truncate text-[9px] leading-none text-muted-foreground">{pair.name}</span>
                   </div>
                 </div>
-                <span className="w-[72px] text-right font-mono text-[11px] text-foreground">
-                  {pair.price > 0 ? formatPrice(pair.price) : "--"}
+                <span className="w-[80px] text-right font-mono text-[11px] text-foreground">
+                  {pair.price > 0
+                    ? formatAssetPrice(pair.price, pair.category === "crypto" ? pair.base : pair.symbol)
+                    : "--"}
                 </span>
                 <span
                   className={`w-[52px] rounded px-1 py-0.5 text-right font-mono text-[10px] font-medium ${
