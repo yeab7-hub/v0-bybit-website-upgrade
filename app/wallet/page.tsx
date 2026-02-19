@@ -4,11 +4,13 @@ import { useState } from "react"
 import useSWR from "swr"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import Link from "next/link"
 import { DEPOSIT_ADDRESSES as FALLBACK_ADDRESSES, type CoinDepositConfig } from "@/lib/deposit-addresses"
 import {
-  ArrowDownLeft, ArrowUpRight, ArrowLeftRight, History,
+  ArrowDownLeft, ArrowUpRight, ArrowLeftRight, RefreshCw, History,
   Copy, Check, X, AlertTriangle, Search, Eye, EyeOff,
-  Clock, CheckCircle2, XCircle, Loader2,
+  Clock, CheckCircle2, XCircle, Loader2, Home, LineChart,
+  TrendingUp, Coins, Wallet, ChevronRight,
 } from "lucide-react"
 import { MarketAsset } from "@/components/market-asset"
 
@@ -19,6 +21,7 @@ type Tab = "overview" | "deposit" | "withdraw" | "transfer" | "history"
 const COIN_NAMES: Record<string, string> = {
   BTC: "Bitcoin", ETH: "Ethereum", USDT: "Tether", SOL: "Solana",
   XRP: "XRP", ADA: "Cardano", BNB: "BNB", DOGE: "Dogecoin", AVAX: "Avalanche",
+  USDC: "USD Coin", DOT: "Polkadot", LINK: "Chainlink",
 }
 
 export default function WalletPage() {
@@ -27,6 +30,7 @@ export default function WalletPage() {
   const [hideZero, setHideZero] = useState(false)
   const [search, setSearch] = useState("")
   const [showBal, setShowBal] = useState(true)
+  const [assetView, setAssetView] = useState<"asset" | "account">("asset")
 
   const { data: balances, mutate: mutBal } = useSWR("/api/trade?type=balances", fetcher, { refreshInterval: 8000 })
   const { data: transactions, mutate: mutTx } = useSWR("/api/transactions", fetcher, { refreshInterval: 8000 })
@@ -43,6 +47,7 @@ export default function WalletPage() {
 
   const totalUsd = balArr.reduce((s: number, b: any) => s + (Number(b.available) + Number(b.in_order || 0)) * (pm[b.asset] || 0), 0)
   const btcVal = pm["BTC"] > 0 ? totalUsd / pm["BTC"] : 0
+  const todayPnl = 0 // Placeholder for real P&L
 
   const filteredBal = balArr.filter((b: any) => {
     const total = Number(b.available) + Number(b.in_order || 0)
@@ -52,128 +57,304 @@ export default function WalletPage() {
     return true
   })
 
-  const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: "overview", label: "Overview", icon: Eye },
-    { id: "deposit", label: "Deposit", icon: ArrowDownLeft },
-    { id: "withdraw", label: "Withdraw", icon: ArrowUpRight },
-    { id: "transfer", label: "Transfer", icon: ArrowLeftRight },
-    { id: "history", label: "History", icon: History },
+  const bottomNav = [
+    { label: "Home", icon: Home, href: "/dashboard" },
+    { label: "Markets", icon: LineChart, href: "/trade" },
+    { label: "Trade", icon: TrendingUp, href: "/trade?pair=BTCUSDT" },
+    { label: "Earn", icon: Coins, href: "/earn" },
+    { label: "Assets", icon: Wallet, href: "/wallet", active: true },
   ]
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="mx-auto max-w-7xl px-4 py-6 lg:px-6">
-        {/* Top balance card */}
-        <div className="mb-6 rounded-2xl border border-border bg-card p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Estimated Balance</p>
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-foreground">
-                  {showBal ? `${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD` : "****"}
-                </h1>
-                <button onClick={() => setShowBal(!showBal)} className="text-muted-foreground hover:text-foreground">
-                  {showBal ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{showBal ? `~ ${btcVal.toFixed(8)} BTC` : "****"}</p>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setTab("deposit")} className="rounded-lg bg-[#f7a600] px-5 py-2.5 text-sm font-semibold text-[#0a0e17] transition hover:bg-[#e09800]">Deposit</button>
-              <button onClick={() => setTab("withdraw")} className="rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground transition hover:bg-secondary">Withdraw</button>
-              <button onClick={() => setTab("transfer")} className="rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground transition hover:bg-secondary">Transfer</button>
-            </div>
-          </div>
-        </div>
+    <div className="flex min-h-[100dvh] flex-col bg-background">
+      {/* Header - show on desktop, hide on mobile in favor of mobile-specific header */}
+      <div className="hidden lg:block">
+        <Header />
+      </div>
 
-        {/* Tab bar */}
-  <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 scrollbar-none">
-  {tabs.map(t => (
-  <button key={t.id} onClick={() => setTab(t.id)}
-  className={`flex shrink-0 flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition ${tab === t.id ? "bg-[#f7a600] text-[#0a0e17]" : "text-muted-foreground hover:text-foreground"}`}>
-  <t.icon className="h-4 w-4" /><span className="whitespace-nowrap">{t.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {tab === "overview" && <OverviewTab bals={filteredBal} pm={pm} show={showBal} search={search} setSearch={setSearch} hideSmall={hideSmall} setHideSmall={setHideSmall} hideZero={hideZero} setHideZero={setHideZero} setTab={setTab} />}
-        {tab === "deposit" && <DepositTab mutTx={mutTx} mutBal={mutBal} />}
-        {tab === "withdraw" && <WithdrawTab bals={balArr} mutTx={mutTx} mutBal={mutBal} />}
-        {tab === "transfer" && <TransferTab bals={balArr} mutTx={mutTx} mutBal={mutBal} />}
-        {tab === "history" && <HistoryTab txs={txArr} />}
-      </main>
-      <Footer />
-    </div>
-  )
-}
-
-/* ===== Overview ===== */
-function OverviewTab({ bals, pm, show, search, setSearch, hideSmall, setHideSmall, hideZero, setHideZero, setTab }: any) {
-  return (
-    <div className="rounded-2xl border border-border bg-card">
-      <div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row md:items-center md:justify-between">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search coin..."
-            className="rounded-lg border border-border bg-background py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#f7a600] focus:outline-none" />
-        </div>
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input type="checkbox" checked={hideSmall} onChange={e => setHideSmall(e.target.checked)} className="accent-[#f7a600]" />
-            {"Hide small balances"}
-          </label>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input type="checkbox" checked={hideZero} onChange={e => setHideZero(e.target.checked)} className="accent-[#f7a600]" />
-            {"Hide zero balances"}
-          </label>
+      {/* Mobile header */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-3 lg:hidden">
+        <img src="/images/bybit-logo.png" alt="Bybit" className="h-5" />
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+            {"U"}
+          </Link>
+          <Link href="/dashboard" className="p-1 text-muted-foreground">
+            <X className="h-5 w-5 rotate-45" />
+          </Link>
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border text-xs text-muted-foreground">
-              <th className="px-4 py-3 text-left font-medium">Coin</th>
-              <th className="px-4 py-3 text-right font-medium">Available</th>
-              <th className="px-4 py-3 text-right font-medium">In Order</th>
-              <th className="px-4 py-3 text-right font-medium">USD Value</th>
-              <th className="px-4 py-3 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bals.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">No assets found</td></tr>
-            ) : bals.map((b: any) => {
-              const inOrder = Number(b.in_order || 0)
-              const total = Number(b.available) + inOrder
-              const usd = total * (pm[b.asset] || 0)
-              return (
-                <tr key={b.asset} className="border-b border-border/50 transition hover:bg-secondary/20">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <MarketAsset symbol={b.asset} size={32} />
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{b.asset}</p>
-                        <p className="text-[10px] text-muted-foreground">{COIN_NAMES[b.asset] || b.asset}</p>
+
+      <main className="flex-1">
+        {/* ===== MOBILE LAYOUT ===== */}
+        <div className="lg:hidden">
+          {tab === "overview" ? (
+            <div className="px-4 pb-20 pt-4">
+              {/* Total Assets */}
+              <div className="mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Total Assets</span>
+                  <button onClick={() => setShowBal(!showBal)} className="text-muted-foreground">
+                    {showBal ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-3xl font-bold text-foreground">
+                      {showBal ? totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " USD" : "*********"}
+                    </h1>
+                    <p className="text-xs text-muted-foreground">
+                      {showBal ? `~ ${btcVal.toFixed(8)} BTC` : "******"}
+                    </p>
+                  </div>
+                  {/* Mini chart placeholder */}
+                  <div className="h-10 w-20">
+                    <svg viewBox="0 0 80 40" className="h-full w-full text-[#f7a600]">
+                      <polyline fill="none" stroke="currentColor" strokeWidth="1.5" points="0,30 10,25 20,28 30,20 40,22 50,15 60,18 70,12 80,16" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Today's P&L */}
+              <button className="mb-5 flex items-center gap-1">
+                <span className="text-sm text-muted-foreground">{"Today's P&L"}</span>
+                <span className={`text-sm font-medium ${todayPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                  {showBal ? `${todayPnl >= 0 ? "+" : ""}${todayPnl.toFixed(2)}` : "******"}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+
+              {/* Available / In Use */}
+              <div className="mb-6 flex gap-8">
+                <div>
+                  <p className="text-xs text-muted-foreground">Available balance</p>
+                  <p className="font-mono text-sm font-semibold text-foreground">
+                    {showBal ? totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "******"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">In Use</p>
+                  <p className="font-mono text-sm font-semibold text-foreground">
+                    {showBal ? balArr.reduce((s: number, b: any) => s + Number(b.in_order || 0) * (pm[b.asset] || 0), 0).toFixed(2) : "******"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons - circular icons like Bybit */}
+              <div className="mb-6 flex items-center justify-around">
+                {[
+                  { label: "Deposit", icon: ArrowDownLeft, tab: "deposit" as Tab, active: true },
+                  { label: "Withdraw", icon: ArrowUpRight, tab: "withdraw" as Tab, active: false },
+                  { label: "Transfer", icon: ArrowLeftRight, tab: "transfer" as Tab, active: false },
+                  { label: "Convert", icon: RefreshCw, tab: "overview" as Tab, active: false },
+                ].map((a) => (
+                  <button key={a.label} onClick={() => setTab(a.tab)} className="flex flex-col items-center gap-1.5">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-full ${a.active ? "bg-[#f7a600]" : "bg-secondary"}`}>
+                      <a.icon className={`h-5 w-5 ${a.active ? "text-[#0a0e17]" : "text-foreground"}`} />
+                    </div>
+                    <span className="text-xs text-muted-foreground">{a.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Referral Banner */}
+              <div className="mb-6 rounded-xl bg-secondary/50 px-4 py-3">
+                <p className="text-center text-sm text-muted-foreground">Grow your assets with every referral</p>
+              </div>
+
+              {/* Asset / Account tabs */}
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setAssetView("asset")} className={`text-base font-semibold ${assetView === "asset" ? "text-foreground" : "text-muted-foreground"}`}>Asset</button>
+                  <button onClick={() => setAssetView("account")} className={`text-base font-semibold ${assetView === "account" ? "text-foreground" : "text-muted-foreground"}`}>Account</button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setTab("history")} className="p-1.5 text-muted-foreground"><History className="h-4 w-4" /></button>
+                  <button onClick={() => setShowBal(!showBal)} className="p-1.5 text-muted-foreground">
+                    {showBal ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Coin List - Bybit style (mobile) */}
+              <div className="flex flex-col gap-0">
+                {filteredBal.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-muted-foreground">No assets found</p>
+                ) : filteredBal.map((b: any) => {
+                  const inOrder = Number(b.in_order || 0)
+                  const total = Number(b.available) + inOrder
+                  const usd = total * (pm[b.asset] || 0)
+                  const change = ((pm[b.asset] || 0) - (pm[b.asset] || 0)) // placeholder
+                  return (
+                    <div key={b.asset} className="flex items-center justify-between py-4">
+                      <div className="flex items-center gap-3">
+                        <MarketAsset symbol={b.asset} size={36} />
+                        <div>
+                          <p className="text-sm font-bold text-foreground">{b.asset}</p>
+                          <p className={`text-xs ${change >= 0 ? "text-muted-foreground" : "text-destructive"}`}>
+                            {COIN_NAMES[b.asset] || b.asset}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-mono text-sm font-semibold text-foreground">
+                          {showBal ? Number(b.available).toFixed(b.asset === "USDT" ? 2 : 6) : "*****"}
+                        </p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {showBal ? `$${usd.toFixed(2)}` : "*****"}
+                        </p>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono text-sm text-foreground">{show ? Number(b.available).toFixed(b.asset === "USDT" ? 2 : 6) : "****"}</td>
-                  <td className="px-4 py-3 text-right font-mono text-sm text-muted-foreground">{show ? inOrder.toFixed(b.asset === "USDT" ? 2 : 6) : "****"}</td>
-                  <td className="px-4 py-3 text-right font-mono text-sm text-muted-foreground">{show ? `$${usd.toFixed(2)}` : "****"}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button onClick={() => setTab("deposit")} className="rounded px-2.5 py-1 text-xs font-medium text-[#f7a600] transition hover:bg-[#f7a600]/10">Deposit</button>
-                      <button onClick={() => setTab("withdraw")} className="rounded px-2.5 py-1 text-xs font-medium text-[#f7a600] transition hover:bg-[#f7a600]/10">Withdraw</button>
-                      <button onClick={() => setTab("transfer")} className="rounded px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-secondary">Transfer</button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="px-4 pb-20 pt-4">
+              {/* Back button */}
+              <button onClick={() => setTab("overview")} className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <X className="h-4 w-4" /> Back to Assets
+              </button>
+              {tab === "deposit" && <DepositTab mutTx={mutTx} mutBal={mutBal} />}
+              {tab === "withdraw" && <WithdrawTab bals={balArr} mutTx={mutTx} mutBal={mutBal} />}
+              {tab === "transfer" && <TransferTab bals={balArr} mutTx={mutTx} mutBal={mutBal} />}
+              {tab === "history" && <HistoryTab txs={txArr} />}
+            </div>
+          )}
+        </div>
+
+        {/* ===== DESKTOP LAYOUT ===== */}
+        <div className="hidden lg:block">
+          <div className="mx-auto max-w-7xl px-6 py-8">
+            {/* Top balance card */}
+            <div className="mb-8 flex items-start justify-between rounded-2xl border border-border bg-card p-8">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Total Assets</span>
+                  <button onClick={() => setShowBal(!showBal)} className="text-muted-foreground">
+                    {showBal ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  </button>
+                </div>
+                <h1 className="mt-1 text-4xl font-bold text-foreground">
+                  {showBal ? totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " USD" : "*********"}
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {showBal ? `~ ${btcVal.toFixed(8)} BTC` : "****"}
+                </p>
+                <div className="mt-4 flex gap-6">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Available balance</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">{showBal ? `$${totalUsd.toFixed(2)}` : "****"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">In Use</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">
+                      {showBal ? `$${balArr.reduce((s: number, b: any) => s + Number(b.in_order || 0) * (pm[b.asset] || 0), 0).toFixed(2)}` : "****"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setTab("deposit")} className="rounded-lg bg-[#f7a600] px-6 py-2.5 text-sm font-semibold text-[#0a0e17] transition hover:bg-[#e09800]">Deposit</button>
+                <button onClick={() => setTab("withdraw")} className="rounded-lg border border-border px-6 py-2.5 text-sm font-semibold text-foreground transition hover:bg-secondary">Withdraw</button>
+                <button onClick={() => setTab("transfer")} className="rounded-lg border border-border px-6 py-2.5 text-sm font-semibold text-foreground transition hover:bg-secondary">Transfer</button>
+                <button onClick={() => setTab("history")} className="rounded-lg border border-border px-6 py-2.5 text-sm font-semibold text-foreground transition hover:bg-secondary">History</button>
+              </div>
+            </div>
+
+            {/* Desktop Tab Content */}
+            {tab === "overview" ? (
+              <div className="rounded-2xl border border-border bg-card">
+                <div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row md:items-center md:justify-between">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search coin..."
+                      className="rounded-lg border border-border bg-background py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#f7a600] focus:outline-none" />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input type="checkbox" checked={hideSmall} onChange={e => setHideSmall(e.target.checked)} className="accent-[#f7a600]" />
+                      {"Hide small balances"}
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input type="checkbox" checked={hideZero} onChange={e => setHideZero(e.target.checked)} className="accent-[#f7a600]" />
+                      {"Hide zero balances"}
+                    </label>
+                  </div>
+                </div>
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border text-xs text-muted-foreground">
+                      <th className="px-6 py-3 text-left font-medium">Coin</th>
+                      <th className="px-6 py-3 text-right font-medium">Available</th>
+                      <th className="px-6 py-3 text-right font-medium">In Order</th>
+                      <th className="px-6 py-3 text-right font-medium">USD Value</th>
+                      <th className="px-6 py-3 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredBal.length === 0 ? (
+                      <tr><td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">No assets found</td></tr>
+                    ) : filteredBal.map((b: any) => {
+                      const inOrder = Number(b.in_order || 0)
+                      const total = Number(b.available) + inOrder
+                      const usd = total * (pm[b.asset] || 0)
+                      return (
+                        <tr key={b.asset} className="border-b border-border/50 transition hover:bg-secondary/20">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <MarketAsset symbol={b.asset} size={36} />
+                              <div>
+                                <p className="text-sm font-semibold text-foreground">{b.asset}</p>
+                                <p className="text-[11px] text-muted-foreground">{COIN_NAMES[b.asset] || b.asset}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right font-mono text-sm text-foreground">{showBal ? Number(b.available).toFixed(b.asset === "USDT" ? 2 : 6) : "****"}</td>
+                          <td className="px-6 py-4 text-right font-mono text-sm text-muted-foreground">{showBal ? inOrder.toFixed(b.asset === "USDT" ? 2 : 6) : "****"}</td>
+                          <td className="px-6 py-4 text-right font-mono text-sm text-muted-foreground">{showBal ? `$${usd.toFixed(2)}` : "****"}</td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-1">
+                              <button onClick={() => setTab("deposit")} className="rounded px-2.5 py-1 text-xs font-medium text-[#f7a600] transition hover:bg-[#f7a600]/10">Deposit</button>
+                              <button onClick={() => setTab("withdraw")} className="rounded px-2.5 py-1 text-xs font-medium text-[#f7a600] transition hover:bg-[#f7a600]/10">Withdraw</button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div>
+                <button onClick={() => setTab("overview")} className="mb-6 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" /> Back to Overview
+                </button>
+                {tab === "deposit" && <DepositTab mutTx={mutTx} mutBal={mutBal} />}
+                {tab === "withdraw" && <WithdrawTab bals={balArr} mutTx={mutTx} mutBal={mutBal} />}
+                {tab === "transfer" && <TransferTab bals={balArr} mutTx={mutTx} mutBal={mutBal} />}
+                {tab === "history" && <HistoryTab txs={txArr} />}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* Footer - desktop only */}
+      <div className="hidden lg:block">
+        <Footer />
       </div>
+
+      {/* Bottom Nav - mobile only */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
+        {bottomNav.map((n) => (
+          <Link key={n.label} href={n.href} className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 ${n.active ? "text-foreground" : "text-muted-foreground"}`}>
+            <n.icon className="h-5 w-5" />
+            <span className="text-[10px]">{n.label}</span>
+          </Link>
+        ))}
+      </nav>
     </div>
   )
 }
@@ -192,7 +373,6 @@ function DepositTab({ mutTx, mutBal }: any) {
 
   const cd = DEPOSIT_ADDRESSES.find(c => c.symbol === coin) || DEPOSIT_ADDRESSES[0]
   const net = cd?.networks?.[netIdx] || cd?.networks?.[0]
-
   const copy = () => { navigator.clipboard.writeText(net.address); setCopied(true); setTimeout(() => setCopied(false), 2000) }
 
   const submit = async () => {
@@ -203,7 +383,7 @@ function DepositTab({ mutTx, mutBal }: any) {
   }
 
   if (done) return (
-    <div className="rounded-2xl border border-border bg-card p-10 text-center">
+    <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-10 text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f7a600]/10"><Clock className="h-8 w-8 text-[#f7a600]" /></div>
       <h3 className="mb-2 text-lg font-bold text-foreground">Deposit Submitted</h3>
       <p className="mb-6 text-sm text-muted-foreground">Your deposit of {amount} {coin} is pending admin review. You will be notified once approved.</p>
@@ -213,7 +393,6 @@ function DepositTab({ mutTx, mutBal }: any) {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      {/* Left: Address + QR */}
       <div className="rounded-2xl border border-border bg-card p-6">
         <h3 className="mb-4 text-lg font-bold text-foreground">Deposit {coin}</h3>
         <div className="mb-4">
@@ -257,10 +436,9 @@ function DepositTab({ mutTx, mutBal }: any) {
           </div>
         </div>
       </div>
-      {/* Right: Confirm form */}
       <div className="rounded-2xl border border-border bg-card p-6">
         <h3 className="mb-2 text-lg font-bold text-foreground">Confirm Deposit</h3>
-        <p className="mb-6 text-sm text-muted-foreground">After sending funds, submit the details below for admin review and approval.</p>
+        <p className="mb-6 text-sm text-muted-foreground">After sending funds, submit the details below for admin review.</p>
         <div className="mb-4">
           <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Amount</label>
           <div className="flex items-center rounded-lg border border-border bg-background">
@@ -311,10 +489,10 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
   }
 
   if (done) return (
-    <div className="rounded-2xl border border-border bg-card p-10 text-center">
+    <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-10 text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f7a600]/10"><Clock className="h-8 w-8 text-[#f7a600]" /></div>
       <h3 className="mb-2 text-lg font-bold text-foreground">Withdrawal Submitted</h3>
-      <p className="mb-6 text-sm text-muted-foreground">Your withdrawal of {amount} {coin} is pending admin review. Funds are locked from your available balance.</p>
+      <p className="mb-6 text-sm text-muted-foreground">Your withdrawal of {amount} {coin} is pending admin review.</p>
       <button onClick={() => { setDone(false); setAmount(""); setAddress("") }} className="rounded-lg bg-[#f7a600] px-6 py-2.5 text-sm font-semibold text-[#0a0e17]">New Withdrawal</button>
     </div>
   )
@@ -372,7 +550,6 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
         className="w-full rounded-lg bg-[#f7a600] py-3 text-sm font-bold text-[#0a0e17] transition hover:bg-[#e09800] disabled:opacity-50">
         {submitting ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : "Submit Withdrawal Request"}
       </button>
-      <p className="mt-3 text-center text-[10px] text-muted-foreground">Withdrawals require admin approval. Usually processed within 1-24 hours.</p>
     </div>
   )
 }
@@ -446,7 +623,6 @@ function TransferTab({ bals, mutTx, mutBal }: any) {
         className="w-full rounded-lg bg-[#f7a600] py-3 text-sm font-bold text-[#0a0e17] transition hover:bg-[#e09800] disabled:opacity-50">
         {submitting ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : "Transfer"}
       </button>
-      <p className="mt-3 text-center text-[10px] text-muted-foreground">Internal transfers are instant and free.</p>
     </div>
   )
 }
@@ -486,21 +662,19 @@ function HistoryTab({ txs }: { txs: any[] }) {
               <th className="px-4 py-3 text-left font-medium">Coin</th>
               <th className="px-4 py-3 text-right font-medium">Amount</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Date</th>
-              <th className="px-4 py-3 text-left font-medium">Note</th>
+              <th className="hidden px-4 py-3 text-left font-medium md:table-cell">Date</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">No transactions yet</td></tr>
+              <tr><td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">No transactions yet</td></tr>
             ) : filtered.map((t: any) => (
               <tr key={t.id} className="border-b border-border/50 transition hover:bg-secondary/20">
                 <td className="px-4 py-3">{typeLabel(t.type)}</td>
                 <td className="px-4 py-3 text-sm font-medium text-foreground">{t.asset}</td>
                 <td className="px-4 py-3 text-right font-mono text-sm text-foreground">{t.amount}</td>
                 <td className="px-4 py-3"><div className="flex items-center gap-1.5">{statusIcon(t.status)}<span className="text-xs capitalize text-muted-foreground">{t.status}</span></div></td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString()} {new Date(t.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">{t.notes || "-"}</td>
+                <td className="hidden px-4 py-3 text-xs text-muted-foreground md:table-cell">{new Date(t.created_at).toLocaleDateString()}</td>
               </tr>
             ))}
           </tbody>
