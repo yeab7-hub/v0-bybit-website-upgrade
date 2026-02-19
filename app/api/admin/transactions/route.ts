@@ -11,14 +11,38 @@ export async function GET() {
   const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
   if (profile?.role !== "admin" && profile?.role !== "super_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-  const { data, error } = await adminSupabase
+  // Fetch transactions (without FK join to avoid PostgREST errors if FK is missing)
+  const { data: transactions, error } = await adminSupabase
     .from("transactions")
-    .select("*, profiles(full_name, email)")
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(200)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  if (error) {
+    console.error("[v0] Admin transactions fetch error:", error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (!transactions || transactions.length === 0) {
+    return NextResponse.json([])
+  }
+
+  // Fetch associated profiles separately
+  const userIds = [...new Set(transactions.map((t: any) => t.user_id).filter(Boolean))]
+  const { data: profiles } = await adminSupabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("id", userIds)
+
+  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
+
+  // Merge profile data into transactions
+  const enriched = transactions.map((t: any) => ({
+    ...t,
+    profiles: profileMap.get(t.user_id) || { full_name: "Unknown", email: "—" },
+  }))
+
+  return NextResponse.json(enriched)
 }
 
 export async function PATCH(request: NextRequest) {

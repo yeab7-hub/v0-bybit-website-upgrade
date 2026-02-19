@@ -47,8 +47,15 @@ export async function createAdminClient() {
     )
   }
 
-  // Use the base supabase-js client with service_role key.
-  // This fully bypasses RLS — no cookies or user session needed.
+  // IMPORTANT: Use the raw supabase-js client with service_role key,
+  // NOT createServerClient with cookies.
+  //
+  // createServerClient + cookies attaches the user session, which means
+  // RLS policies still evaluate auth.uid() based on the cookie — so admin
+  // queries return 0 rows when the logged-in admin doesn't own those rows.
+  //
+  // createSupabaseClient with service_role bypasses RLS entirely, which is
+  // what we need for admin operations (viewing all users' KYC, transactions, etc.)
   return createSupabaseClient(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,

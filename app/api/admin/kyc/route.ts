@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
 
   const filter = request.nextUrl.searchParams.get("filter") ?? "pending"
 
-  // 1. Fetch actual KYC document submissions
+  // 1. Fetch actual KYC document submissions (no FK join — fetch profiles separately)
   let query = adminSupabase
     .from("kyc_documents")
-    .select("*, profiles(email, full_name)")
+    .select("*")
     .order("created_at", { ascending: false })
 
   if (filter !== "all") {
@@ -36,35 +36,55 @@ export async function GET(request: NextRequest) {
   }
 
   const { data: docRecords, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error("[v0] KYC documents fetch error:", error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
-  const records = [...(docRecords ?? [])]
+  // Fetch profiles for the KYC doc users
+  const docUserIds = new Set((docRecords ?? []).map((r: any) => r.user_id).filter(Boolean))
+  const allProfileIds = [...docUserIds]
 
-  // 2. For "pending" or "all" filter, also include profiles with kyc_status = 'pending'
-  //    that have NO matching kyc_documents row (user is pending but hasn't uploaded docs)
+  // 2. For "pending" or "all", also get profiles with kyc_status = 'pending'
+  let pendingProfiles: any[] = []
   if (filter === "pending" || filter === "all") {
-    const { data: pendingProfiles } = await adminSupabase
+    const { data: pp } = await adminSupabase
       .from("profiles")
       .select("id, email, full_name, kyc_status, created_at")
       .eq("kyc_status", "pending")
       .order("created_at", { ascending: false })
+    pendingProfiles = pp ?? []
+    for (const p of pendingProfiles) {
+      if (!docUserIds.has(p.id)) allProfileIds.push(p.id)
+    }
+  }
 
-    if (pendingProfiles) {
-      const docUserIds = new Set((docRecords ?? []).map((r: { user_id: string }) => r.user_id))
-      for (const p of pendingProfiles) {
-        if (!docUserIds.has(p.id)) {
-          // Create a synthetic record for display
-          records.push({
-            id: `profile-${p.id}`,
-            user_id: p.id,
-            document_type: "not_submitted",
-            document_data: {},
-            status: "pending",
-            created_at: p.created_at,
-            reviewed_at: null,
-            profiles: { email: p.email, full_name: p.full_name },
-          })
-        }
+  // Fetch all related profiles in one query
+  const { data: profiles } = allProfileIds.length > 0
+    ? await adminSupabase.from("profiles").select("id, full_name, email").in("id", allProfileIds)
+    : { data: [] }
+  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
+
+  // Build records list with profile data merged in
+  const records: any[] = (docRecords ?? []).map((r: any) => ({
+    ...r,
+    profiles: profileMap.get(r.user_id) || { full_name: "Unknown", email: "—" },
+  }))
+
+  // Add synthetic records for pending profiles without kyc_documents
+  if (filter === "pending" || filter === "all") {
+    for (const p of pendingProfiles) {
+      if (!docUserIds.has(p.id)) {
+        records.push({
+          id: `profile-${p.id}`,
+          user_id: p.id,
+          document_type: "not_submitted",
+          document_data: {},
+          status: "pending",
+          created_at: p.created_at,
+          reviewed_at: null,
+          profiles: { email: p.email, full_name: p.full_name },
+        })
       }
     }
   }
