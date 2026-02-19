@@ -19,7 +19,6 @@ export async function GET() {
     .limit(200)
 
   if (error) {
-    console.error("[v0] Admin transactions fetch error:", error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 

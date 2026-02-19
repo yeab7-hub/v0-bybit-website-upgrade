@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
 
   const { data: docRecords, error } = await query
   if (error) {
-    console.error("[v0] KYC documents fetch error:", error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
