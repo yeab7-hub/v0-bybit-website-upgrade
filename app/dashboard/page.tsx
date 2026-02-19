@@ -305,7 +305,7 @@ export default function DashboardPage() {
                           )}
                         </div>
                         <span className="mt-0.5 block text-[11px] text-muted-foreground md:hidden">
-                          {formatVolume(asset.volume * asset.price)}{isCrypto ? " USDT" : ""}
+                          {asset.volume > 0 ? formatVolume(asset.volume * asset.price) : "0"}{isCrypto ? " USDT" : ""}
                         </span>
                         {/* Desktop: show asset name */}
                         <span className="mt-0.5 hidden text-xs text-muted-foreground md:block">
@@ -320,9 +320,11 @@ export default function DashboardPage() {
 
                       {/* Price */}
                       <span className="min-w-[80px] text-right font-mono text-[15px] font-medium text-foreground md:w-28 md:text-sm">
-                        {isCrypto
-                          ? formatPrice(asset.price)
-                          : formatAssetPrice(asset.price, asset.symbol).replace("$", "")}
+                        {asset.price > 0
+                          ? (isCrypto
+                              ? `$${formatPrice(asset.price)}`
+                              : formatAssetPrice(asset.price, asset.symbol))
+                          : "--"}
                       </span>
 
                       {/* Change badge */}
