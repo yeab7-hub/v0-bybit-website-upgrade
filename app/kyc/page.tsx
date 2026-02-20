@@ -242,7 +242,7 @@ export default function KYCPage() {
               </Button>
             </Link>
             <p className="mt-8 text-[10px] text-muted-foreground/60">
-              Bybit&trade; 2026. All rights reserved.
+              &copy; 2026 Bybit. All rights reserved.
             </p>
           </div>
         </div>
@@ -761,7 +761,7 @@ export default function KYCPage() {
         )}
 
         <p className="mt-8 text-center text-[10px] text-muted-foreground/60">
-          Bybit&trade; 2026. All rights reserved.
+          &copy; 2026 Bybit. All rights reserved.
         </p>
       </div>
     </div>

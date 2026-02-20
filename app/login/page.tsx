@@ -3,6 +3,7 @@
 import { useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
+import { BybitLogo } from "@/components/bybit-logo"
 import {
   Eye,
   EyeOff,
@@ -152,7 +153,7 @@ function LoginContent() {
         <div className="w-full max-w-md">
           {/* Logo */}
           <Link href="/" className="mb-8 flex items-center">
-            <img src="/images/bybit-logo.png" alt="Bybit" className="h-6" />
+            <BybitLogo className="h-6" />
           </Link>
 
           {!show2FA ? (
@@ -400,7 +401,7 @@ function LoginContent() {
 
               <div className="mt-8 text-center">
                 <p className="text-[10px] text-muted-foreground/60">
-                  Bybit&trade; 2026. All rights reserved.
+                  &copy; 2026 Bybit. All rights reserved.
                 </p>
               </div>
             </>

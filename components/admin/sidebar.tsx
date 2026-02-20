@@ -19,6 +19,8 @@ import {
   TrendingUp,
 } from "lucide-react"
 
+import { BybitLogo } from "@/components/bybit-logo"
+
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 interface NavLink {
@@ -84,7 +86,7 @@ export function AdminSidebar({ role }: { role?: string }) {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div className="flex items-center gap-3">
-          <img src="/images/bybit-logo.png" alt="Bybit" className="h-5" />
+          <BybitLogo className="h-5" />
           <div className="h-4 w-px bg-border" />
           <p className="text-xs font-medium text-muted-foreground">
             {isSuperAdmin ? "Master Admin" : "Admin"}
@@ -181,7 +183,7 @@ export function AdminSidebar({ role }: { role?: string }) {
           Back to Platform
         </Link>
         <p className="mt-3 px-3 text-[10px] text-muted-foreground/60">
-          Bybit 2026
+          &copy; 2026 Bybit
         </p>
       </div>
     </aside>

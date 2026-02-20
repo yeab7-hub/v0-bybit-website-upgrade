@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { BybitLogo } from "@/components/bybit-logo"
 
 export default function AdminLogin() {
   const router = useRouter()
@@ -101,7 +102,7 @@ export default function AdminLogin() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <img src="/images/bybit-logo.png" alt="Bybit" className="h-8" />
+          <BybitLogo className="h-8" />
           <div className="flex items-center gap-2">
             <div className="h-px w-8 bg-[#f7a600]/30" />
             <span className="text-xs font-semibold tracking-widest text-[#f7a600]">ADMIN PANEL</span>

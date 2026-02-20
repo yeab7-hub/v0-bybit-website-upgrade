@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
+import { BybitLogo } from "@/components/bybit-logo"
 
 const navItems = [
   {
@@ -141,11 +142,7 @@ export function Header() {
         {/* Logo */}
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center">
-            <img
-              src="/images/bybit-logo.png"
-              alt="Bybit"
-              className="h-6"
-            />
+            <BybitLogo className="h-6" />
           </Link>
 
           {/* Desktop Nav */}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { AdminSidebar } from "@/components/admin/sidebar"
+import { BybitLogo } from "@/components/bybit-logo"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -92,7 +93,7 @@ function MobileAdminHeader({ role }: { role: string }) {
     <>
       <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
         <div className="flex items-center gap-2">
-          <img src="/images/bybit-logo.png" alt="Bybit" className="h-5" />
+          <BybitLogo className="h-5" />
           <div className="h-4 w-px bg-border" />
           <span className="text-[10px] font-semibold tracking-wider text-[#f7a600]">
             {role === "super_admin" ? "MASTER" : "ADMIN"}
