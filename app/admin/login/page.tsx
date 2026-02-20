@@ -20,14 +20,28 @@ export default function AdminLogin() {
     try {
       const supabase = createClient()
 
-      // Step 1: Sign in with Supabase Auth
+      // Step 1: Sign in with Supabase Auth (retry once on transient network errors)
       let signInResult
       try {
         signInResult = await supabase.auth.signInWithPassword({ email, password })
-      } catch (err: any) {
-        setError("Unable to connect to authentication service. Please try again or check your internet connection.")
-        setLoading(false)
-        return
+      } catch (firstErr: any) {
+        // Retry once on transient "Load failed" / network errors (common on mobile Safari)
+        const m = firstErr?.message?.toLowerCase() || ""
+        const isTransient = m.includes("load failed") || m.includes("failed to fetch") || m.includes("networkerror") || firstErr?.name === "TypeError"
+        if (isTransient) {
+          await new Promise((r) => setTimeout(r, 1000))
+          try {
+            signInResult = await supabase.auth.signInWithPassword({ email, password })
+          } catch {
+            setError("Unable to connect to authentication service. Please check your internet connection and try again.")
+            setLoading(false)
+            return
+          }
+        } else {
+          setError("Unable to connect to authentication service. Please try again.")
+          setLoading(false)
+          return
+        }
       }
 
       if (signInResult.error) {

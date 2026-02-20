@@ -59,16 +59,28 @@ function LoginContent() {
     }
   }
 
+  // Helper: attempt sign-in with automatic retry on transient network errors
+  const attemptSignIn = async (retries = 1): Promise<any> => {
+    try {
+      return await supabase.auth.signInWithPassword({ email, password })
+    } catch (err: any) {
+      const msg = err?.message?.toLowerCase() || ""
+      const isTransient = msg.includes("load failed") || msg.includes("failed to fetch") || msg.includes("networkerror") || err?.name === "TypeError"
+      if (isTransient && retries > 0) {
+        await new Promise((r) => setTimeout(r, 1000))
+        return attemptSignIn(retries - 1)
+      }
+      throw err
+    }
+  }
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      const { data, error: authError } = await attemptSignIn(1)
 
       if (authError) {
         const msg = authError.message || ""

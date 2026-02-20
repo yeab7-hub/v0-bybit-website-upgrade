@@ -62,38 +62,44 @@ export default function RegisterPage() {
     let data
     let authError
 
-    try {
-      const result = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-            `${window.location.origin}/auth/callback`,
-          data: {
-            full_name: fullName,
-            referral_code: referral || null,
-          },
+    const signUpOptions = {
+      email,
+      password,
+      options: {
+        emailRedirectTo:
+          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+          `${window.location.origin}/auth/callback`,
+        data: {
+          full_name: fullName,
+          referral_code: referral || null,
         },
-      })
+      },
+    }
+
+    try {
+      const result = await supabase.auth.signUp(signUpOptions)
       data = result.data
       authError = result.error
-    } catch (err: any) {
-      const msg = err?.message?.toLowerCase() || ""
-      if (
-        msg.includes("fetch") ||
-        msg.includes("network") ||
-        msg.includes("load failed") ||
-        msg.includes("failed to fetch") ||
-        msg.includes("networkerror") ||
-        err?.name === "TypeError"
-      ) {
-        setError("Unable to connect to authentication service. Please check your internet connection and try again.")
+    } catch (firstErr: any) {
+      // Retry once on transient "Load failed" / network errors (common on mobile Safari)
+      const m = firstErr?.message?.toLowerCase() || ""
+      const isTransient = m.includes("load failed") || m.includes("failed to fetch") || m.includes("networkerror") || firstErr?.name === "TypeError"
+      if (isTransient) {
+        await new Promise((r) => setTimeout(r, 1000))
+        try {
+          const retryResult = await supabase.auth.signUp(signUpOptions)
+          data = retryResult.data
+          authError = retryResult.error
+        } catch {
+          setError("Unable to connect. Please check your internet connection and try again.")
+          setLoading(false)
+          return
+        }
       } else {
-        setError(err?.message || "An unexpected error occurred. Please try again.")
+        setError(firstErr?.message || "An unexpected error occurred. Please try again.")
+        setLoading(false)
+        return
       }
-      setLoading(false)
-      return
     }
 
     if (authError) {
