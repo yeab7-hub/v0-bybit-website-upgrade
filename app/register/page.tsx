@@ -29,8 +29,51 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showTerms, setShowTerms] = useState(false)
+  const [showVerify, setShowVerify] = useState(false)
+  const [verifyCode, setVerifyCode] = useState(["", "", "", "", "", ""])
+  const [resendTimer, setResendTimer] = useState(0)
 
   const supabase = createClient()
+
+  const startResendTimer = () => {
+    setResendTimer(60)
+    const interval = setInterval(() => {
+      setResendTimer((t) => { if (t <= 1) { clearInterval(interval); return 0 }; return t - 1 })
+    }, 1000)
+  }
+
+  const handleVerifyCodeChange = (index: number, value: string) => {
+    if (value.length > 1) return
+    const newCode = [...verifyCode]
+    newCode[index] = value
+    setVerifyCode(newCode)
+    if (value && index < 5) document.getElementById(`signup-code-${index + 1}`)?.focus()
+  }
+
+  const handleVerifySignup = async () => {
+    const code = verifyCode.join("")
+    if (code.length !== 6) { setError("Please enter the full 6-digit code."); return }
+    setLoading(true)
+    setError(null)
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({ email, token: code, type: "signup" })
+      if (verifyError) {
+        // Try email type too
+        const { data: d2, error: e2 } = await supabase.auth.verifyOtp({ email, token: code, type: "email" })
+        if (e2) { setError("Invalid verification code."); setLoading(false); return }
+        if (d2?.session) { router.push("/dashboard"); router.refresh(); return }
+      }
+      if (data?.session) { router.push("/dashboard"); router.refresh(); return }
+      // Try password login as fallback
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
+      if (!signInErr) { router.push("/dashboard"); router.refresh(); return }
+      setError("Verification succeeded. Please log in.")
+      setLoading(false)
+    } catch (err: any) {
+      setError(err?.message || "Verification failed.")
+      setLoading(false)
+    }
+  }
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,24 +136,14 @@ export default function RegisterPage() {
     fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
 
     if (data.session) {
+      // If email confirmation is disabled, go straight through
       router.push("/dashboard")
       router.refresh()
     } else {
-      await new Promise((r) => setTimeout(r, 1000))
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-      if (signInError) {
-        await new Promise((r) => setTimeout(r, 1500))
-        const { error: retryError } = await supabase.auth.signInWithPassword({ email, password })
-        if (retryError) {
-          router.push("/auth/sign-up-success")
-        } else {
-          router.push("/trade")
-          router.refresh()
-        }
-      } else {
-        router.push("/trade")
-        router.refresh()
-      }
+      // Email confirmation required -- show verification step
+      startResendTimer()
+      setShowVerify(true)
+      setLoading(false)
     }
   }
 
@@ -134,6 +167,78 @@ export default function RegisterPage() {
 
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-[400px]">
+          {showVerify ? (
+            /* Email Verification Step */
+            <div>
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Mail className="h-5 w-5 text-primary" />
+              </div>
+              <h1 className="text-xl font-bold text-foreground">Verify Your Email</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {"We've sent a 6-digit verification code to "}
+                <span className="font-medium text-foreground">{email}</span>
+              </p>
+
+              {error && (
+                <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>
+              )}
+
+              <div className="mt-6 flex items-center justify-center gap-2">
+                {verifyCode.map((digit, i) => (
+                  <input
+                    key={i}
+                    id={`signup-code-${i}`}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleVerifyCodeChange(i, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Backspace" && !digit && i > 0) {
+                        document.getElementById(`signup-code-${i - 1}`)?.focus()
+                      }
+                    }}
+                    className="h-11 w-11 rounded-md border border-border bg-card text-center font-mono text-lg text-foreground outline-none focus:border-primary"
+                  />
+                ))}
+              </div>
+
+              <Button
+                onClick={handleVerifySignup}
+                disabled={loading || verifyCode.join("").length !== 6}
+                className="mt-6 h-11 w-full bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & Create Account"}
+              </Button>
+
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  onClick={() => { setShowVerify(false); setVerifyCode(["", "", "", "", "", ""]); setError(null) }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={async () => {
+                    if (resendTimer > 0) return
+                    await supabase.auth.resend({ type: "signup", email })
+                    startResendTimer()
+                    setVerifyCode(["", "", "", "", "", ""])
+                  }}
+                  disabled={resendTimer > 0}
+                  className={`text-xs ${resendTimer > 0 ? "text-muted-foreground" : "text-primary hover:underline"}`}
+                >
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend code"}
+                </button>
+              </div>
+
+              <p className="mt-6 text-center text-xs text-muted-foreground">
+                {"Didn't receive the email? Check your spam folder or "}
+                <button onClick={() => { setShowVerify(false); setError(null) }} className="text-primary hover:underline">try a different email</button>
+              </p>
+            </div>
+          ) : (
+          <>
           <h1 className="text-2xl font-bold text-foreground">Create Your Account</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">Join millions of traders worldwide</p>
 
@@ -257,6 +362,8 @@ export default function RegisterPage() {
           <p className="mt-6 text-center text-xs text-muted-foreground">
             Already have an account? <Link href="/login" className="font-medium text-primary hover:underline">Log In</Link>
           </p>
+          </>
+          )}
         </div>
       </div>
 

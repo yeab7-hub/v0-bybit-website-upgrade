@@ -1,4 +1,9 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
 import { MarketTicker } from "@/components/market-ticker"
 import { HeroSection } from "@/components/hero-section"
 import { MarketTable } from "@/components/market-table"
@@ -7,9 +12,51 @@ import { FeaturesSection } from "@/components/features-section"
 import { SecuritySection } from "@/components/security-section"
 import { AppDownloadSection } from "@/components/app-download-section"
 import { CTASection } from "@/components/cta-section"
-import { Footer } from "@/components/footer"
+import { HomeLoggedIn } from "@/components/home-logged-in"
+import { BottomNav } from "@/components/bottom-nav"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 
 export default function HomePage() {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    try {
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data }) => {
+        setUser(data.user)
+        setLoading(false)
+      }).catch(() => setLoading(false))
+    } catch { setLoading(false) }
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <MarketTicker />
+        <div className="flex items-center justify-center py-32">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      </div>
+    )
+  }
+
+  if (user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <MarketTicker />
+        <main className="pb-14 lg:pb-0">
+          <HomeLoggedIn user={user} />
+        </main>
+        <BottomNav />
+        <div className="hidden lg:block"><Footer /></div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />

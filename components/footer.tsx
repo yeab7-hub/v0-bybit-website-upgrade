@@ -86,7 +86,7 @@ export function Footer() {
                   key={s.name}
                   href={s.href}
                   aria-label={s.name}
-                  className="flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-muted-foreground transition-colors hover:text-primary"
+                  className="flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-muted-foreground transition-all hover:scale-110 hover:bg-primary/10 hover:text-primary"
                 >
                   {s.icon}
                 </a>
@@ -100,7 +100,7 @@ export function Footer() {
               <ul className="flex flex-col gap-2">
                 {sec.links.map((l) => (
                   <li key={l.label}>
-                    <Link href={l.href} className="text-xs text-muted-foreground transition-colors hover:text-foreground">{l.label}</Link>
+                    <Link href={l.href} className="text-xs text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4">{l.label}</Link>
                   </li>
                 ))}
               </ul>

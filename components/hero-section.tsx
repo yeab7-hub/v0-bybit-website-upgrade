@@ -40,7 +40,7 @@ export function HeroSection() {
                 className="flex-1 rounded-md border border-border bg-card px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
               />
               <Link href={email ? `/register?email=${encodeURIComponent(email)}` : "/register"}>
-                <Button className="h-[46px] w-full rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:w-auto">
+                <Button className="h-[46px] w-full rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-[0_0_24px_rgba(234,179,8,0.25)] hover:bg-primary/90 hover:shadow-[0_0_32px_rgba(234,179,8,0.4)] sm:w-auto">
                   Sign Up
                 </Button>
               </Link>
@@ -70,7 +70,7 @@ export function HeroSection() {
               <Link
                 key={coin?.id || i}
                 href={coin ? `/trade?pair=${coin.symbol}USDT` : "/trade"}
-                className="group rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/30"
+                className="group rounded-lg border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-[0_0_20px_rgba(234,179,8,0.06)]"
               >
                 {!coin ? (
                   <>

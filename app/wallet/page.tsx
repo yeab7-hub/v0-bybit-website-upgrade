@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { MarketAsset } from "@/components/market-asset"
 import { BybitLogo } from "@/components/bybit-logo"
+import { BottomNav } from "@/components/bottom-nav"
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -58,13 +59,7 @@ export default function WalletPage() {
     return true
   })
 
-  const bottomNav = [
-    { label: "Home", icon: Home, href: "/dashboard" },
-    { label: "Markets", icon: LineChart, href: "/trade" },
-    { label: "Trade", icon: TrendingUp, href: "/trade?pair=BTCUSDT" },
-    { label: "Earn", icon: Coins, href: "/earn" },
-    { label: "Assets", icon: Wallet, href: "/wallet", active: true },
-  ]
+
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
@@ -141,6 +136,22 @@ export default function WalletPage() {
                   </p>
                 </div>
               </div>
+
+              {/* My Card */}
+              <Link href="/card" className="mb-6 block rounded-xl bg-gradient-to-r from-[#e8e8e8] to-[#d0d0d0] p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold text-[#1a1a1a]">My Card</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-[#1a1a1a]/60" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs tracking-wider text-[#1a1a1a]/60">**** **** **** 4774</span>
+                    <div className="flex h-6 w-8 items-center justify-center rounded bg-[#eb001b]/80">
+                      <div className="h-4 w-4 rounded-full bg-[#f79e1b]/80" />
+                    </div>
+                  </div>
+                </div>
+              </Link>
 
               {/* Action Buttons - circular icons like Bybit */}
               <div className="mb-6 flex items-center justify-around">
@@ -348,14 +359,7 @@ export default function WalletPage() {
       </div>
 
       {/* Bottom Nav - mobile only */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
-        {bottomNav.map((n) => (
-          <Link key={n.label} href={n.href} className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 ${n.active ? "text-foreground" : "text-muted-foreground"}`}>
-            <n.icon className="h-5 w-5" />
-            <span className="text-[10px]">{n.label}</span>
-          </Link>
-        ))}
-      </nav>
+      <BottomNav />
     </div>
   )
 }

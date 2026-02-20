@@ -28,9 +28,12 @@ function LoginContent() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [show2FA, setShow2FA] = useState(false)
+  const [showEmailVerify, setShowEmailVerify] = useState(false)
   const [twoFACode, setTwoFACode] = useState(["", "", "", "", "", ""])
+  const [emailCode, setEmailCode] = useState(["", "", "", "", "", ""])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [resendTimer, setResendTimer] = useState(0)
 
   const supabase = createClient()
 
@@ -56,12 +59,68 @@ function LoginContent() {
     }
   }
 
+  const startResendTimer = () => {
+    setResendTimer(60)
+    const interval = setInterval(() => {
+      setResendTimer((t) => { if (t <= 1) { clearInterval(interval); return 0 }; return t - 1 })
+    }, 1000)
+  }
+
+  const sendEmailOTP = async () => {
+    try {
+      const { error: otpError } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } })
+      if (otpError) {
+        // If OTP not supported, fall back to password login
+        return false
+      }
+      return true
+    } catch { return false }
+  }
+
+  const handleEmailVerify = async () => {
+    const code = emailCode.join("")
+    if (code.length !== 6) { setError("Please enter the full 6-digit code."); return }
+    setLoading(true)
+    setError(null)
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({ email, token: code, type: "email" })
+      if (verifyError) {
+        setError("Invalid verification code. Please try again.")
+        setLoading(false)
+        return
+      }
+      if (data?.session) {
+        fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
+        router.push(redirectTo)
+        router.refresh()
+        return
+      }
+      // Fallback: try password login
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInErr) { setError(signInErr.message); setLoading(false); return }
+      router.push(redirectTo)
+      router.refresh()
+    } catch (err: any) {
+      setError(err?.message || "Verification failed.")
+      setLoading(false)
+    }
+  }
+
+  const handleEmailCodeChange = (index: number, value: string) => {
+    if (value.length > 1) return
+    const newCode = [...emailCode]
+    newCode[index] = value
+    setEmailCode(newCode)
+    if (value && index < 5) document.getElementById(`email-code-${index + 1}`)?.focus()
+  }
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
+      // First validate credentials
       const { data, error: authError } = await attemptSignIn(1)
 
       if (authError) {
@@ -83,6 +142,22 @@ function LoginContent() {
       }
 
       if (!data?.session) { setError("Login succeeded but no session was created."); setLoading(false); return }
+
+      // Sign out temporarily -- we'll require email verification first
+      await supabase.auth.signOut()
+
+      // Try to send OTP for email verification
+      const otpSent = await sendEmailOTP()
+      if (otpSent) {
+        startResendTimer()
+        setShowEmailVerify(true)
+        setLoading(false)
+        return
+      }
+
+      // If OTP not available, sign back in and proceed
+      const { error: reSignErr } = await supabase.auth.signInWithPassword({ email, password })
+      if (reSignErr) { setError(reSignErr.message); setLoading(false); return }
       fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
       router.push(redirectTo)
       router.refresh()
@@ -118,7 +193,72 @@ function LoginContent() {
       {/* Form */}
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-[380px]">
-          {!show2FA ? (
+          {showEmailVerify ? (
+            /* Email Verification Step */
+            <div>
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Mail className="h-5 w-5 text-primary" />
+              </div>
+              <h1 className="text-xl font-bold text-foreground">Email Verification</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {"We've sent a 6-digit verification code to "}
+                <span className="font-medium text-foreground">{email}</span>
+              </p>
+
+              {error && (
+                <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>
+              )}
+
+              <div className="mt-6 flex items-center justify-center gap-2">
+                {emailCode.map((digit, i) => (
+                  <input
+                    key={i}
+                    id={`email-code-${i}`}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleEmailCodeChange(i, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Backspace" && !digit && i > 0) {
+                        document.getElementById(`email-code-${i - 1}`)?.focus()
+                      }
+                    }}
+                    className="h-11 w-11 rounded-md border border-border bg-card text-center font-mono text-lg text-foreground outline-none focus:border-primary"
+                  />
+                ))}
+              </div>
+
+              <Button
+                onClick={handleEmailVerify}
+                disabled={loading || emailCode.join("").length !== 6}
+                className="mt-6 h-11 w-full bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & Log In"}
+              </Button>
+
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  onClick={() => { setShowEmailVerify(false); setEmailCode(["", "", "", "", "", ""]); setError(null) }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Back to login
+                </button>
+                <button
+                  onClick={async () => {
+                    if (resendTimer > 0) return
+                    await sendEmailOTP()
+                    startResendTimer()
+                    setEmailCode(["", "", "", "", "", ""])
+                  }}
+                  disabled={resendTimer > 0}
+                  className={`text-xs ${resendTimer > 0 ? "text-muted-foreground" : "text-primary hover:underline"}`}
+                >
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend code"}
+                </button>
+              </div>
+            </div>
+          ) : !show2FA ? (
             <>
               <h1 className="text-2xl font-bold text-foreground">Welcome to Bybit</h1>
 
@@ -218,7 +358,7 @@ function LoginContent() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="h-11 w-full rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                    className="h-11 w-full rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-[0_0_20px_rgba(234,179,8,0.2)] hover:bg-primary/90 hover:shadow-[0_0_28px_rgba(234,179,8,0.35)]"
                   >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log In"}
                   </Button>
@@ -241,7 +381,7 @@ function LoginContent() {
                 <button
                   onClick={() => handleOAuthLogin("google")}
                   disabled={loading}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border py-2.5 text-sm text-foreground hover:bg-secondary disabled:opacity-50"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border py-2.5 text-sm text-foreground transition-all hover:border-primary/40 hover:bg-secondary disabled:opacity-50"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                   Google
@@ -249,7 +389,7 @@ function LoginContent() {
                 <button
                   onClick={() => handleOAuthLogin("apple")}
                   disabled={loading}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border py-2.5 text-sm text-foreground hover:bg-secondary disabled:opacity-50"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border py-2.5 text-sm text-foreground transition-all hover:border-primary/40 hover:bg-secondary disabled:opacity-50"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.18 0-.36-.02-.53-.06-.01-.17-.03-.36-.03-.56 0-1.12.535-2.3 1.235-3.07.36-.39.81-.73 1.36-1 .55-.27 1.06-.42 1.56-.46.02.16.03.32.03.5zm4.563 17.97c-.033.1-.05.2-.07.3-.43 1.38-1.12 2.73-2.02 3.9-.79 1.01-1.6 2.02-2.87 2.05-1.13.03-1.59-.67-3.22-.67-1.63 0-2.13.65-3.2.7-1.22.05-2.15-1.1-2.95-2.1-1.63-2.05-2.88-5.79-1.2-8.32.83-1.25 2.31-2.04 3.92-2.06 1.1-.02 2.14.74 2.81.74.67 0 1.93-.92 3.26-.78.55.02 2.1.22 3.1 1.68-.08.05-1.85 1.08-1.83 3.22.03 2.56 2.24 3.42 2.27 3.43z"/></svg>
                   Apple
