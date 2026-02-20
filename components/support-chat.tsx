@@ -16,6 +16,100 @@ export function SupportChat() {
   const [activeTicket, setActiveTicket] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
 
+  // Draggable state
+  const [btnPos, setBtnPos] = useState<{ x: number; y: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const dragOffset = useRef({ x: 0, y: 0 })
+  const dragStarted = useRef(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  // Initialize position on mount (bottom-right)
+  useEffect(() => {
+    if (!btnPos) {
+      setBtnPos({ x: window.innerWidth - 72, y: window.innerHeight - 90 })
+    }
+    const handleResize = () => {
+      setBtnPos(prev => {
+        if (!prev) return { x: window.innerWidth - 72, y: window.innerHeight - 90 }
+        return {
+          x: Math.min(prev.x, window.innerWidth - 56),
+          y: Math.min(prev.y, window.innerHeight - 56),
+        }
+      })
+    }
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [btnPos])
+
+  // Mouse drag handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!btnRef.current) return
+    dragStarted.current = false
+    setDragging(true)
+    const rect = btnRef.current.getBoundingClientRect()
+    dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
+  useEffect(() => {
+    if (!dragging) return
+    const handleMouseMove = (e: MouseEvent) => {
+      dragStarted.current = true
+      const x = Math.max(0, Math.min(window.innerWidth - 56, e.clientX - dragOffset.current.x))
+      const y = Math.max(0, Math.min(window.innerHeight - 56, e.clientY - dragOffset.current.y))
+      setBtnPos({ x, y })
+    }
+    const handleMouseUp = () => {
+      setDragging(false)
+      // Snap to nearest edge
+      setBtnPos(prev => {
+        if (!prev) return prev
+        const midX = window.innerWidth / 2
+        return { x: prev.x < midX ? 16 : window.innerWidth - 72, y: prev.y }
+      })
+    }
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+  }, [dragging])
+
+  // Touch drag handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!btnRef.current) return
+    dragStarted.current = false
+    setDragging(true)
+    const touch = e.touches[0]
+    const rect = btnRef.current.getBoundingClientRect()
+    dragOffset.current = { x: touch.clientX - rect.left, y: touch.clientY - rect.top }
+  }
+
+  useEffect(() => {
+    if (!dragging) return
+    const handleTouchMove = (e: TouchEvent) => {
+      dragStarted.current = true
+      const touch = e.touches[0]
+      const x = Math.max(0, Math.min(window.innerWidth - 56, touch.clientX - dragOffset.current.x))
+      const y = Math.max(0, Math.min(window.innerHeight - 56, touch.clientY - dragOffset.current.y))
+      setBtnPos({ x, y })
+    }
+    const handleTouchEnd = () => {
+      setDragging(false)
+      setBtnPos(prev => {
+        if (!prev) return prev
+        const midX = window.innerWidth / 2
+        return { x: prev.x < midX ? 16 : window.innerWidth - 72, y: prev.y }
+      })
+    }
+    window.addEventListener("touchmove", handleTouchMove, { passive: false })
+    window.addEventListener("touchend", handleTouchEnd)
+    return () => {
+      window.removeEventListener("touchmove", handleTouchMove)
+      window.removeEventListener("touchend", handleTouchEnd)
+    }
+  }, [dragging])
+
   useEffect(() => {
     try {
       const supabase = createClient()
@@ -113,10 +207,20 @@ export function SupportChat() {
 
   const HeadphoneButton = ({ size = 56, onClick }: { size?: number; onClick: () => void }) => (
     <button
-      onClick={onClick}
-      className="fixed bottom-6 right-6 z-50 flex items-center justify-center rounded-full bg-[#f7a600] shadow-[0_4px_24px_rgba(247,166,0,0.4)] transition-all duration-200 hover:scale-110 hover:shadow-[0_6px_32px_rgba(247,166,0,0.5)] active:scale-95"
-      style={{ width: size, height: size }}
-      aria-label="Support Chat"
+      ref={btnRef}
+      onClick={() => { if (!dragStarted.current) onClick() }}
+      onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
+      className={`fixed z-50 flex items-center justify-center rounded-full bg-[#f7a600] shadow-[0_4px_24px_rgba(247,166,0,0.4)] ${dragging ? "cursor-grabbing scale-110" : "cursor-grab hover:scale-110 hover:shadow-[0_6px_32px_rgba(247,166,0,0.5)] active:scale-95"}`}
+      style={{
+        width: size,
+        height: size,
+        left: btnPos ? btnPos.x : undefined,
+        top: btnPos ? btnPos.y : undefined,
+        transition: dragging ? "none" : "transform 0.2s, box-shadow 0.2s, left 0.3s ease, top 0.3s ease",
+        touchAction: "none",
+      }}
+      aria-label="Support Chat - drag to reposition"
     >
       <svg width={size * 0.43} height={size * 0.43} viewBox="0 0 24 24" fill="none" stroke="#0a0e17" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
@@ -130,16 +234,7 @@ export function SupportChat() {
   }
 
   if (!open) {
-    return (
-      <div className="fixed bottom-6 right-6 z-50">
-        <HeadphoneButton onClick={() => setOpen(true)} />
-        {messages.length > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow">
-            !
-          </span>
-        )}
-      </div>
-    )
+    return <HeadphoneButton onClick={() => setOpen(true)} />
   }
 
   if (minimized) {
@@ -158,7 +253,7 @@ export function SupportChat() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex h-[480px] w-[360px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:h-[520px]">
+    <div className="fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden border-border bg-card shadow-2xl sm:bottom-6 sm:right-6 sm:h-[520px] sm:w-[360px] sm:rounded-2xl sm:border md:w-[400px]">
       {/* Header */}
       <div className="flex items-center justify-between bg-[#f7a600] px-4 py-3">
         <div className="flex items-center gap-2.5">

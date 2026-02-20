@@ -12,6 +12,7 @@ import {
 import { useLivePrices, formatPrice, formatVolume } from "@/hooks/use-live-prices"
 import { MarketAsset, formatAssetPrice } from "@/components/market-asset"
 import { PairSelector } from "@/components/trading/pair-selector"
+import { TradingViewChart } from "@/components/trading/tradingview-chart"
 import { BottomNav } from "@/components/bottom-nav"
 import { createClient } from "@/lib/supabase/client"
 import useSWR, { mutate as globalMutate } from "swr"
@@ -637,6 +638,9 @@ export default function TradePage() {
             {change24h >= 0 ? "+" : ""}{change24h.toFixed(2)}%
           </span>
           <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">MM</span>
+          <Link href={`/trade/chart?pair=${selectedPair}`} className="rounded border border-border p-1.5 lg:hidden">
+            <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+          </Link>
           <div className="hidden items-center gap-1.5 lg:flex">
             <button className="rounded border border-border p-1.5"><SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" /></button>
             <button className="rounded border border-border p-1.5"><BarChart3 className="h-3.5 w-3.5 text-muted-foreground" /></button>
@@ -704,12 +708,8 @@ export default function TradePage() {
           {OrderBookPanel}
         </div>
         <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex flex-1 items-center justify-center border-b border-border bg-card">
-            <div className="text-center">
-              <BarChart3 className="mx-auto mb-2 h-12 w-12 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">{pairDisplay} - ${formatPrice(livePrice)}</p>
-              <p className={`text-xs ${change24h >= 0 ? "text-success" : "text-destructive"}`}>{change24h >= 0 ? "+" : ""}{change24h.toFixed(2)}%</p>
-            </div>
+          <div className="flex-1 border-b border-border bg-card">
+            <TradingViewChart symbol={selectedPair.replace("/", "")} theme="dark" />
           </div>
           {BottomTabsPanel}
         </div>

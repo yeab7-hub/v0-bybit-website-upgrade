@@ -29,7 +29,7 @@ const events = [
 ]
 
 type MarketTab = "favorites" | "hot" | "new" | "gainers" | "losers" | "turnover"
-type MarketSubTab = "spot" | "derivatives" | "tradfi"
+type MarketSubTab = "spot" | "derivatives" | "forex" | "stocks" | "commodities" | "cfd"
 
 export function HomeLoggedIn({ user }: { user: User }) {
   const { crypto, isLoading } = useLivePrices(5000)
@@ -41,9 +41,18 @@ export function HomeLoggedIn({ user }: { user: User }) {
   const [eventIndex, setEventIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
   const [favorites, setFavorites] = useState<string[]>(["BTC", "ETH", "SOL", "XRP", "SUI", "AVAX"])
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const initials = (user.user_metadata?.full_name || user.email || "U").charAt(0).toUpperCase()
   const maskedEmail = user.email ? user.email.replace(/(.{3}).*(@.*)/, "$1***$2") : "User"
+
+  // Fetch notification count
+  useEffect(() => {
+    fetch("/api/notifications")
+      .then(r => r.json())
+      .then(d => { if (typeof d.unread_count === "number") setUnreadCount(d.unread_count) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const supabase = createClient()
@@ -125,9 +134,11 @@ export function HomeLoggedIn({ user }: { user: User }) {
         <button className="p-1.5 text-muted-foreground"><ScanLine className="h-5 w-5" /></button>
         <Link href="/account/notifications" className="relative p-1.5 text-muted-foreground">
           <Bell className="h-5 w-5" />
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-            99+
-          </span>
+          {unreadCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+              {unreadCount}
+            </span>
+          )}
         </Link>
       </div>
 
@@ -206,14 +217,14 @@ export function HomeLoggedIn({ user }: { user: User }) {
         </div>
 
         {/* Sub tabs */}
-        <div className="flex items-center gap-0 px-4 pb-3">
-          {(["spot", "derivatives", "tradfi"] as MarketSubTab[]).map((st) => (
+        <div className="scrollbar-none flex items-center gap-0 overflow-x-auto px-4 pb-3">
+          {(["spot", "derivatives", "forex", "stocks", "commodities", "cfd"] as MarketSubTab[]).map((st) => (
             <button
               key={st}
               onClick={() => setSubTab(st)}
-              className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${subTab === st ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
+              className={`shrink-0 rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${subTab === st ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
             >
-              {st === "tradfi" ? "TradFi" : st.charAt(0).toUpperCase() + st.slice(1)}
+              {st === "cfd" ? "CFD" : st.charAt(0).toUpperCase() + st.slice(1)}
             </button>
           ))}
         </div>
@@ -289,6 +300,13 @@ export function HomeLoggedIn({ user }: { user: User }) {
             </div>
           </div>
         )}
+
+        {/* View All Markets CTA */}
+        <div className="flex items-center justify-center border-t border-border px-4 py-3">
+          <Link href="/markets" className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+            View All Markets <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
 
       {/* Add widget / Reset layout buttons */}

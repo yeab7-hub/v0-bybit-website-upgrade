@@ -50,25 +50,54 @@ export default function RegisterPage() {
     if (value && index < 5) document.getElementById(`signup-code-${index + 1}`)?.focus()
   }
 
+  const sendSignupCode = async () => {
+    try {
+      const res = await fetch("/api/auth/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, purpose: "signup" }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 429) setError("Please wait before requesting another code.")
+        return false
+      }
+      return data.success === true
+    } catch { return false }
+  }
+
   const handleVerifySignup = async () => {
     const code = verifyCode.join("")
     if (code.length !== 6) { setError("Please enter the full 6-digit code."); return }
     setLoading(true)
     setError(null)
     try {
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({ email, token: code, type: "signup" })
-      if (verifyError) {
-        // Try email type too
-        const { data: d2, error: e2 } = await supabase.auth.verifyOtp({ email, token: code, type: "email" })
-        if (e2) { setError("Invalid verification code."); setLoading(false); return }
-        if (d2?.session) { router.push("/dashboard"); router.refresh(); return }
+      // Verify numeric code via our custom API
+      const res = await fetch("/api/auth/verify-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code, purpose: "signup" }),
+      })
+      const result = await res.json()
+      if (!res.ok) {
+        setError(result.error || "Invalid verification code.")
+        setLoading(false)
+        return
       }
-      if (data?.session) { router.push("/dashboard"); router.refresh(); return }
-      // Try password login as fallback
+      // Code verified -- sign in with password
       const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
-      if (!signInErr) { router.push("/dashboard"); router.refresh(); return }
-      setError("Verification succeeded. Please log in.")
-      setLoading(false)
+      if (signInErr) {
+        // If email confirmation still pending, try once more after a short delay
+        await new Promise((r) => setTimeout(r, 1500))
+        const { error: retryErr } = await supabase.auth.signInWithPassword({ email, password })
+        if (retryErr) {
+          setError("Email verified! Please go to the login page to sign in.")
+          setLoading(false)
+          return
+        }
+      }
+      router.push("/dashboard")
+      router.refresh()
     } catch (err: any) {
       setError(err?.message || "Verification failed.")
       setLoading(false)
@@ -136,13 +165,18 @@ export default function RegisterPage() {
     fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
 
     if (data.session) {
-      // If email confirmation is disabled, go straight through
-      router.push("/dashboard")
-      router.refresh()
-    } else {
-      // Email confirmation required -- show verification step
+      // If email confirmation is disabled, sign out first then send code
+      await supabase.auth.signOut()
+    }
+
+    // Always send our custom numeric verification code
+    const sent = await sendSignupCode()
+    if (sent) {
       startResendTimer()
       setShowVerify(true)
+      setLoading(false)
+    } else {
+      setError("Could not send verification email. Please try again.")
       setLoading(false)
     }
   }
@@ -221,9 +255,14 @@ export default function RegisterPage() {
                 <button
                   onClick={async () => {
                     if (resendTimer > 0) return
-                    await supabase.auth.resend({ type: "signup", email })
-                    startResendTimer()
-                    setVerifyCode(["", "", "", "", "", ""])
+                    setError(null)
+                    const sent = await sendSignupCode()
+                    if (sent) {
+                      startResendTimer()
+                      setVerifyCode(["", "", "", "", "", ""])
+                    } else {
+                      setError("Failed to resend. Please wait and try again.")
+                    }
                   }}
                   disabled={resendTimer > 0}
                   className={`text-xs ${resendTimer > 0 ? "text-muted-foreground" : "text-primary hover:underline"}`}

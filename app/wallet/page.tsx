@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import useSWR from "swr"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -27,7 +28,9 @@ const COIN_NAMES: Record<string, string> = {
 }
 
 export default function WalletPage() {
-  const [tab, setTab] = useState<Tab>("overview")
+  const searchParams = useSearchParams()
+  const initialTab = (searchParams.get("tab") as Tab) || "overview"
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [hideSmall, setHideSmall] = useState(false)
   const [hideZero, setHideZero] = useState(false)
   const [search, setSearch] = useState("")
