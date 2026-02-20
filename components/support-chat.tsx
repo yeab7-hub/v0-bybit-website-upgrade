@@ -253,7 +253,7 @@ export function SupportChat() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex h-[480px] w-[360px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:h-[520px]">
+    <div className="fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden border-border bg-card shadow-2xl sm:bottom-6 sm:right-6 sm:h-[520px] sm:w-[360px] sm:rounded-2xl sm:border md:w-[400px]">
       {/* Header */}
       <div className="flex items-center justify-between bg-[#f7a600] px-4 py-3">
         <div className="flex items-center gap-2.5">

@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { User, Shield, Bell, Key, BellRing, Mail, Smartphone, MessageSquare, TrendingUp, AlertCircle, Megaphone } from "lucide-react"
+import { User, Shield, Bell, Key, BellRing, Mail, Smartphone, MessageSquare, TrendingUp, AlertCircle, Megaphone, CheckCheck, Circle, Loader2, Inbox } from "lucide-react"
 import Link from "next/link"
 
 const sidebarItems = [
@@ -49,9 +49,50 @@ const initialSettings: { category: string; icon: any; items: NotifSetting[] }[] 
   },
 ]
 
+type Notification = {
+  id: string
+  type: string
+  title: string
+  message: string
+  read: boolean
+  created_at: string
+  metadata: Record<string, any> | null
+}
+
 export default function NotificationsPage() {
   const [settings, setSettings] = useState(initialSettings)
   const [saved, setSaved] = useState(false)
+  const [activeView, setActiveView] = useState<"inbox" | "settings">("inbox")
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loadingNotifs, setLoadingNotifs] = useState(true)
+
+  useEffect(() => {
+    fetch("/api/notifications")
+      .then(r => r.json())
+      .then(d => {
+        if (d.notifications) setNotifications(d.notifications)
+        setLoadingNotifs(false)
+      })
+      .catch(() => setLoadingNotifs(false))
+  }, [])
+
+  const markAsRead = async (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }).catch(() => {})
+  }
+
+  const markAllRead = async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mark_all: true }),
+    }).catch(() => {})
+  }
 
   const toggleSetting = (catIdx: number, itemIdx: number, channel: "email" | "push" | "sms") => {
     const updated = [...settings]
@@ -61,6 +102,17 @@ export default function NotificationsPage() {
   }
 
   const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+
+  const getNotifIcon = (type: string) => {
+    switch (type) {
+      case "withdrawal_rejected": return <AlertCircle className="h-5 w-5 text-destructive" />
+      case "deposit_confirmed": return <CheckCheck className="h-5 w-5 text-[#0ecb81]" />
+      case "trade": return <TrendingUp className="h-5 w-5 text-primary" />
+      default: return <Bell className="h-5 w-5 text-muted-foreground" />
+    }
+  }
+
+  const unreadCount = notifications.filter(n => !n.read).length
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -87,6 +139,83 @@ export default function NotificationsPage() {
               ))}
             </div>
 
+            {/* View tabs: Inbox | Settings */}
+            <div className="mb-6 flex items-center gap-4 border-b border-border">
+              <button
+                onClick={() => setActiveView("inbox")}
+                className={`relative flex items-center gap-2 pb-3 text-sm font-semibold transition-colors ${activeView === "inbox" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Inbox className="h-4 w-4" />
+                Inbox
+                {unreadCount > 0 && (
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
+                    {unreadCount}
+                  </span>
+                )}
+                {activeView === "inbox" && <span className="absolute bottom-0 left-0 h-0.5 w-full bg-primary" />}
+              </button>
+              <button
+                onClick={() => setActiveView("settings")}
+                className={`relative flex items-center gap-2 pb-3 text-sm font-semibold transition-colors ${activeView === "settings" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Bell className="h-4 w-4" />
+                Settings
+                {activeView === "settings" && <span className="absolute bottom-0 left-0 h-0.5 w-full bg-primary" />}
+              </button>
+            </div>
+
+            {/* INBOX VIEW */}
+            {activeView === "inbox" && (
+              <div>
+                {/* Mark all as read */}
+                {unreadCount > 0 && (
+                  <div className="mb-4 flex justify-end">
+                    <button onClick={markAllRead} className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+                      <CheckCheck className="h-3.5 w-3.5" /> Mark all as read
+                    </button>
+                  </div>
+                )}
+
+                {loadingNotifs ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
+                      <Bell className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">No notifications yet</p>
+                    <p className="mt-1 text-xs text-muted-foreground">You will see important updates here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {notifications.map(notif => (
+                      <button
+                        key={notif.id}
+                        onClick={() => { if (!notif.read) markAsRead(notif.id) }}
+                        className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors ${notif.read ? "border-border bg-card" : "border-primary/20 bg-primary/5"}`}
+                      >
+                        <div className="mt-0.5 shrink-0">{getNotifIcon(notif.type)}</div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-semibold text-foreground">{notif.title}</h3>
+                            {!notif.read && <Circle className="h-2 w-2 fill-primary text-primary" />}
+                          </div>
+                          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{notif.message}</p>
+                          <p className="mt-1.5 text-[10px] text-muted-foreground/70">
+                            {new Date(notif.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SETTINGS VIEW */}
+            {activeView === "settings" && (<div>
             <div className="mb-6 flex items-center justify-between">
               <h1 className="text-xl font-bold text-foreground">Notification Settings</h1>
               <button onClick={handleSave} className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${saved ? "bg-[#0ecb81] text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
@@ -138,6 +267,7 @@ export default function NotificationsPage() {
                 <button className="relative h-5 w-9 rounded-full bg-border transition-colors"><div className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow" /></button>
               </div>
             </div>
+            </div>)}
           </div>
         </div>
       </main>

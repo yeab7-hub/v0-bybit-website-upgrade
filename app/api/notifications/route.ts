@@ -34,18 +34,18 @@ export async function PATCH(request: NextRequest) {
 
   const body = await request.json()
 
-  if (body.action === "mark_read" && body.id) {
-    await supabase
-      .from("notifications")
-      .update({ read: true })
-      .eq("id", body.id)
-      .eq("user_id", user.id)
-  } else if (body.action === "mark_all_read") {
+  if (body.mark_all) {
     await supabase
       .from("notifications")
       .update({ read: true })
       .eq("user_id", user.id)
       .eq("read", false)
+  } else if (body.id) {
+    await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("id", body.id)
+      .eq("user_id", user.id)
   }
 
   return NextResponse.json({ ok: true })

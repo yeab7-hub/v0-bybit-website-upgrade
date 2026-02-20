@@ -638,6 +638,9 @@ export default function TradePage() {
             {change24h >= 0 ? "+" : ""}{change24h.toFixed(2)}%
           </span>
           <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">MM</span>
+          <Link href={`/trade/chart?pair=${selectedPair}`} className="rounded border border-border p-1.5 lg:hidden">
+            <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+          </Link>
           <div className="hidden items-center gap-1.5 lg:flex">
             <button className="rounded border border-border p-1.5"><SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" /></button>
             <button className="rounded border border-border p-1.5"><BarChart3 className="h-3.5 w-3.5 text-muted-foreground" /></button>
