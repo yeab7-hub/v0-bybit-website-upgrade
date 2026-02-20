@@ -17,6 +17,17 @@ import {
   Wallet,
   MessageCircle,
   LayoutDashboard,
+  BarChart3,
+  Layers,
+  Copy,
+  Bot,
+  Coins,
+  Rocket,
+  CreditCard,
+  Users,
+  Gift,
+  FileText,
+  Landmark,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
@@ -28,9 +39,8 @@ const navItems = [
     label: "Buy Crypto",
     href: "/buy-crypto",
     children: [
-      { label: "Express Buy", href: "/buy-crypto" },
-      { label: "P2P Trading", href: "/buy-crypto" },
-      { label: "Third Party", href: "/buy-crypto" },
+      { label: "Express Buy", desc: "Buy crypto with card", icon: CreditCard, href: "/buy-crypto" },
+      { label: "P2P Trading", desc: "Trade with other users", icon: Users, href: "/buy-crypto" },
     ],
   },
   {
@@ -41,20 +51,19 @@ const navItems = [
     label: "Trade",
     href: "/trade",
     children: [
-      { label: "Spot Trading", href: "/trade" },
-      { label: "Margin Trading", href: "/trade" },
-      { label: "Derivatives", href: "/trade" },
-      { label: "Copy Trading", href: "/trade" },
-      { label: "Trading Bots", href: "/trade" },
+      { label: "Spot Trading", desc: "Buy and sell crypto", icon: BarChart3, href: "/trade" },
+      { label: "Derivatives", desc: "Futures & perpetuals", icon: Layers, href: "/trade" },
+      { label: "Copy Trading", desc: "Follow top traders", icon: Copy, href: "/trade" },
+      { label: "Trading Bots", desc: "Automated strategies", icon: Bot, href: "/trade" },
     ],
   },
   {
     label: "Earn",
     href: "/earn",
     children: [
-      { label: "Savings", href: "/earn" },
-      { label: "Liquidity Mining", href: "/earn" },
-      { label: "Launchpool", href: "/earn" },
+      { label: "Savings", desc: "Flexible & fixed", icon: Coins, href: "/earn" },
+      { label: "Liquidity Mining", desc: "Provide liquidity", icon: Landmark, href: "/earn" },
+      { label: "Launchpool", desc: "Stake to earn new tokens", icon: Rocket, href: "/earn" },
     ],
   },
   {
@@ -65,9 +74,9 @@ const navItems = [
     label: "More",
     href: "/about",
     children: [
-      { label: "Rewards Hub", href: "/earn" },
-      { label: "Referral", href: "/finance" },
-      { label: "Affiliates", href: "/finance" },
+      { label: "Rewards Hub", desc: "Bonuses & rewards", icon: Gift, href: "/earn" },
+      { label: "Referral", desc: "Invite and earn", icon: Users, href: "/finance" },
+      { label: "About Us", desc: "Learn about Bybit", icon: FileText, href: "/about" },
     ],
   },
 ]
@@ -78,7 +87,6 @@ export function Header() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-
 
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null
@@ -92,15 +100,6 @@ export function Header() {
             data: { user: currentUser },
           } = await supabase.auth.getUser()
           setUser(currentUser)
-
-          if (currentUser) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("role")
-              .eq("id", currentUser.id)
-              .single()
-      
-          }
         } catch {
           // Auth not available yet
         }
@@ -109,7 +108,6 @@ export function Header() {
 
       const { data } = supabase.auth.onAuthStateChange((_event, session) => {
         setUser(session?.user ?? null)
-        if (!session?.user) { /* logged out */ }
       })
       subscription = data.subscription
     } catch {
@@ -137,16 +135,16 @@ export function Header() {
     "User"
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-xl">
-      <div className="flex items-center justify-between px-4 py-3 lg:px-6">
-        {/* Logo */}
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center">
-            <BybitLogo className="h-6" />
+    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-md">
+      <div className="mx-auto flex max-w-[1440px] items-center justify-between px-4 py-2.5 lg:px-6">
+        {/* Left: Logo + Nav */}
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex shrink-0 items-center">
+            <BybitLogo className="h-5" />
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden items-center gap-1 lg:flex">
+          <nav className="hidden items-center gap-0.5 lg:flex">
             {navItems.map((item) => (
               <div
                 key={item.label}
@@ -158,21 +156,35 @@ export function Header() {
               >
                 <Link
                   href={item.href}
-                  className="flex items-center gap-1 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  className="flex items-center gap-1 rounded-md px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {item.label}
-                  {item.children && <ChevronDown className="h-3 w-3" />}
+                  {item.children && <ChevronDown className="h-3 w-3 opacity-50" />}
                 </Link>
 
                 {item.children && activeDropdown === item.label && (
-                  <div className="absolute left-0 top-full z-50 min-w-[200px] rounded-lg border border-border bg-card p-2 shadow-xl">
+                  <div className="absolute left-0 top-full z-50 min-w-[260px] rounded-xl border border-border bg-card p-2 shadow-2xl">
                     {item.children.map((child) => (
                       <Link
                         key={child.label}
                         href={child.href}
-                        className="block rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-secondary"
                       >
-                        {child.label}
+                        {"icon" in child && child.icon && (
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                            <child.icon className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-sm font-medium text-foreground">
+                            {child.label}
+                          </div>
+                          {"desc" in child && (
+                            <div className="text-xs text-muted-foreground">
+                              {child.desc}
+                            </div>
+                          )}
+                        </div>
                       </Link>
                     ))}
                   </div>
@@ -183,37 +195,47 @@ export function Header() {
         </div>
 
         {/* Right Side */}
-        <div className="flex items-center gap-2">
-          <button className="hidden rounded-md p-2 text-muted-foreground hover:text-foreground lg:block">
+        <div className="flex items-center gap-1.5">
+          <button
+            className="hidden rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground lg:flex"
+            aria-label="Search"
+          >
             <Search className="h-4 w-4" />
           </button>
 
           {user ? (
-            /* Logged in state */
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <Link href="/wallet">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="hidden text-muted-foreground hover:text-foreground lg:flex"
+                  className="hidden h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground lg:flex"
                 >
-                  <Wallet className="mr-1.5 h-4 w-4" />
-                  Wallet
+                  <Wallet className="h-3.5 w-3.5" />
+                  Assets
                 </Button>
               </Link>
 
-              {/* User menu */}
+              <Link href="/trade">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="hidden h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground lg:flex"
+                >
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  Trade
+                </Button>
+              </Link>
+
+              {/* User avatar menu */}
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 >
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
                     {displayName.charAt(0).toUpperCase()}
                   </div>
-                  <span className="hidden text-sm lg:block">
-                    {displayName}
-                  </span>
                   <ChevronDown className="hidden h-3 w-3 lg:block" />
                 </button>
 
@@ -223,8 +245,8 @@ export function Header() {
                       className="fixed inset-0 z-40"
                       onClick={() => setUserMenuOpen(false)}
                     />
-                    <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-border bg-card p-2 shadow-xl">
-                      <div className="border-b border-border px-3 pb-2 pt-1">
+                    <div className="absolute right-0 top-full z-50 mt-1.5 w-56 rounded-xl border border-border bg-card p-1.5 shadow-2xl">
+                      <div className="border-b border-border px-3 pb-2.5 pt-1.5">
                         <p className="text-sm font-medium text-foreground">
                           {displayName}
                         </p>
@@ -232,51 +254,27 @@ export function Header() {
                           {user.email}
                         </p>
                       </div>
-                      <div className="pt-2">
-                        <Link
-                          href="/dashboard"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                        >
-                          <LayoutDashboard className="h-4 w-4" />
-                          Dashboard
-                        </Link>
-                        <Link
-                          href="/wallet"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                        >
-                          <Wallet className="h-4 w-4" />
-                          Wallet
-                        </Link>
-                        <Link
-                          href="/kyc"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                        >
-                          <Shield className="h-4 w-4" />
-                          KYC Verification
-                        </Link>
-                        <Link
-                          href="/support"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                          Support
-                        </Link>
-                        <Link
-                          href="#"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                        >
-                          <Settings className="h-4 w-4" />
-                          Settings
-                        </Link>
-
+                      <div className="pt-1.5">
+                        {[
+                          { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+                          { href: "/wallet", icon: Wallet, label: "Wallet" },
+                          { href: "/kyc", icon: Shield, label: "KYC Verification" },
+                          { href: "/support", icon: MessageCircle, label: "Support" },
+                        ].map((item) => (
+                          <Link
+                            key={item.label}
+                            href={item.href}
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          >
+                            <item.icon className="h-4 w-4" />
+                            {item.label}
+                          </Link>
+                        ))}
+                        <div className="my-1 border-t border-border" />
                         <button
                           onClick={handleSignOut}
-                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
                         >
                           <LogOut className="h-4 w-4" />
                           Sign Out
@@ -288,13 +286,12 @@ export function Header() {
               </div>
             </div>
           ) : (
-            /* Logged out state */
-            <>
+            <div className="flex items-center gap-1.5">
               <Link href="/login">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="h-8 text-xs font-medium text-muted-foreground hover:text-foreground"
                 >
                   Log In
                 </Button>
@@ -302,65 +299,69 @@ export function Header() {
               <Link href="/register">
                 <Button
                   size="sm"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="h-8 bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
                 >
                   Sign Up
                 </Button>
               </Link>
-            </>
+            </div>
           )}
 
-          <button className="hidden rounded-md p-2 text-muted-foreground hover:text-foreground lg:block">
+          <button
+            className="hidden rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground lg:flex"
+            aria-label="Download app"
+          >
             <Download className="h-4 w-4" />
           </button>
-          <button className="hidden rounded-md p-2 text-muted-foreground hover:text-foreground lg:block">
+          <button
+            className="hidden rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground lg:flex"
+            aria-label="Language"
+          >
             <Globe className="h-4 w-4" />
           </button>
 
           {/* Mobile toggle */}
           <button
-            className="rounded-md p-2 text-muted-foreground hover:text-foreground lg:hidden"
+            className="rounded-lg p-2 text-muted-foreground hover:text-foreground lg:hidden"
             onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Menu"
           >
-            {mobileOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
 
       {/* Mobile Nav */}
       {mobileOpen && (
-        <div className="border-t border-border bg-card p-4 lg:hidden">
+        <div className="border-t border-border bg-card px-4 pb-6 pt-4 lg:hidden">
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => (
               <div key={item.label}>
                 <Link
                   href={item.href}
-                  className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+                  className="flex items-center justify-between rounded-lg px-3 py-3 text-sm font-medium text-foreground"
                   onClick={() => setMobileOpen(false)}
                 >
                   {item.label}
+                  {item.children && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                 </Link>
-                {item.children && (
-                  <div className="ml-4">
-                    {item.children.map((child) => (
-                      <Link
-                        key={child.label}
-                        href={child.href}
-                        className="block rounded-md px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => setMobileOpen(false)}
-                      >
-                        {child.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
           </nav>
+          {!user && (
+            <div className="mt-4 flex flex-col gap-2">
+              <Link href="/login" onClick={() => setMobileOpen(false)}>
+                <Button variant="outline" className="w-full border-border text-foreground">
+                  Log In
+                </Button>
+              </Link>
+              <Link href="/register" onClick={() => setMobileOpen(false)}>
+                <Button className="w-full bg-primary text-primary-foreground">
+                  Sign Up
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </header>
