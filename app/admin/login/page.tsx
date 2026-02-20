@@ -16,63 +16,84 @@ export default function AdminLogin() {
     setLoading(true)
     setError(null)
 
-    const supabase = createClient()
-
-    let authError
     try {
-      const result = await supabase.auth.signInWithPassword({ email, password })
-      authError = result.error
+      const supabase = createClient()
+
+      // Step 1: Sign in with Supabase Auth
+      let signInResult
+      try {
+        signInResult = await supabase.auth.signInWithPassword({ email, password })
+      } catch (err: any) {
+        setError("Unable to connect to authentication service. Please try again or check your internet connection.")
+        setLoading(false)
+        return
+      }
+
+      if (signInResult.error) {
+        if (signInResult.error.message === "Supabase not configured") {
+          setError("Authentication service is not configured. Please check environment variables.")
+        } else if (signInResult.error.message?.includes("Invalid login")) {
+          setError("Invalid email or password.")
+        } else {
+          setError(signInResult.error.message)
+        }
+        setLoading(false)
+        return
+      }
+
+      // Step 2: Get the user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setError("Authentication failed. Please try again.")
+        setLoading(false)
+        return
+      }
+
+      // Step 3: Verify admin role via server-side API (bypasses RLS)
+      let isAdmin = false
+      let roleName = ""
+
+      try {
+        const res = await fetch("/api/admin/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id }),
+        })
+
+        if (res.ok) {
+          const result = await res.json()
+          isAdmin = result.isAdmin === true
+          roleName = result.role || ""
+        }
+      } catch {
+        // Fallback: direct client-side profile check
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single()
+          isAdmin = profile?.role === "admin" || profile?.role === "super_admin"
+          roleName = profile?.role || ""
+        } catch {
+          // Both methods failed
+        }
+      }
+
+      if (!isAdmin) {
+        await supabase.auth.signOut()
+        setError(`Access denied.${roleName ? ` Your role is "${roleName}".` : ""} Admin credentials required.`)
+        setLoading(false)
+        return
+      }
+
+      // Step 4: Success -- redirect to admin dashboard
+      router.push("/admin")
+      router.refresh()
     } catch (err: any) {
-      if (err?.message?.includes("fetch") || err?.message?.includes("network") || err?.name === "TypeError") {
-        setError("Unable to connect to authentication service. Please check that the site is properly configured.")
-      } else {
-        setError(err?.message || "An unexpected error occurred.")
-      }
+      setError(err?.message || "An unexpected error occurred. Please try again.")
       setLoading(false)
-      return
     }
-
-    if (authError) {
-      if (authError.message === "Supabase not configured") {
-        setError("Authentication service is not configured. Please check environment variables in Settings.")
-      } else {
-        setError(authError.message)
-      }
-      setLoading(false)
-      return
-    }
-
-    // Verify admin role using server-side API (bypasses RLS with service role)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError("Authentication failed"); setLoading(false); return }
-
-    try {
-      const res = await fetch("/api/admin/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
-      })
-      const result = await res.json()
-
-      if (!result.isAdmin) {
-        await supabase.auth.signOut()
-        setError(`Access denied. ${result.role ? `Your role is "${result.role}".` : ""} Admin credentials required.`)
-        setLoading(false)
-        return
-      }
-    } catch {
-      // Fallback: try direct client-side check
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-      if (profile?.role !== "admin" && profile?.role !== "super_admin") {
-        await supabase.auth.signOut()
-        setError("Access denied. Admin credentials required.")
-        setLoading(false)
-        return
-      }
-    }
-
-    router.push("/admin")
-    router.refresh()
   }
 
   return (
