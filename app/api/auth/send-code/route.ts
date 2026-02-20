@@ -34,13 +34,7 @@ function buildEmailHTML(code: string, purpose: "login" | "signup") {
           <!-- Header with Logo -->
           <tr>
             <td style="padding:32px 40px 24px;text-align:center;border-bottom:1px solid #2a2d35;">
-              <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
-                <tr>
-                  <td>
-                    <span style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:1px;">BYB</span><span style="font-size:28px;font-weight:800;color:#f7a600;letter-spacing:1px;">I</span><span style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:1px;">T</span>
-                  </td>
-                </tr>
-              </table>
+              <img src="${process.env.NEXT_PUBLIC_APP_URL || 'https://v0-bybit-website-upgrade.vercel.app'}/images/bybit-email-logo.jpg" alt="Bybit" width="180" height="45" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
               <p style="margin:8px 0 0;font-size:12px;color:#72768f;letter-spacing:0.5px;">CRYPTO EXCHANGE</p>
             </td>
           </tr>
