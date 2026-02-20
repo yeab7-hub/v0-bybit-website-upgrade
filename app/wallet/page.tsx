@@ -142,6 +142,22 @@ export default function WalletPage() {
                 </div>
               </div>
 
+              {/* My Card */}
+              <Link href="/card" className="mb-6 block rounded-xl bg-gradient-to-r from-[#e8e8e8] to-[#d0d0d0] p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold text-[#1a1a1a]">My Card</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-[#1a1a1a]/60" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs tracking-wider text-[#1a1a1a]/60">**** **** **** 4774</span>
+                    <div className="flex h-6 w-8 items-center justify-center rounded bg-[#eb001b]/80">
+                      <div className="h-4 w-4 rounded-full bg-[#f79e1b]/80" />
+                    </div>
+                  </div>
+                </div>
+              </Link>
+
               {/* Action Buttons - circular icons like Bybit */}
               <div className="mb-6 flex items-center justify-around">
                 {[
