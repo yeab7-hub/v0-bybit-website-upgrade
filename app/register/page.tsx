@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { BybitLogo } from "@/components/bybit-logo"
 import {
   Eye,
   EyeOff,
@@ -61,30 +62,44 @@ export default function RegisterPage() {
     let data
     let authError
 
-    try {
-      const result = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-            `${window.location.origin}/auth/callback`,
-          data: {
-            full_name: fullName,
-            referral_code: referral || null,
-          },
+    const signUpOptions = {
+      email,
+      password,
+      options: {
+        emailRedirectTo:
+          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+          `${window.location.origin}/auth/callback`,
+        data: {
+          full_name: fullName,
+          referral_code: referral || null,
         },
-      })
+      },
+    }
+
+    try {
+      const result = await supabase.auth.signUp(signUpOptions)
       data = result.data
       authError = result.error
-    } catch (err: any) {
-      if (err?.message?.includes("fetch") || err?.message?.includes("network") || err?.name === "TypeError") {
-        setError("Unable to connect to authentication service. Please check that the site is properly configured.")
+    } catch (firstErr: any) {
+      // Retry once on transient "Load failed" / network errors (common on mobile Safari)
+      const m = firstErr?.message?.toLowerCase() || ""
+      const isTransient = m.includes("load failed") || m.includes("failed to fetch") || m.includes("networkerror") || firstErr?.name === "TypeError"
+      if (isTransient) {
+        await new Promise((r) => setTimeout(r, 1000))
+        try {
+          const retryResult = await supabase.auth.signUp(signUpOptions)
+          data = retryResult.data
+          authError = retryResult.error
+        } catch {
+          setError("Unable to connect. Please check your internet connection and try again.")
+          setLoading(false)
+          return
+        }
       } else {
-        setError(err?.message || "An unexpected error occurred. Please try again.")
+        setError(firstErr?.message || "An unexpected error occurred. Please try again.")
+        setLoading(false)
+        return
       }
-      setLoading(false)
-      return
     }
 
     if (authError) {
@@ -220,7 +235,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-md">
           {/* Logo */}
           <Link href="/" className="mb-8 flex items-center">
-            <img src="/images/bybit-logo.png" alt="Bybit" className="h-6" />
+            <BybitLogo className="h-6" />
           </Link>
 
           <h1 className="text-2xl font-bold text-foreground">
@@ -474,7 +489,7 @@ export default function RegisterPage() {
 
           <div className="mt-8 text-center">
             <p className="text-[10px] text-muted-foreground/60">
-              Bybit&trade; 2026. All rights reserved.
+              &copy; 2026 Bybit. All rights reserved.
             </p>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { BybitLogo } from "@/components/bybit-logo"
 
 const footerSections = [
   {
@@ -117,7 +118,7 @@ export function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1">
             <div className="flex items-center">
-              <img src="/images/bybit-logo.png" alt="Bybit" className="h-6" />
+              <BybitLogo className="h-6" />
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
               Trade smarter with next-generation tools, institutional-grade
@@ -165,7 +166,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
           <p className="text-xs text-muted-foreground">
-            Bybit 2026. All rights reserved.
+            &copy; 2026 Bybit. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">

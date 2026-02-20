@@ -21,7 +21,7 @@ export default function AuthErrorPage() {
           </Button>
         </Link>
         <p className="mt-6 text-[10px] text-muted-foreground/60">
-          Bybit&trade; 2026. All rights reserved.
+          &copy; 2026 Bybit. All rights reserved.
         </p>
       </div>
     </div>

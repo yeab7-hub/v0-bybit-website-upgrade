@@ -13,6 +13,7 @@ import {
   TrendingUp, Coins, Wallet, ChevronRight,
 } from "lucide-react"
 import { MarketAsset } from "@/components/market-asset"
+import { BybitLogo } from "@/components/bybit-logo"
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -74,7 +75,7 @@ export default function WalletPage() {
 
       {/* Mobile header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3 lg:hidden">
-        <img src="/images/bybit-logo.png" alt="Bybit" className="h-5" />
+        <BybitLogo className="h-5" />
         <div className="flex items-center gap-2">
           <Link href="/dashboard" className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
             {"U"}

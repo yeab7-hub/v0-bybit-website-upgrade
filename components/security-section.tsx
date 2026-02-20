@@ -1,5 +1,3 @@
-"use client"
-
 import {
   ShieldCheck,
   Lock,
@@ -10,80 +8,40 @@ import {
 } from "lucide-react"
 
 const securityFeatures = [
-  {
-    icon: ShieldCheck,
-    title: "Proof of Reserves",
-    description:
-      "1:1 backed reserves verified by independent third-party auditors. View real-time reserve data anytime.",
-  },
-  {
-    icon: Lock,
-    title: "Cold Storage",
-    description:
-      "95% of all assets stored in multi-signature cold wallets with hardware security modules (HSM).",
-  },
-  {
-    icon: Eye,
-    title: "Real-Time Monitoring",
-    description:
-      "AI-powered risk detection system monitors every transaction for suspicious activity 24/7.",
-  },
-  {
-    icon: Server,
-    title: "Enterprise Infrastructure",
-    description:
-      "Distributed across multiple data centers with DDoS protection and 99.99% uptime SLA.",
-  },
-  {
-    icon: FileKey,
-    title: "Regulatory Compliance",
-    description:
-      "Licensed and regulated in multiple jurisdictions. Full KYC/AML compliance with leading identity providers.",
-  },
-  {
-    icon: AlertTriangle,
-    title: "Insurance Fund",
-    description:
-      "Dedicated insurance fund covering user assets against potential security breaches and system failures.",
-  },
+  { icon: ShieldCheck, title: "Proof of Reserves", description: "1:1 backed reserves verified by independent third-party auditors." },
+  { icon: Lock, title: "Cold Storage", description: "95% of all assets stored in multi-signature cold wallets with HSM." },
+  { icon: Eye, title: "Real-Time Monitoring", description: "AI-powered risk detection monitors every transaction 24/7." },
+  { icon: Server, title: "Enterprise Infrastructure", description: "Distributed data centers with DDoS protection and 99.99% uptime." },
+  { icon: FileKey, title: "Regulatory Compliance", description: "Licensed in multiple jurisdictions with full KYC/AML compliance." },
+  { icon: AlertTriangle, title: "Insurance Fund", description: "Dedicated fund covering user assets against potential breaches." },
 ]
 
 export function SecuritySection() {
   return (
-    <section className="border-t border-border bg-card/50">
-      <div className="mx-auto max-w-7xl px-4 py-20 lg:px-6">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          {/* Left: Visual */}
-          <div className="relative">
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-8">
-              <div className="absolute left-0 top-0 h-48 w-48 rounded-full bg-primary/5 blur-[80px]" />
+    <section className="border-t border-border">
+      <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6 lg:py-20">
+        <div className="grid items-center gap-10 lg:grid-cols-2">
+          {/* Left: Metrics */}
+          <div>
+            <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 lg:p-8">
+              <div className="absolute left-0 top-0 h-40 w-40 rounded-full bg-primary/[0.04] blur-[80px]" />
 
               <div className="relative">
-                {/* Shield Graphic */}
-                <div className="mx-auto mb-8 flex h-32 w-32 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/5">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
-                    <ShieldCheck className="h-10 w-10 text-primary" />
-                  </div>
+                {/* Shield icon */}
+                <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-primary/20 bg-primary/5">
+                  <ShieldCheck className="h-10 w-10 text-primary" />
                 </div>
 
-                {/* Metrics */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   {[
                     { label: "Assets Protected", value: "$12B+" },
                     { label: "Security Audits", value: "47" },
                     { label: "Uptime Record", value: "99.99%" },
                     { label: "Bug Bounty Paid", value: "$4.2M" },
                   ].map((m) => (
-                    <div
-                      key={m.label}
-                      className="rounded-xl border border-border bg-secondary/30 p-4 text-center"
-                    >
-                      <div className="text-xl font-bold text-foreground">
-                        {m.value}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {m.label}
-                      </div>
+                    <div key={m.label} className="rounded-xl border border-border bg-secondary/20 p-4 text-center">
+                      <div className="font-mono text-lg font-bold text-foreground">{m.value}</div>
+                      <div className="mt-0.5 text-[10px] text-muted-foreground">{m.label}</div>
                     </div>
                   ))}
                 </div>
@@ -96,28 +54,22 @@ export function SecuritySection() {
             <span className="text-xs font-medium uppercase tracking-widest text-primary">
               Security First
             </span>
-            <h2 className="mt-3 text-balance text-3xl font-bold text-foreground">
+            <h2 className="mt-2 text-balance text-2xl font-bold text-foreground md:text-3xl">
               Your Assets, Fully Protected
             </h2>
-            <p className="mt-4 leading-relaxed text-muted-foreground">
-              We employ the most advanced security infrastructure in the
-              industry. From multi-sig cold storage to real-time AI monitoring,
-              every layer is engineered to keep your funds safe.
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              We employ the most advanced security infrastructure in the industry. Every layer is engineered to keep your funds safe.
             </p>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {securityFeatures.map((f) => (
                 <div
                   key={f.title}
-                  className="group rounded-xl border border-border bg-card p-4 hover:border-primary/20"
+                  className="group rounded-xl border border-border bg-card p-3.5 transition-colors hover:border-primary/20"
                 >
-                  <f.icon className="mb-2 h-5 w-5 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {f.title}
-                  </h3>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {f.description}
-                  </p>
+                  <f.icon className="mb-2 h-4 w-4 text-primary" />
+                  <h3 className="text-xs font-semibold text-foreground">{f.title}</h3>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{f.description}</p>
                 </div>
               ))}
             </div>

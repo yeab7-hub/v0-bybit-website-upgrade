@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { BybitLogo } from "@/components/bybit-logo"
 
 export default function AdminLogin() {
   const router = useRouter()
@@ -16,63 +17,109 @@ export default function AdminLogin() {
     setLoading(true)
     setError(null)
 
-    const supabase = createClient()
-
-    let authError
     try {
-      const result = await supabase.auth.signInWithPassword({ email, password })
-      authError = result.error
+      const supabase = createClient()
+
+      // Step 1: Sign in with Supabase Auth (retry once on transient network errors)
+      let signInResult
+      try {
+        signInResult = await supabase.auth.signInWithPassword({ email, password })
+      } catch (firstErr: any) {
+        // Retry once on transient "Load failed" / network errors (common on mobile Safari)
+        const m = firstErr?.message?.toLowerCase() || ""
+        const isTransient = m.includes("load failed") || m.includes("failed to fetch") || m.includes("networkerror") || firstErr?.name === "TypeError"
+        if (isTransient) {
+          await new Promise((r) => setTimeout(r, 1000))
+          try {
+            signInResult = await supabase.auth.signInWithPassword({ email, password })
+          } catch {
+            setError("Unable to connect to authentication service. Please check your internet connection and try again.")
+            setLoading(false)
+            return
+          }
+        } else {
+          setError("Unable to connect to authentication service. Please try again.")
+          setLoading(false)
+          return
+        }
+      }
+
+      if (signInResult.error) {
+        if (signInResult.error.message === "Supabase not configured") {
+          setError("Authentication service is not configured. Please check environment variables.")
+        } else if (signInResult.error.message?.includes("Invalid login")) {
+          setError("Invalid email or password.")
+        } else {
+          setError(signInResult.error.message)
+        }
+        setLoading(false)
+        return
+      }
+
+      // Step 2: Get the user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setError("Authentication failed. Please try again.")
+        setLoading(false)
+        return
+      }
+
+      // Step 3: Verify admin role via server-side API (bypasses RLS)
+      let isAdmin = false
+      let roleName = ""
+
+      try {
+        const res = await fetch("/api/admin/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id }),
+        })
+
+        if (res.ok) {
+          const result = await res.json()
+          isAdmin = result.isAdmin === true
+          roleName = result.role || ""
+        }
+      } catch {
+        // Fallback: direct client-side profile check
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single()
+          isAdmin = profile?.role === "admin" || profile?.role === "super_admin"
+          roleName = profile?.role || ""
+        } catch {
+          // Both methods failed
+        }
+      }
+
+      if (!isAdmin) {
+        await supabase.auth.signOut()
+        setError(`Access denied.${roleName ? ` Your role is "${roleName}".` : ""} Admin credentials required.`)
+        setLoading(false)
+        return
+      }
+
+      // Step 4: Success -- redirect to admin dashboard
+      router.push("/admin")
+      router.refresh()
     } catch (err: any) {
-      if (err?.message?.includes("fetch") || err?.message?.includes("network") || err?.name === "TypeError") {
-        setError("Unable to connect to authentication service. Please check that the site is properly configured.")
+      const msg = err?.message?.toLowerCase() || ""
+      if (
+        msg.includes("fetch") ||
+        msg.includes("network") ||
+        msg.includes("load failed") ||
+        msg.includes("failed to fetch") ||
+        err?.name === "TypeError"
+      ) {
+        setError("Unable to connect to authentication service. Please check your internet connection and try again.")
       } else {
-        setError(err?.message || "An unexpected error occurred.")
+        setError(err?.message || "An unexpected error occurred. Please try again.")
       }
       setLoading(false)
-      return
     }
-
-    if (authError) {
-      if (authError.message === "Supabase not configured") {
-        setError("Authentication service is not configured. Please check environment variables in Settings.")
-      } else {
-        setError(authError.message)
-      }
-      setLoading(false)
-      return
-    }
-
-    // Verify admin role using server-side API (bypasses RLS with service role)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError("Authentication failed"); setLoading(false); return }
-
-    try {
-      const res = await fetch("/api/admin/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
-      })
-      const result = await res.json()
-
-      if (!result.isAdmin) {
-        await supabase.auth.signOut()
-        setError(`Access denied. ${result.role ? `Your role is "${result.role}".` : ""} Admin credentials required.`)
-        setLoading(false)
-        return
-      }
-    } catch {
-      // Fallback: try direct client-side check
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-      if (profile?.role !== "admin" && profile?.role !== "super_admin") {
-        await supabase.auth.signOut()
-        setError("Access denied. Admin credentials required.")
-        setLoading(false)
-        return
-      }
-    }
-
-    router.push("/admin")
-    router.refresh()
   }
 
   return (
@@ -80,7 +127,7 @@ export default function AdminLogin() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <img src="/images/bybit-logo.png" alt="Bybit" className="h-8" />
+          <BybitLogo className="h-8" />
           <div className="flex items-center gap-2">
             <div className="h-px w-8 bg-[#f7a600]/30" />
             <span className="text-xs font-semibold tracking-widest text-[#f7a600]">ADMIN PANEL</span>

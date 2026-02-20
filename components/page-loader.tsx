@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { usePathname } from "next/navigation"
+import { BybitLogo } from "@/components/bybit-logo"
 
 export function PageLoader() {
   const pathname = usePathname()
@@ -40,12 +41,9 @@ export function PageLoader() {
       }`}
     >
       <div className="flex flex-col items-center gap-5">
-        <img
-          src="/images/bybit-logo.png"
-          alt="Bybit"
-          className="h-8"
-          style={{ animation: "logoPulse 1s ease-in-out infinite" }}
-        />
+        <div style={{ animation: "logoPulse 1s ease-in-out infinite" }}>
+          <BybitLogo className="h-8" />
+        </div>
         <div className="h-[2px] w-20 overflow-hidden rounded-full bg-[#1a1f2e]">
           <div
             className="h-full rounded-full bg-[#f7a600]"
