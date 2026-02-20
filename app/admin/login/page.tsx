@@ -92,7 +92,18 @@ export default function AdminLogin() {
       router.push("/admin")
       router.refresh()
     } catch (err: any) {
-      setError(err?.message || "An unexpected error occurred. Please try again.")
+      const msg = err?.message?.toLowerCase() || ""
+      if (
+        msg.includes("fetch") ||
+        msg.includes("network") ||
+        msg.includes("load failed") ||
+        msg.includes("failed to fetch") ||
+        err?.name === "TypeError"
+      ) {
+        setError("Unable to connect to authentication service. Please check your internet connection and try again.")
+      } else {
+        setError(err?.message || "An unexpected error occurred. Please try again.")
+      }
       setLoading(false)
     }
   }

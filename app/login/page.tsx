@@ -122,8 +122,16 @@ function LoginContent() {
       router.push(redirectTo)
       router.refresh()
     } catch (err: any) {
-      if (err?.message?.includes("fetch") || err?.message?.includes("network") || err?.name === "TypeError") {
-        setError("Unable to connect to authentication service. Please check your network connection.")
+      const msg = err?.message?.toLowerCase() || ""
+      if (
+        msg.includes("fetch") ||
+        msg.includes("network") ||
+        msg.includes("load failed") ||
+        msg.includes("failed to fetch") ||
+        msg.includes("networkerror") ||
+        err?.name === "TypeError"
+      ) {
+        setError("Unable to connect to authentication service. Please check your internet connection and try again.")
       } else {
         setError(err?.message || "An unexpected error occurred. Please try again.")
       }

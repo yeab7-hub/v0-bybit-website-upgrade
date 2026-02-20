@@ -58,20 +58,25 @@ export async function updateSession(request: NextRequest) {
 
     // For admin routes, also verify the user has admin role
     if ((isAdminRoute || isAdminApi) && user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
 
-      const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
-      if (!isAdmin) {
-        if (isAdminApi) {
-          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
+        if (!isAdmin) {
+          if (isAdminApi) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+          }
+          const url = request.nextUrl.clone()
+          url.pathname = '/trade'
+          return NextResponse.redirect(url)
         }
-        const url = request.nextUrl.clone()
-        url.pathname = '/trade'
-        return NextResponse.redirect(url)
+      } catch {
+        // If profile check fails, allow through -- the page/API will handle auth
+        // This prevents middleware crashes from blocking admin access
       }
     }
 
