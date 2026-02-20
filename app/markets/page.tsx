@@ -257,7 +257,7 @@ export default function MarketsPage() {
                         </tr>
                       ))
                     : filtered.map((coin, idx) => (
-                        <tr key={coin.symbol} className="border-b border-border/50 transition-colors hover:bg-card/30">
+                        <tr key={coin.symbol} className="group/row border-b border-border/50 transition-colors hover:bg-card/50">
                           <td className="px-4 py-3">
                             <button onClick={() => toggleFav(coin.symbol)} className="text-muted-foreground hover:text-primary">
                               <Star className={`h-4 w-4 ${favorites.has(coin.symbol) ? "fill-primary text-primary" : ""}`} />
@@ -307,7 +307,7 @@ export default function MarketsPage() {
                           <td className="px-4 py-3 text-right">
                             <Link
                               href={`/trade?pair=${coin.symbol}USDT`}
-                              className="rounded-md bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+                              className="rounded-md bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-all hover:bg-primary hover:text-primary-foreground hover:shadow-[0_0_12px_rgba(234,179,8,0.2)]"
                             >
                               Trade
                             </Link>

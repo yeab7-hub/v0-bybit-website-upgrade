@@ -167,15 +167,18 @@ export function Header() {
               >
                 <Link
                   href={item.href}
-                  className="flex items-center gap-0.5 px-2.5 py-4 text-[13px] font-medium text-secondary-foreground transition-colors hover:text-foreground"
+                  className={`relative flex items-center gap-0.5 px-2.5 py-4 text-[13px] font-medium transition-colors hover:text-foreground ${hoveredNav === item.label ? "text-foreground" : "text-secondary-foreground"}`}
                 >
                   {item.label}
-                  {item.children && <ChevronDown className="h-3 w-3 opacity-40" />}
+                  {item.children && <ChevronDown className={`h-3 w-3 transition-transform ${hoveredNav === item.label ? "rotate-180 opacity-70" : "opacity-40"}`} />}
+                  {hoveredNav === item.label && (
+                    <span className="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full bg-primary" />
+                  )}
                 </Link>
                 {/* Mega menu dropdown */}
                 {item.children && hoveredNav === item.label && (
                   <div
-                    className="absolute left-0 top-full z-50 min-w-[280px] rounded-xl border border-border bg-card py-2 shadow-2xl"
+                    className="absolute left-0 top-full z-50 min-w-[280px] animate-in fade-in-0 slide-in-from-top-2 rounded-xl border border-border bg-card py-2 shadow-2xl duration-200"
                     onMouseEnter={() => handleMouseEnter(item.label)}
                     onMouseLeave={handleMouseLeave}
                   >
@@ -183,7 +186,7 @@ export function Header() {
                       <Link
                         key={child.label}
                         href={child.href}
-                        className="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-secondary"
+                        className="flex items-start gap-3 px-4 py-2.5 transition-all hover:bg-secondary hover:pl-5"
                       >
                         {'icon' in child && child.icon && (
                           <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary">
@@ -215,7 +218,7 @@ export function Header() {
             {searchOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => { setSearchOpen(false); setSearchQuery("") }} />
-                <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-xl border border-border bg-card shadow-2xl">
+                <div className="absolute right-0 top-full z-50 mt-1 w-72 animate-in fade-in-0 slide-in-from-top-2 rounded-xl border border-border bg-card shadow-2xl duration-200">
                   <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
                     <Search className="h-4 w-4 text-muted-foreground" />
                     <input
@@ -234,7 +237,7 @@ export function Header() {
                           key={p.href}
                           href={p.href}
                           onClick={() => { setSearchOpen(false); setSearchQuery("") }}
-                          className="block px-4 py-2 text-[13px] text-secondary-foreground hover:bg-secondary hover:text-foreground"
+                          className="block px-4 py-2 text-[13px] text-secondary-foreground transition-all hover:bg-secondary hover:pl-5 hover:text-foreground"
                         >
                           {p.label}
                         </Link>
@@ -286,7 +289,7 @@ export function Header() {
                 {userMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
-                    <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-border bg-card py-1 shadow-2xl">
+                    <div className="absolute right-0 top-full z-50 mt-1 w-56 animate-in fade-in-0 slide-in-from-top-2 rounded-xl border border-border bg-card py-1 shadow-2xl duration-200">
                       <div className="border-b border-border px-4 pb-3 pt-2">
                         <p className="text-sm font-medium text-foreground">{user.user_metadata?.full_name || user.email?.split("@")[0]}</p>
                         <p className="truncate text-xs text-muted-foreground">{user.email}</p>
@@ -323,7 +326,7 @@ export function Header() {
                 </Button>
               </Link>
               <Link href="/register">
-                <Button size="sm" className="h-8 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">
+                <Button size="sm" className="h-8 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground shadow-[0_0_16px_rgba(234,179,8,0.2)] hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(234,179,8,0.35)]">
                   Sign Up
                 </Button>
               </Link>

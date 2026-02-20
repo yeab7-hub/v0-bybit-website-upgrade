@@ -98,7 +98,42 @@
 
 /* Smooth interactive transitions */
 button, a, input, select, textarea {
-  transition-property: background-color, border-color, color, opacity, box-shadow;
+  transition-property: background-color, border-color, color, opacity, box-shadow, transform, padding;
   transition-duration: 150ms;
   transition-timing-function: ease;
+}
+
+/* Active/pressed state for buttons */
+button:active:not(:disabled), a:active, [role="button"]:active {
+  transform: scale(0.98);
+}
+
+/* Focus ring for keyboard navigation */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid hsl(40 96% 53%);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Table row hover */
+tr { transition: background-color 150ms ease; }
+
+/* Card/border hover transitions */
+.group:hover { transition: all 200ms ease; }
+
+/* Smooth dropdown animations */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Selection color */
+::selection {
+  background: hsl(40 96% 53% / 0.3);
+  color: white;
 }
