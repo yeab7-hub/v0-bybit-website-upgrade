@@ -68,12 +68,17 @@ function LoginContent() {
 
   const sendEmailOTP = async () => {
     try {
-      const { error: otpError } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } })
-      if (otpError) {
-        // If OTP not supported, fall back to password login
+      const res = await fetch("/api/auth/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, purpose: "login" }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 429) setError("Please wait before requesting another code.")
         return false
       }
-      return true
+      return data.success === true
     } catch { return false }
   }
 
@@ -83,21 +88,22 @@ function LoginContent() {
     setLoading(true)
     setError(null)
     try {
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({ email, token: code, type: "email" })
-      if (verifyError) {
-        setError("Invalid verification code. Please try again.")
+      // Verify the numeric code via our custom API
+      const res = await fetch("/api/auth/verify-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code, purpose: "login" }),
+      })
+      const result = await res.json()
+      if (!res.ok) {
+        setError(result.error || "Invalid verification code.")
         setLoading(false)
         return
       }
-      if (data?.session) {
-        fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
-        router.push(redirectTo)
-        router.refresh()
-        return
-      }
-      // Fallback: try password login
+      // Code verified -- now sign in with password
       const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
       if (signInErr) { setError(signInErr.message); setLoading(false); return }
+      fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
       router.push(redirectTo)
       router.refresh()
     } catch (err: any) {
@@ -143,10 +149,10 @@ function LoginContent() {
 
       if (!data?.session) { setError("Login succeeded but no session was created."); setLoading(false); return }
 
-      // Sign out temporarily -- we'll require email verification first
+      // Sign out temporarily -- we require email verification first
       await supabase.auth.signOut()
 
-      // Try to send OTP for email verification
+      // Send numeric verification code via our custom API
       const otpSent = await sendEmailOTP()
       if (otpSent) {
         startResendTimer()
@@ -155,12 +161,9 @@ function LoginContent() {
         return
       }
 
-      // If OTP not available, sign back in and proceed
-      const { error: reSignErr } = await supabase.auth.signInWithPassword({ email, password })
-      if (reSignErr) { setError(reSignErr.message); setLoading(false); return }
-      fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
-      router.push(redirectTo)
-      router.refresh()
+      // If sending fails, sign back in and proceed (fallback)
+      setError("Could not send verification email. Please try again.")
+      setLoading(false)
     } catch (err: any) {
       const msg = err?.message?.toLowerCase() || ""
       if (msg.includes("fetch") || msg.includes("network") || msg.includes("load failed") || err?.name === "TypeError") {
@@ -247,9 +250,14 @@ function LoginContent() {
                 <button
                   onClick={async () => {
                     if (resendTimer > 0) return
-                    await sendEmailOTP()
-                    startResendTimer()
-                    setEmailCode(["", "", "", "", "", ""])
+                    setError(null)
+                    const sent = await sendEmailOTP()
+                    if (sent) {
+                      startResendTimer()
+                      setEmailCode(["", "", "", "", "", ""])
+                    } else {
+                      setError("Failed to resend. Please wait and try again.")
+                    }
                   }}
                   disabled={resendTimer > 0}
                   className={`text-xs ${resendTimer > 0 ? "text-muted-foreground" : "text-primary hover:underline"}`}
