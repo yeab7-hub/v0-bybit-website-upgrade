@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { MarketAsset } from "@/components/market-asset"
 import { BybitLogo } from "@/components/bybit-logo"
+import { BottomNav } from "@/components/bottom-nav"
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -58,13 +59,7 @@ export default function WalletPage() {
     return true
   })
 
-  const bottomNav = [
-    { label: "Home", icon: Home, href: "/dashboard" },
-    { label: "Markets", icon: LineChart, href: "/trade" },
-    { label: "Trade", icon: TrendingUp, href: "/trade?pair=BTCUSDT" },
-    { label: "Earn", icon: Coins, href: "/earn" },
-    { label: "Assets", icon: Wallet, href: "/wallet", active: true },
-  ]
+
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
@@ -364,14 +359,7 @@ export default function WalletPage() {
       </div>
 
       {/* Bottom Nav - mobile only */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
-        {bottomNav.map((n) => (
-          <Link key={n.label} href={n.href} className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 ${n.active ? "text-foreground" : "text-muted-foreground"}`}>
-            <n.icon className="h-5 w-5" />
-            <span className="text-[10px]">{n.label}</span>
-          </Link>
-        ))}
-      </nav>
+      <BottomNav />
     </div>
   )
 }

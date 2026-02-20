@@ -13,6 +13,7 @@ import { SecuritySection } from "@/components/security-section"
 import { AppDownloadSection } from "@/components/app-download-section"
 import { CTASection } from "@/components/cta-section"
 import { HomeLoggedIn } from "@/components/home-logged-in"
+import { BottomNav } from "@/components/bottom-nav"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
@@ -47,10 +48,11 @@ export default function HomePage() {
       <div className="min-h-screen bg-background">
         <Header />
         <MarketTicker />
-        <main>
+        <main className="pb-14 lg:pb-0">
           <HomeLoggedIn user={user} />
         </main>
-        <Footer />
+        <BottomNav />
+        <div className="hidden lg:block"><Footer /></div>
       </div>
     )
   }

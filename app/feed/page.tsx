@@ -5,9 +5,9 @@ import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import {
-  ThumbsUp, MessageSquare, Repeat2, ExternalLink, MoreHorizontal, Plus,
-  Home, TrendingUp, BarChart3, Coins, Wallet, Check,
+  ThumbsUp, MessageSquare, Repeat2, ExternalLink, MoreHorizontal, Plus, Check,
 } from "lucide-react"
+import { BottomNav } from "@/components/bottom-nav"
 
 type FeedTab = "byx" | "events" | "rooms" | "livestream" | "news"
 
@@ -207,24 +207,7 @@ export default function FeedPage() {
         </button>
       </main>
 
-      {/* Bottom nav */}
-      <nav className="sticky bottom-0 flex items-center justify-around border-t border-border bg-background py-2 lg:hidden">
-        <Link href="/" className="flex flex-col items-center gap-0.5 px-3">
-          <Home className="h-5 w-5 text-foreground" /><span className="text-[10px] font-medium text-foreground">Home</span>
-        </Link>
-        <Link href="/markets" className="flex flex-col items-center gap-0.5 px-3">
-          <TrendingUp className="h-5 w-5 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">Markets</span>
-        </Link>
-        <Link href="/trade" className="flex flex-col items-center gap-0.5 px-3">
-          <BarChart3 className="h-5 w-5 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">Trade</span>
-        </Link>
-        <Link href="/earn" className="flex flex-col items-center gap-0.5 px-3">
-          <Coins className="h-5 w-5 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">Earn</span>
-        </Link>
-        <Link href="/wallet" className="flex flex-col items-center gap-0.5 px-3">
-          <Wallet className="h-5 w-5 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">Assets</span>
-        </Link>
-      </nav>
+      <BottomNav />
       <div className="hidden lg:block"><Footer /></div>
     </div>
   )

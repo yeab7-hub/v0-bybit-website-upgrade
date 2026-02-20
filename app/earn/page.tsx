@@ -9,6 +9,7 @@ import {
   ArrowRight, Home, LineChart, TrendingUp, Coins, Wallet, Flame,
 } from "lucide-react"
 import { MarketAsset } from "@/components/market-asset"
+import { BottomNav } from "@/components/bottom-nav"
 
 type EarnCategory = "easy" | "onchain" | "advanced"
 type ProductTab = "steady" | "topGains" | "vip"
@@ -76,13 +77,7 @@ export default function EarnPage() {
     ? earnProducts.filter(p => p.coin.toLowerCase().includes(searchQuery.toLowerCase()) || p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : earnProducts
 
-  const bottomNav = [
-    { label: "Home", icon: Home, href: "/dashboard", active: false },
-    { label: "Markets", icon: LineChart, href: "/trade", active: false },
-    { label: "Trade", icon: TrendingUp, href: "/trade?pair=BTCUSDT", active: false },
-    { label: "Earn", icon: Coins, href: "/earn", active: true },
-    { label: "Assets", icon: Wallet, href: "/wallet", active: false },
-  ]
+
 
   const categories: { id: EarnCategory; label: string; hot?: boolean }[] = [
     { id: "easy", label: "Easy Earn" },
@@ -452,15 +447,7 @@ export default function EarnPage() {
         <Footer />
       </div>
 
-      {/* Bottom Nav - mobile only */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
-        {bottomNav.map((n) => (
-          <Link key={n.label} href={n.href} className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 ${n.active ? "text-foreground" : "text-muted-foreground"}`}>
-            <n.icon className="h-5 w-5" />
-            <span className="text-[10px]">{n.label}</span>
-          </Link>
-        ))}
-      </nav>
+      <BottomNav />
     </div>
   )
 }

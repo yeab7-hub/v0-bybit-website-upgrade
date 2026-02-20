@@ -11,6 +11,7 @@ import {
   Search, Star, TrendingUp, TrendingDown, ArrowUpDown,
   Flame, Sparkles, BarChart3, ChevronRight, Filter,
 } from "lucide-react"
+import { BottomNav } from "@/components/bottom-nav"
 
 type MarketCategory = "all" | "spot" | "derivatives" | "defi" | "metaverse" | "layer1" | "layer2" | "meme"
 type SortKey = "name" | "price" | "change" | "volume" | "marketCap"
@@ -320,7 +321,8 @@ export default function MarketsPage() {
           </div>
         </section>
       </main>
-      <Footer />
+      <BottomNav />
+      <div className="hidden lg:block"><Footer /></div>
     </div>
   )
 }
