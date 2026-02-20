@@ -7,7 +7,7 @@ import {
   ArrowLeft, ChevronDown, X, Settings2, BarChart3,
   Loader2, Eye, EyeOff, ArrowUpDown, SlidersHorizontal,
   TrendingUp, TrendingDown, Clock, CheckCircle2, Info,
-  Home, LineChart, Coins, Wallet, Menu,
+  Home, LineChart, Coins, Wallet, Menu, Share2, Copy,
 } from "lucide-react"
 import { useLivePrices, formatPrice, formatVolume } from "@/hooks/use-live-prices"
 import { MarketAsset, formatAssetPrice } from "@/components/market-asset"
@@ -20,7 +20,7 @@ const percentages = [0, 25, 50, 75, 100]
 
 type OrderSide = "buy" | "sell"
 type OrderType = "Market" | "Limit" | "Stop-Limit"
-type BottomTab = "orders" | "positions" | "assets" | "borrowing"
+type BottomTab = "orders" | "positions" | "history" | "assets" | "pnl"
 type TradeMode = "Convert" | "Spot" | "Futures" | "Options" | "TradFi"
 
 export default function TradePage() {
@@ -155,6 +155,16 @@ export default function TradePage() {
   }
 
   const isBuy = side === "buy"
+
+  const handleShare = async (detail: any) => {
+    const pnl = Number(detail.pnl) || 0
+    const text = `${detail.pair} | ${detail.side?.toUpperCase()} | ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT\nPrice: $${Number(detail.price).toLocaleString()} | Qty: ${Number(detail.amount).toFixed(4)}\nTraded on Bybit`
+    if (navigator.share) {
+      try { await navigator.share({ title: "My Trade", text }) } catch {}
+    } else {
+      try { await navigator.clipboard.writeText(text); setFeedback({ type: "success", msg: "Trade details copied!" }); setTimeout(() => setFeedback(null), 2000) } catch {}
+    }
+  }
 
   // Order book data
   const [asks, setAsks] = useState<{ price: number; qty: number }[]>([])
@@ -388,13 +398,22 @@ export default function TradePage() {
   const BottomTabsPanel = (
     <div className="border-t border-border">
       <div className="scrollbar-none flex items-center gap-0 overflow-x-auto border-b border-border px-2">
-        {(["orders", "positions", "assets", "borrowing"] as BottomTab[]).map((t) => (
-          <button key={t} onClick={() => setBottomTab(t)}
-            className={`shrink-0 px-3 py-2.5 text-xs font-medium capitalize transition-colors ${bottomTab === t ? "border-b-2 border-foreground text-foreground" : "text-muted-foreground"}`}
-          >
-            {t === "orders" ? `Orders(${orders.length})` : t === "positions" ? `Positions(${trades.length})` : t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
+        {(["orders", "positions", "history", "assets", "pnl"] as BottomTab[]).map((t) => {
+          const labels: Record<string, string> = {
+            orders: `Open Orders(${orders.length})`,
+            positions: `Positions(${trades.filter((tr: any) => tr.status === "open").length})`,
+            history: "Trade History",
+            assets: "Assets",
+            pnl: "Realized PnL",
+          }
+          return (
+            <button key={t} onClick={() => setBottomTab(t)}
+              className={`shrink-0 whitespace-nowrap px-3 py-2.5 text-xs font-medium transition-colors ${bottomTab === t ? "border-b-2 border-foreground text-foreground" : "text-muted-foreground"}`}
+            >
+              {labels[t]}
+            </button>
+          )
+        })}
         <div className="ml-auto flex items-center gap-1">
           <button onClick={() => setBalanceVisible(!balanceVisible)} className="p-1.5">
             {balanceVisible ? <Eye className="h-3.5 w-3.5 text-muted-foreground" /> : <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -512,8 +531,83 @@ export default function TradePage() {
           )
         )}
 
-        {bottomTab === "borrowing" && (
-          <EmptyState icon={<Info className="h-7 w-7 text-muted-foreground/40" />} text="No Borrowing Records" />
+        {bottomTab === "history" && (
+          trades.length === 0 ? (
+            <EmptyState icon={<Clock className="h-7 w-7 text-muted-foreground/40" />} text="No Trade History" />
+          ) : (
+            <div className="flex flex-col">
+              <div className="grid grid-cols-5 gap-1 border-b border-border px-3 py-2">
+                <span className="text-[10px] font-medium text-muted-foreground">Pair</span>
+                <span className="text-[10px] font-medium text-muted-foreground">Side</span>
+                <span className="text-[10px] font-medium text-muted-foreground">Price</span>
+                <span className="text-[10px] font-medium text-muted-foreground">Amount</span>
+                <span className="text-right text-[10px] font-medium text-muted-foreground">Time</span>
+              </div>
+              {trades.map((t: any) => (
+                <div key={t.id} className="grid grid-cols-5 gap-1 border-b border-border/50 px-3 py-2">
+                  <span className="text-[11px] font-medium text-foreground">{t.pair}</span>
+                  <span className={`text-[11px] font-semibold ${t.side === "buy" ? "text-success" : "text-destructive"}`}>{t.side?.toUpperCase()}</span>
+                  <span className="font-mono text-[11px] text-foreground">${Number(t.price).toLocaleString()}</span>
+                  <span className="font-mono text-[11px] text-foreground">{Number(t.amount).toFixed(4)}</span>
+                  <span className="text-right text-[10px] text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</span>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {bottomTab === "pnl" && (
+          trades.length === 0 ? (
+            <EmptyState icon={<TrendingUp className="h-7 w-7 text-muted-foreground/40" />} text="No PnL Records" />
+          ) : (
+            <div className="flex flex-col">
+              {/* PnL Summary */}
+              <div className="grid grid-cols-3 gap-3 border-b border-border p-3">
+                <div className="rounded-lg bg-secondary/30 p-2.5">
+                  <p className="text-[10px] text-muted-foreground">Total Realized PnL</p>
+                  <p className={`font-mono text-sm font-bold ${trades.reduce((s: number, t: any) => s + (Number(t.pnl) || 0), 0) >= 0 ? "text-success" : "text-destructive"}`}>
+                    {trades.reduce((s: number, t: any) => s + (Number(t.pnl) || 0), 0) >= 0 ? "+" : ""}
+                    {trades.reduce((s: number, t: any) => s + (Number(t.pnl) || 0), 0).toFixed(2)} USDT
+                  </p>
+                </div>
+                <div className="rounded-lg bg-secondary/30 p-2.5">
+                  <p className="text-[10px] text-muted-foreground">Total Trades</p>
+                  <p className="font-mono text-sm font-bold text-foreground">{trades.length}</p>
+                </div>
+                <div className="rounded-lg bg-secondary/30 p-2.5">
+                  <p className="text-[10px] text-muted-foreground">Win Rate</p>
+                  <p className="font-mono text-sm font-bold text-foreground">
+                    {trades.length > 0 ? Math.round((trades.filter((t: any) => (Number(t.pnl) || 0) >= 0).length / trades.length) * 100) : 0}%
+                  </p>
+                </div>
+              </div>
+              {/* Individual PnL rows */}
+              {trades.map((t: any) => {
+                const pnl = Number(t.pnl) || 0
+                const pnlPct = Number(t.price) > 0 ? (pnl / (Number(t.price) * Number(t.amount))) * 100 : 0
+                return (
+                  <div key={t.id} className="flex items-center justify-between border-b border-border/50 px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <MarketAsset symbol={t.pair?.split("/")[0] || "BTC"} size={24} />
+                      <div>
+                        <span className="text-[11px] font-semibold text-foreground">{t.pair}</span>
+                        <span className="ml-1.5 text-[10px] text-muted-foreground">{t.side?.toUpperCase()}</span>
+                        <p className="text-[10px] text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-mono text-xs font-bold ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} USDT
+                      </p>
+                      <p className={`font-mono text-[10px] ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                        {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )
         )}
       </div>
     </div>
@@ -685,9 +779,18 @@ export default function TradePage() {
               )}
               {selectedDetail.created_at && <DetailCell label="Time" value={new Date(selectedDetail.created_at).toLocaleString()} />}
             </div>
-            {selectedDetail._type === "order" && (
-              <button onClick={() => { cancelOrder(selectedDetail.id); setSelectedDetail(null) }} className="mt-4 w-full rounded-lg border border-destructive py-3 text-sm font-semibold text-destructive">Cancel Order</button>
-            )}
+            <div className="mt-4 flex gap-2">
+              {selectedDetail._type === "order" ? (
+                <button onClick={() => { cancelOrder(selectedDetail.id); setSelectedDetail(null) }} className="flex-1 rounded-lg border border-destructive py-3 text-sm font-semibold text-destructive">Cancel Order</button>
+              ) : (
+                <button onClick={() => handleShare(selectedDetail)} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground">
+                  <Share2 className="h-4 w-4" /> Share Trade
+                </button>
+              )}
+              <button onClick={() => handleShare(selectedDetail)} className="flex items-center justify-center rounded-lg border border-border px-4 py-3 text-muted-foreground hover:text-foreground">
+                <Copy className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}

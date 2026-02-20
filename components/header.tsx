@@ -72,6 +72,7 @@ const navLinks = [
 const userMenuItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/wallet", icon: Wallet, label: "Assets" },
+  { href: "/asset-overview", icon: BarChart3, label: "Asset Overview" },
   { href: "/orders", icon: FileText, label: "Orders" },
   { href: "/account/settings", icon: Settings, label: "Settings" },
   { href: "/account/security", icon: Shield, label: "Security" },
@@ -140,6 +141,8 @@ export function Header() {
     { label: "Affiliates", href: "/affiliates" }, { label: "Institutional", href: "/institutional" },
     { label: "Settings", href: "/account/settings" }, { label: "Notifications", href: "/account/notifications" },
     { label: "Orders", href: "/orders" }, { label: "Dashboard", href: "/dashboard" },
+    { label: "Asset Overview", href: "/asset-overview" }, { label: "Account Settings", href: "/account/settings" },
+    { label: "Account Security", href: "/account/security" }, { label: "API Management", href: "/account/api-management" },
   ]
 
   const filteredSearch = searchQuery.length > 0
