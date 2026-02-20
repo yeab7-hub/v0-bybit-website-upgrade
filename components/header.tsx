@@ -93,13 +93,22 @@ export function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [notifCount, setNotifCount] = useState(0)
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let sub: { unsubscribe: () => void } | null = null
     try {
       const supabase = createClient()
-      supabase.auth.getUser().then(({ data }) => setUser(data.user)).catch(() => {})
+      supabase.auth.getUser().then(({ data }) => {
+        setUser(data.user)
+        if (data.user) {
+          fetch("/api/notifications")
+            .then(r => r.json())
+            .then(d => { if (typeof d.unread_count === "number") setNotifCount(d.unread_count) })
+            .catch(() => {})
+        }
+      }).catch(() => {})
       const { data } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null))
       sub = data.subscription
     } catch {}
@@ -271,8 +280,13 @@ export function Header() {
               </Link>
 
               {/* Notification bell */}
-              <Link href="/account/notifications" className="hidden p-2 text-muted-foreground hover:text-foreground lg:block" aria-label="Notifications">
+              <Link href="/account/notifications" className="relative hidden p-2 text-muted-foreground hover:text-foreground lg:block" aria-label="Notifications">
                 <Bell className="h-4 w-4" />
+                {notifCount > 0 && (
+                  <span className="absolute right-0.5 top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                    {notifCount}
+                  </span>
+                )}
               </Link>
 
               {/* User dropdown */}
