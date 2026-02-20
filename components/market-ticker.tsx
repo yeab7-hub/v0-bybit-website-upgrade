@@ -1,16 +1,16 @@
 "use client"
 
+import Link from "next/link"
 import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
 
 export function MarketTicker() {
   const { crypto, isLoading } = useLivePrices(4000)
+  const coins = crypto.slice(0, 12)
 
-  const topAssets = crypto.slice(0, 10)
-
-  if (isLoading || topAssets.length === 0) {
+  if (isLoading || coins.length === 0) {
     return (
-      <div className="overflow-hidden border-b border-border bg-card/30">
-        <div className="flex items-center gap-8 px-4 py-1.5 lg:px-6">
+      <div className="overflow-hidden border-b border-border bg-background">
+        <div className="flex items-center gap-6 px-4 py-2">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="flex shrink-0 items-center gap-2">
               <div className="h-3 w-14 animate-pulse rounded bg-secondary" />
@@ -22,29 +22,26 @@ export function MarketTicker() {
     )
   }
 
+  const items = [...coins, ...coins]
+
   return (
-    <div className="overflow-hidden border-b border-border bg-card/30">
-      <div className="flex items-center gap-6 overflow-x-auto px-4 py-1.5 scrollbar-none lg:gap-8 lg:px-6">
-        {topAssets.map((asset) => (
-          <div
-            key={asset.id}
-            className="flex shrink-0 items-center gap-2"
+    <div className="overflow-hidden border-b border-border bg-background">
+      <div
+        className="flex items-center gap-0"
+        style={{ width: "max-content", animation: "marquee 45s linear infinite" }}
+      >
+        {items.map((coin, i) => (
+          <Link
+            key={`${coin.id}-${i}`}
+            href={`/trade?pair=${coin.symbol}USDT`}
+            className="flex shrink-0 items-center gap-2 px-4 py-2 text-xs transition-colors hover:bg-secondary/30"
           >
-            <span className="text-xs font-medium text-foreground">
-              {asset.symbol}/USDT
+            <span className="font-medium text-foreground">{coin.symbol}/USDT</span>
+            <span className="font-mono text-foreground">${formatPrice(coin.price)}</span>
+            <span className={`font-mono ${coin.change24h >= 0 ? "text-success" : "text-destructive"}`}>
+              {coin.change24h >= 0 ? "+" : ""}{coin.change24h.toFixed(2)}%
             </span>
-            <span className="font-mono text-xs text-foreground">
-              ${formatPrice(asset.price)}
-            </span>
-            <span
-              className={`font-mono text-xs ${
-                asset.change24h >= 0 ? "text-success" : "text-destructive"
-              }`}
-            >
-              {asset.change24h >= 0 ? "+" : ""}
-              {asset.change24h.toFixed(2)}%
-            </span>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

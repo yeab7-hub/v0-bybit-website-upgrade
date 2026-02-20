@@ -192,7 +192,7 @@ export default function TradePage() {
   const fmtP = (p: number) => p >= 1000 ? p.toFixed(1) : p >= 1 ? p.toFixed(4) : p.toFixed(6)
   const fmtQ = (q: number) => q >= 100 ? q.toFixed(2) : q.toFixed(4)
 
-  const tradeModes: TradeMode[] = ["Convert", "Spot", "Futures", "Options", "TradFi"]
+  const tradeModes: TradeMode[] = ["Spot", "Futures", "Options"]
 
   const bottomNav = [
     { label: "Home", icon: Home, href: "/dashboard", active: false },
