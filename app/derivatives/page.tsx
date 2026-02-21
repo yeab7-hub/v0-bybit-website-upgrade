@@ -30,12 +30,27 @@ const features = [
   { icon: Layers, title: "Cross & Isolated Margin", desc: "Choose between cross margin for flexibility or isolated margin for risk control." },
 ]
 
+const DERIV_FALLBACK = [
+  { id: "btc", symbol: "BTC", name: "Bitcoin", price: 97842.50, change24h: 2.34, volume: 28.5e9, marketCap: 1.92e12, category: "crypto" as const },
+  { id: "eth", symbol: "ETH", name: "Ethereum", price: 3456.78, change24h: 1.82, volume: 14.2e9, marketCap: 415e9, category: "crypto" as const },
+  { id: "sol", symbol: "SOL", name: "Solana", price: 189.45, change24h: -0.56, volume: 3.8e9, marketCap: 82e9, category: "crypto" as const },
+  { id: "xrp", symbol: "XRP", name: "XRP", price: 2.87, change24h: 3.12, volume: 5.1e9, marketCap: 148e9, category: "crypto" as const },
+  { id: "bnb", symbol: "BNB", name: "BNB", price: 654.32, change24h: 0.94, volume: 1.9e9, marketCap: 97e9, category: "crypto" as const },
+  { id: "ada", symbol: "ADA", name: "Cardano", price: 0.9876, change24h: -1.23, volume: 1.2e9, marketCap: 34e9, category: "crypto" as const },
+  { id: "doge", symbol: "DOGE", name: "Dogecoin", price: 0.3245, change24h: 5.67, volume: 2.3e9, marketCap: 47e9, category: "crypto" as const },
+  { id: "avax", symbol: "AVAX", name: "Avalanche", price: 35.67, change24h: -2.15, volume: 890e6, marketCap: 14e9, category: "crypto" as const },
+  { id: "dot", symbol: "DOT", name: "Polkadot", price: 7.89, change24h: 1.45, volume: 560e6, marketCap: 10.5e9, category: "crypto" as const },
+  { id: "link", symbol: "LINK", name: "Chainlink", price: 19.54, change24h: 0.78, volume: 780e6, marketCap: 12.3e9, category: "crypto" as const },
+]
+
 export default function DerivativesPage() {
   const { crypto } = useLivePrices(5000)
   const [activeType, setActiveType] = useState<DerivType>("usdt-perp")
 
+  const liveData = crypto.length > 0 ? crypto : DERIV_FALLBACK
+
   const topContracts = useMemo(() => {
-    return [...crypto]
+    return [...liveData]
       .sort((a, b) => (b.volume * b.price) - (a.volume * a.price))
       .slice(0, 15)
       .map((c) => ({
@@ -44,7 +59,7 @@ export default function DerivativesPage() {
         fundingRate: (Math.random() * 0.02 - 0.005).toFixed(4),
         openInterest: formatVolume(c.volume * c.price * 0.3),
       }))
-  }, [crypto])
+  }, [liveData])
 
   return (
     <div className="min-h-screen bg-background">

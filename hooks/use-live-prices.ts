@@ -14,7 +14,7 @@ export interface PriceData {
   high24h?: number
   low24h?: number
   sparkline?: number[]
-  category: "crypto" | "forex" | "commodity" | "stock"
+  category: "crypto" | "forex" | "commodity" | "stock" | "cfd"
 }
 
 export interface PricesResponse {
@@ -22,6 +22,7 @@ export interface PricesResponse {
   forex: PriceData[]
   commodities: PriceData[]
   stocks: PriceData[]
+  cfd: PriceData[]
   timestamp: number
 }
 
@@ -44,6 +45,7 @@ export function useLivePrices(refreshInterval = 5000) {
     forex: data?.forex ?? [],
     commodities: data?.commodities ?? [],
     stocks: data?.stocks ?? [],
+    cfd: data?.cfd ?? [],
     isLoading,
     isError: !!error,
   }

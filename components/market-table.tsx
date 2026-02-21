@@ -35,7 +35,7 @@ function MiniChart({ data, positive }: { data: number[]; positive: boolean }) {
   )
 }
 
-const categories = ["Crypto", "Forex", "Commodities", "Stocks"]
+const categories = ["Crypto", "Forex", "Commodities", "Stocks", "CFD"]
 const cryptoTabs = ["Hot", "Top Gainers", "Top Volume"]
 
 const CRYPTO_FALLBACK: PriceData[] = [
@@ -74,8 +74,19 @@ const STOCKS_FALLBACK: PriceData[] = [
   { id: "nvda", symbol: "NVDA", name: "NVIDIA", price: 138.5, change24h: 1.67, volume: 520e6, marketCap: 3.4e12, category: "stock" },
 ]
 
+const CFD_FALLBACK: PriceData[] = [
+  { id: "us30", symbol: "US30", name: "US Wall St 30", price: 42850, change24h: 0.28, volume: 3e9, marketCap: 0, category: "cfd" },
+  { id: "us500", symbol: "US500", name: "US 500", price: 5920, change24h: 0.34, volume: 2.5e9, marketCap: 0, category: "cfd" },
+  { id: "us100", symbol: "US100", name: "US Tech 100", price: 21150, change24h: 0.52, volume: 2.8e9, marketCap: 0, category: "cfd" },
+  { id: "uk100", symbol: "UK100", name: "UK 100", price: 8415, change24h: -0.18, volume: 1.2e9, marketCap: 0, category: "cfd" },
+  { id: "de40", symbol: "DE40", name: "Germany 40", price: 22340, change24h: 0.45, volume: 1.5e9, marketCap: 0, category: "cfd" },
+  { id: "jp225", symbol: "JP225", name: "Japan 225", price: 38750, change24h: -0.32, volume: 1.1e9, marketCap: 0, category: "cfd" },
+  { id: "hk50", symbol: "HK50", name: "Hong Kong 50", price: 22480, change24h: 1.12, volume: 900e6, marketCap: 0, category: "cfd" },
+  { id: "vix", symbol: "VIX", name: "Volatility Index", price: 15.8, change24h: -2.45, volume: 500e6, marketCap: 0, category: "cfd" },
+]
+
 export function MarketTable() {
-  const { crypto, forex, commodities, stocks, isLoading } = useLivePrices(5000)
+  const { crypto, forex, commodities, stocks, cfd, isLoading } = useLivePrices(5000)
   const [activeCategory, setActiveCategory] = useState("Crypto")
   const [activeCryptoTab, setActiveCryptoTab] = useState("Hot")
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
@@ -94,6 +105,7 @@ export function MarketTable() {
   const liveForex = forex.length > 0 ? forex : FOREX_FALLBACK
   const liveCommodities = commodities.length > 0 ? commodities : COMMODITIES_FALLBACK
   const liveStocks = stocks.length > 0 ? stocks : STOCKS_FALLBACK
+  const liveCfd = cfd.length > 0 ? cfd : CFD_FALLBACK
 
   let assets: PriceData[] = []
   if (activeCategory === "Crypto") {
@@ -107,8 +119,10 @@ export function MarketTable() {
     assets = liveForex
   } else if (activeCategory === "Commodities") {
     assets = liveCommodities
-  } else {
+  } else if (activeCategory === "Stocks") {
     assets = liveStocks
+  } else if (activeCategory === "CFD") {
+    assets = liveCfd
   }
 
   return (

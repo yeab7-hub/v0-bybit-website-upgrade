@@ -47,6 +47,17 @@ const STOCKS = [
   { symbol: "NVDA", name: "NVIDIA", base: 138.5 },
 ]
 
+const CFDS = [
+  { symbol: "US30", name: "US Wall St 30", base: 42850 },
+  { symbol: "US500", name: "US 500", base: 5920 },
+  { symbol: "US100", name: "US Tech 100", base: 21150 },
+  { symbol: "UK100", name: "UK 100", base: 8415 },
+  { symbol: "DE40", name: "Germany 40", base: 22340 },
+  { symbol: "JP225", name: "Japan 225", base: 38750 },
+  { symbol: "HK50", name: "Hong Kong 50", base: 22480 },
+  { symbol: "VIX", name: "Volatility Index", base: 15.8 },
+]
+
 // Cache
 let cachedCrypto: Record<string, unknown>[] | null = null
 let cacheTime = 0
@@ -214,11 +225,17 @@ export async function GET() {
     return { id: item.symbol.toLowerCase(), symbol: item.symbol, name: item.name, price, change24h: change, volume: Math.round(Math.random() * 5e8), marketCap: Math.round(price * (1e9 + Math.random() * 2e9)), category: "stock" }
   })
 
+  const cfdData = CFDS.map((item) => {
+    const { price, change } = getDriftPrice(item.symbol, item.base)
+    return { id: item.symbol.toLowerCase(), symbol: item.symbol, name: item.name, price, change24h: change, volume: Math.round(Math.random() * 3e9), marketCap: 0, category: "cfd" }
+  })
+
   return NextResponse.json({
     crypto: cryptoData,
     forex: forexData,
     commodities: commodityData,
     stocks: stockData,
+    cfd: cfdData,
     timestamp: now,
   })
 }
