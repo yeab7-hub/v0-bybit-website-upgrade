@@ -31,7 +31,7 @@ export function ProductsShowcase() {
             <Link
               key={p.title}
               href={p.href}
-              className="group flex items-start gap-4 rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/20"
+              className="group flex items-start gap-4 rounded-lg border border-border bg-secondary/50 p-5 transition-colors hover:border-primary/30 hover:bg-secondary"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary">
                 <p.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />

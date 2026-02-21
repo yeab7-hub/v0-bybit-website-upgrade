@@ -152,6 +152,13 @@ function LoginContent() {
       // Sign out temporarily -- we require email verification first
       await supabase.auth.signOut()
 
+      // Auto-confirm user email to prevent Supabase sending magic link
+      await fetch("/api/auth/confirm-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      }).catch(() => {})
+
       // Send numeric verification code via our custom API
       const otpSent = await sendEmailOTP()
       if (otpSent) {

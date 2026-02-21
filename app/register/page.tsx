@@ -119,7 +119,6 @@ export default function RegisterPage() {
       email,
       password,
       options: {
-        emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
         data: { full_name: fullName, referral_code: referral || null },
       },
     }
@@ -164,12 +163,18 @@ export default function RegisterPage() {
 
     fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
 
+    // Auto-confirm user's email via admin API to prevent Supabase magic link email
+    await fetch("/api/auth/confirm-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    }).catch(() => {})
+
     if (data.session) {
-      // If email confirmation is disabled, sign out first then send code
       await supabase.auth.signOut()
     }
 
-    // Always send our custom numeric verification code
+    // Send our custom numeric verification code (not Supabase's)
     const sent = await sendSignupCode()
     if (sent) {
       startResendTimer()

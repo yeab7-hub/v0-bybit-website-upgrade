@@ -96,7 +96,7 @@
   button, a, [role="button"] { min-height: 44px; }
 }
 
-/* Smooth interactive transitions */
+/* Smooth interactive transitions (exclude left/top to not interfere with draggable elements) */
 button, a, input, select, textarea {
   transition-property: background-color, border-color, color, opacity, box-shadow, transform, padding;
   transition-duration: 150ms;
