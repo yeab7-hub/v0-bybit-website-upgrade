@@ -149,15 +149,8 @@ function LoginContent() {
 
       if (!data?.session) { setError("Login succeeded but no session was created."); setLoading(false); return }
 
-      // Sign out temporarily -- we require email verification first
+      // Sign out temporarily -- we require email OTP verification first
       await supabase.auth.signOut()
-
-      // Auto-confirm user email to prevent Supabase sending magic link
-      await fetch("/api/auth/confirm-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      }).catch(() => {})
 
       // Send numeric verification code via our custom API
       const otpSent = await sendEmailOTP()

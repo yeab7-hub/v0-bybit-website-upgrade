@@ -28,7 +28,7 @@ export interface PricesResponse {
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-export function useLivePrices(refreshInterval = 5000) {
+export function useLivePrices(refreshInterval = 15000) {
   const { data, error, isLoading } = useSWR<PricesResponse>(
     "/api/prices",
     fetcher,

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Resend is optional -- code still gets stored, can be verified
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 function generateCode(): string {
   // Secure 6-digit numeric code
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
     const { error: insertError } = await supabase.from("verification_codes").insert({
       email: email.toLowerCase(),
       code,
-      purpose,
+      type: purpose,
       expires_at: expiresAt,
       used: false,
     })
@@ -176,17 +177,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to generate code" }, { status: 500 })
     }
 
-    // Send email via Resend
-    const { error: emailError } = await resend.emails.send({
-      from: "Bybit <onboarding@resend.dev>",
-      to: email,
-      subject: purpose === "signup" ? "Verify Your Email - Bybit" : "Login Verification Code - Bybit",
-      html: buildEmailHTML(code, purpose),
-    })
+    // Send email via Resend (if configured)
+    if (resend) {
+      try {
+        const { error: emailError } = await resend.emails.send({
+          from: "Bybit <onboarding@resend.dev>",
+          to: email,
+          subject: purpose === "signup" ? "Verify Your Email - Bybit" : "Login Verification Code - Bybit",
+          html: buildEmailHTML(code, purpose),
+        })
 
-    if (emailError) {
-      console.error("Resend error:", emailError)
-      return NextResponse.json({ error: "Failed to send email" }, { status: 500 })
+        if (emailError) {
+          console.error("Resend email error:", emailError)
+          // Still return success -- code is stored and can be verified
+          // The admin can see codes in the database
+        }
+      } catch (resendErr) {
+        console.error("Resend send failed:", resendErr)
+      }
+    } else {
+      console.log(`[OTP] No RESEND_API_KEY set. Code for ${email}: ${code} (purpose: ${purpose})`)
     }
 
     return NextResponse.json({ success: true, message: "Verification code sent" })

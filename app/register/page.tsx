@@ -115,73 +115,47 @@ export default function RegisterPage() {
       return
     }
 
-    const signUpOptions = {
-      email,
-      password,
-      options: {
-        data: { full_name: fullName, referral_code: referral || null },
-      },
-    }
-
-    let data: any, authError: any
     try {
-      const result = await supabase.auth.signUp(signUpOptions)
-      data = result.data
-      authError = result.error
-    } catch (firstErr: any) {
-      const m = firstErr?.message?.toLowerCase() || ""
-      const isTransient = m.includes("load failed") || m.includes("failed to fetch") || m.includes("networkerror") || firstErr?.name === "TypeError"
-      if (isTransient) {
-        await new Promise((r) => setTimeout(r, 1000))
-        try {
-          const retryResult = await supabase.auth.signUp(signUpOptions)
-          data = retryResult.data
-          authError = retryResult.error
-        } catch {
-          setError("Unable to connect. Please check your internet and try again.")
-          setLoading(false)
-          return
-        }
-      } else {
-        setError(firstErr?.message || "An unexpected error occurred.")
+      // Use server-side signup API (admin.createUser with email_confirm: true)
+      // This prevents Supabase from sending any magic link email
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+          referralCode: referral || null,
+        }),
+      })
+
+      const result = await res.json()
+
+      if (!res.ok) {
+        setError(result.error || "Failed to create account.")
         setLoading(false)
         return
       }
-    }
 
-    if (authError) {
-      if (authError.message === "Supabase not configured") {
-        setError("Authentication not configured. Check environment variables.")
-      } else if (authError.message.includes("already registered")) {
-        setError("This email is already registered. Please log in instead.")
+      fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
+
+      // Send our custom branded numeric verification code
+      const sent = await sendSignupCode()
+      if (sent) {
+        startResendTimer()
+        setShowVerify(true)
+        setLoading(false)
       } else {
-        setError(authError.message)
+        setError("Account created but could not send verification email. Please try logging in.")
+        setLoading(false)
       }
-      setLoading(false)
-      return
-    }
-
-    fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
-
-    // Auto-confirm user's email via admin API to prevent Supabase magic link email
-    await fetch("/api/auth/confirm-user", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    }).catch(() => {})
-
-    if (data.session) {
-      await supabase.auth.signOut()
-    }
-
-    // Send our custom numeric verification code (not Supabase's)
-    const sent = await sendSignupCode()
-    if (sent) {
-      startResendTimer()
-      setShowVerify(true)
-      setLoading(false)
-    } else {
-      setError("Could not send verification email. Please try again.")
+    } catch (err: any) {
+      const msg = err?.message?.toLowerCase() || ""
+      if (msg.includes("fetch") || msg.includes("network")) {
+        setError("Unable to connect. Please check your internet and try again.")
+      } else {
+        setError(err?.message || "An unexpected error occurred.")
+      }
       setLoading(false)
     }
   }
