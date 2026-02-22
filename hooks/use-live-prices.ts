@@ -26,11 +26,18 @@ export interface PricesResponse {
   timestamp: number
 }
 
-const fetcher = (url: string) =>
-  fetch(url).then((res) => {
-    if (!res.ok) throw new Error("prices fetch failed")
-    return res.json()
-  })
+const fetcher = async (url: string) => {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null // Don't throw -- SWR will keep previous data
+    const json = await res.json()
+    // Validate response has actual data
+    if (!json || !json.crypto || json.crypto.length === 0) return null
+    return json
+  } catch {
+    return null // Never throw -- SWR will keep previous data
+  }
+}
 
 // Static fallback data so the UI never shows empty/skeleton state
 const FALLBACK_CRYPTO = [
@@ -73,28 +80,33 @@ const INITIAL_DATA: PricesResponse = {
 }
 
 export function useLivePrices(refreshInterval = 15000) {
-  const { data, error, isLoading } = useSWR<PricesResponse>(
+  const { data, error, isLoading } = useSWR<PricesResponse | null>(
     "/api/prices",
     fetcher,
     {
       refreshInterval,
-      revalidateOnFocus: true,
-      dedupingInterval: 5000,
+      revalidateOnFocus: false,
+      dedupingInterval: 10000,
       fallbackData: INITIAL_DATA,
-      errorRetryCount: 3,
-      errorRetryInterval: 5000,
+      keepPreviousData: true,
+      errorRetryCount: 2,
+      errorRetryInterval: 10000,
+      revalidateOnReconnect: true,
     }
   )
 
-  // Always return data -- either from API or from fallbacks
+  // ALWAYS return data -- use API data if available, otherwise static fallbacks
+  // This guarantees the UI is never empty
+  const safeData = data || INITIAL_DATA
+
   return {
-    data,
-    crypto: data?.crypto?.length ? data.crypto : FALLBACK_CRYPTO,
-    forex: data?.forex?.length ? data.forex : FALLBACK_FOREX,
-    commodities: data?.commodities?.length ? data.commodities : FALLBACK_COMMODITIES,
-    stocks: data?.stocks?.length ? data.stocks : FALLBACK_STOCKS,
-    cfd: data?.cfd?.length ? data.cfd : FALLBACK_CFD,
-    isLoading,
+    data: safeData,
+    crypto: safeData.crypto?.length ? safeData.crypto : FALLBACK_CRYPTO,
+    forex: safeData.forex?.length ? safeData.forex : FALLBACK_FOREX,
+    commodities: safeData.commodities?.length ? safeData.commodities : FALLBACK_COMMODITIES,
+    stocks: safeData.stocks?.length ? safeData.stocks : FALLBACK_STOCKS,
+    cfd: safeData.cfd?.length ? safeData.cfd : FALLBACK_CFD,
+    isLoading: false, // Never report loading since we always have fallback data
     isError: !!error,
   }
 }

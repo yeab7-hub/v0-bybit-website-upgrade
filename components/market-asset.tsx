@@ -9,8 +9,6 @@ import { useState } from "react"
  * the correct logo/icon with appropriate styling.
  */
 
-type AssetType = "crypto" | "forex" | "commodity" | "stock"
-
 interface MarketAssetProps {
   symbol: string
   name?: string
@@ -25,6 +23,10 @@ const FOREX_FLAGS: Record<string, { base: string; quote: string }> = {
   "USD/JPY": { base: "US", quote: "JP" },
   "AUD/USD": { base: "AU", quote: "US" },
   "USD/CHF": { base: "US", quote: "CH" },
+  "USD/CAD": { base: "US", quote: "CA" },
+  "NZD/USD": { base: "NZ", quote: "US" },
+  "EUR/GBP": { base: "EU", quote: "GB" },
+  "EUR/JPY": { base: "EU", quote: "JP" },
 }
 
 // Map stock tickers to clearbit logo domains
@@ -35,6 +37,7 @@ const STOCK_LOGOS: Record<string, string> = {
   AMZN: "amazon.com",
   TSLA: "tesla.com",
   NVDA: "nvidia.com",
+  META: "meta.com",
 }
 
 // Commodity colors and labels
@@ -44,6 +47,19 @@ const COMMODITY_MAP: Record<string, { label: string; color: string; bg: string }
   WTI: { label: "Oil", color: "text-[#4A2511]", bg: "bg-amber-900/15" },
   BRENT: { label: "Brt", color: "text-[#8B4513]", bg: "bg-amber-800/15" },
   NG: { label: "Gas", color: "text-sky-400", bg: "bg-sky-400/15" },
+  HG: { label: "Cu", color: "text-orange-400", bg: "bg-orange-400/15" },
+}
+
+// CFD / Index mappings
+const CFD_MAP: Record<string, { label: string; color: string; bg: string }> = {
+  US30: { label: "30", color: "text-blue-400", bg: "bg-blue-400/15" },
+  US500: { label: "500", color: "text-green-400", bg: "bg-green-400/15" },
+  US100: { label: "100", color: "text-purple-400", bg: "bg-purple-400/15" },
+  UK100: { label: "UK", color: "text-red-400", bg: "bg-red-400/15" },
+  DE40: { label: "DE", color: "text-yellow-400", bg: "bg-yellow-400/15" },
+  JP225: { label: "JP", color: "text-rose-400", bg: "bg-rose-400/15" },
+  HK50: { label: "HK", color: "text-orange-400", bg: "bg-orange-400/15" },
+  VIX: { label: "VIX", color: "text-red-500", bg: "bg-red-500/15" },
 }
 
 // Crypto colors for the letter avatar fallback
@@ -60,10 +76,13 @@ const CRYPTO_COLORS: Record<string, { color: string; bg: string }> = {
   LINK: { color: "text-[#2A5ADA]", bg: "bg-[#2A5ADA]/15" },
 }
 
-function detectAssetType(symbol: string): AssetType {
+type AssetTypeExt = "crypto" | "forex" | "commodity" | "stock" | "cfd"
+
+function detectAssetType(symbol: string): AssetTypeExt {
   if (FOREX_FLAGS[symbol]) return "forex"
   if (COMMODITY_MAP[symbol]) return "commodity"
   if (STOCK_LOGOS[symbol]) return "stock"
+  if (CFD_MAP[symbol]) return "cfd"
   return "crypto"
 }
 
@@ -127,7 +146,24 @@ export function MarketAsset({ symbol, size = 32, className = "" }: MarketAssetPr
     )
   }
 
-  // Crypto: try CoinGecko image, fallback to letter avatar
+  if (type === "cfd") {
+    const info = CFD_MAP[symbol] || { label: symbol.slice(0, 2), color: "text-primary", bg: "bg-primary/15" }
+    return (
+      <div
+        className={`flex items-center justify-center rounded-full ${info.bg} ${className}`}
+        style={{ width: dim, height: dim }}
+      >
+        <span
+          className={`font-bold ${info.color}`}
+          style={{ fontSize: size * 0.32 }}
+        >
+          {info.label}
+        </span>
+      </div>
+    )
+  }
+
+  // Crypto: try GitHub-hosted icons, fallback to letter avatar
   return <CryptoLogo symbol={symbol} size={size} className={className} />
 }
 
@@ -242,6 +278,7 @@ export function formatAssetPrice(price: number, symbol: string): string {
   if (type === "forex") return price.toFixed(5)
   if (type === "stock") return `$${price.toFixed(2)}`
   if (type === "commodity") return `$${price.toFixed(2)}`
+  if (type === "cfd") return price >= 100 ? `$${price.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : `$${price.toFixed(2)}`
   // Crypto
   if (price >= 10000) return `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   if (price >= 1) return `$${price.toFixed(4)}`

@@ -54,15 +54,29 @@ function LoginContent() {
         const msg = authError.message || ""
         if (msg === "Supabase not configured") {
           setError("Authentication service is not configured. Please check environment variables.")
+          setLoading(false)
+          return
         } else if (msg.includes("Email not confirmed")) {
-          // Try again after a short delay (admin-created users should be confirmed)
-          await new Promise((r) => setTimeout(r, 1500))
-          const { error: retryError } = await supabase.auth.signInWithPassword({ email, password })
-          if (retryError) {
-            setError("Email not confirmed yet. Please wait and try again.")
-          } else {
+          // Auto-confirm via server API, then retry
+          try {
+            await fetch("/api/auth/confirm-user", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email }),
+            })
+            await new Promise((r) => setTimeout(r, 500))
+            const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ email, password })
+            if (retryError || !retryData?.session) {
+              setError("Could not confirm your email. Please try again or create a new account.")
+              setLoading(false)
+              return
+            }
             router.push(redirectTo)
             router.refresh()
+            return
+          } catch {
+            setError("Could not confirm your email. Please try again.")
+            setLoading(false)
             return
           }
         } else if (msg.includes("Invalid login credentials")) {

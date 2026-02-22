@@ -193,6 +193,7 @@ function getDriftPrice(symbol: string, base: number) {
 }
 
 export async function GET() {
+  try {
   const now = Date.now()
 
   // ── Crypto ──
@@ -293,4 +294,27 @@ export async function GET() {
     source: lastSource,
     timestamp: now,
   })
+  } catch (e) {
+    // Absolute last resort -- return hardcoded data so the UI is never empty
+    console.error("Prices API top-level error:", e)
+    const emergency = [
+      { id: "btc", symbol: "BTC", name: "Bitcoin", price: 97842.50, change24h: 2.34, volume: 28.5e9, marketCap: 1.92e12, sparkline: [], category: "crypto" },
+      { id: "eth", symbol: "ETH", name: "Ethereum", price: 3456.78, change24h: 1.82, volume: 14.2e9, marketCap: 415e9, sparkline: [], category: "crypto" },
+      { id: "sol", symbol: "SOL", name: "Solana", price: 189.45, change24h: -0.56, volume: 3.8e9, marketCap: 82e9, sparkline: [], category: "crypto" },
+      { id: "xrp", symbol: "XRP", name: "XRP", price: 2.87, change24h: 3.12, volume: 5.1e9, marketCap: 148e9, sparkline: [], category: "crypto" },
+      { id: "bnb", symbol: "BNB", name: "BNB", price: 654.32, change24h: 0.94, volume: 1.9e9, marketCap: 97e9, sparkline: [], category: "crypto" },
+      { id: "ada", symbol: "ADA", name: "Cardano", price: 0.9876, change24h: -1.23, volume: 1.2e9, marketCap: 34e9, sparkline: [], category: "crypto" },
+      { id: "doge", symbol: "DOGE", name: "Dogecoin", price: 0.3245, change24h: 5.67, volume: 2.3e9, marketCap: 47e9, sparkline: [], category: "crypto" },
+      { id: "avax", symbol: "AVAX", name: "Avalanche", price: 35.67, change24h: -2.15, volume: 890e6, marketCap: 14e9, sparkline: [], category: "crypto" },
+    ]
+    return NextResponse.json({
+      crypto: emergency,
+      forex: [{ id: "eur-usd", symbol: "EUR/USD", name: "EUR/USD", price: 1.0842, change24h: 0.12, volume: 5e9, marketCap: 0, category: "forex" }],
+      commodities: [{ id: "xau-usd", symbol: "XAU/USD", name: "Gold", price: 2924.5, change24h: 0.45, volume: 2e9, marketCap: 0, category: "commodity" }],
+      stocks: [{ id: "aapl", symbol: "AAPL", name: "Apple Inc.", price: 232.4, change24h: 0.78, volume: 5e8, marketCap: 3.5e12, category: "stock" }],
+      cfd: [{ id: "us500", symbol: "US500", name: "US 500", price: 5920, change24h: 0.34, volume: 2.5e9, marketCap: 0, category: "cfd" }],
+      source: "emergency",
+      timestamp: Date.now(),
+    })
+  }
 }

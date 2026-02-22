@@ -59,7 +59,18 @@ export default function RegisterPage() {
       const result = await res.json()
 
       if (!res.ok) {
-        setError(result.error || "Failed to create account.")
+        if (res.status === 409) {
+          // User already exists -- try to just sign them in
+          const { error: existingSignIn } = await supabase.auth.signInWithPassword({ email, password })
+          if (!existingSignIn) {
+            router.push("/dashboard")
+            router.refresh()
+            return
+          }
+          setError("This email is already registered. Please go to the login page.")
+        } else {
+          setError(result.error || "Failed to create account.")
+        }
         setLoading(false)
         return
       }

@@ -31,7 +31,7 @@ function getTradeLink(item: { symbol: string; category?: string }) {
 }
 
 export function MarketTicker() {
-  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(4000)
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(15000)
 
   // Mix all asset classes into the ticker
   const allAssets: typeof FALLBACK = []
