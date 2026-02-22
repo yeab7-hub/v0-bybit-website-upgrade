@@ -4,7 +4,7 @@ import { useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { BybitLogo } from "@/components/bybit-logo"
-import { Eye, EyeOff, Mail, Lock, Smartphone, QrCode, Loader2, ArrowRight, Shield } from "lucide-react"
+import { Eye, EyeOff, Mail, Smartphone, QrCode, Loader2, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 
@@ -28,12 +28,9 @@ function LoginContent() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [show2FA, setShow2FA] = useState(false)
-  const [showEmailVerify, setShowEmailVerify] = useState(false)
   const [twoFACode, setTwoFACode] = useState(["", "", "", "", "", ""])
-  const [emailCode, setEmailCode] = useState(["", "", "", "", "", ""])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [resendTimer, setResendTimer] = useState(0)
 
   const supabase = createClient()
 
@@ -45,89 +42,13 @@ function LoginContent() {
     if (value && index < 5) document.getElementById(`2fa-${index + 1}`)?.focus()
   }
 
-  const attemptSignIn = async (retries = 1): Promise<any> => {
-    try {
-      return await supabase.auth.signInWithPassword({ email, password })
-    } catch (err: any) {
-      const msg = err?.message?.toLowerCase() || ""
-      const isTransient = msg.includes("load failed") || msg.includes("failed to fetch") || msg.includes("networkerror") || err?.name === "TypeError"
-      if (isTransient && retries > 0) {
-        await new Promise((r) => setTimeout(r, 1000))
-        return attemptSignIn(retries - 1)
-      }
-      throw err
-    }
-  }
-
-  const startResendTimer = () => {
-    setResendTimer(60)
-    const interval = setInterval(() => {
-      setResendTimer((t) => { if (t <= 1) { clearInterval(interval); return 0 }; return t - 1 })
-    }, 1000)
-  }
-
-  const sendEmailOTP = async () => {
-    try {
-      const res = await fetch("/api/auth/send-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, purpose: "login" }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        if (res.status === 429) setError("Please wait before requesting another code.")
-        return false
-      }
-      return data.success === true
-    } catch { return false }
-  }
-
-  const handleEmailVerify = async () => {
-    const code = emailCode.join("")
-    if (code.length !== 6) { setError("Please enter the full 6-digit code."); return }
-    setLoading(true)
-    setError(null)
-    try {
-      // Verify the numeric code via our custom API
-      const res = await fetch("/api/auth/verify-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code, purpose: "login" }),
-      })
-      const result = await res.json()
-      if (!res.ok) {
-        setError(result.error || "Invalid verification code.")
-        setLoading(false)
-        return
-      }
-      // Code verified -- now sign in with password
-      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
-      if (signInErr) { setError(signInErr.message); setLoading(false); return }
-      fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
-      router.push(redirectTo)
-      router.refresh()
-    } catch (err: any) {
-      setError(err?.message || "Verification failed.")
-      setLoading(false)
-    }
-  }
-
-  const handleEmailCodeChange = (index: number, value: string) => {
-    if (value.length > 1) return
-    const newCode = [...emailCode]
-    newCode[index] = value
-    setEmailCode(newCode)
-    if (value && index < 5) document.getElementById(`email-code-${index + 1}`)?.focus()
-  }
-
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      // First validate credentials
-      const { data, error: authError } = await attemptSignIn(1)
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
       if (authError) {
         const msg = authError.message || ""
@@ -135,42 +56,47 @@ function LoginContent() {
           setError("Authentication service is not configured. Please check environment variables.")
           setLoading(false)
           return
+        } else if (msg.includes("Email not confirmed")) {
+          // Auto-confirm via server API, then retry
+          try {
+            await fetch("/api/auth/confirm-user", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email }),
+            })
+            await new Promise((r) => setTimeout(r, 500))
+            const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ email, password })
+            if (retryError || !retryData?.session) {
+              setError("Could not confirm your email. Please try again or create a new account.")
+              setLoading(false)
+              return
+            }
+            router.push(redirectTo)
+            router.refresh()
+            return
+          } catch {
+            setError("Could not confirm your email. Please try again.")
+            setLoading(false)
+            return
+          }
+        } else if (msg.includes("Invalid login credentials")) {
+          setError("Invalid email or password.")
+        } else {
+          setError(msg)
         }
-        if (msg.includes("Email not confirmed")) {
-          await new Promise((r) => setTimeout(r, 1500))
-          const { error: retryError } = await supabase.auth.signInWithPassword({ email, password })
-          if (retryError) { setError("Email not confirmed yet. Please wait and try again."); setLoading(false); return }
-          router.push(redirectTo); router.refresh(); return
-        }
-        setError(msg.includes("Invalid login credentials") ? "Invalid email or password." : msg)
         setLoading(false)
         return
       }
 
-      if (!data?.session) { setError("Login succeeded but no session was created."); setLoading(false); return }
-
-      // Sign out temporarily -- we require email verification first
-      await supabase.auth.signOut()
-
-      // Auto-confirm user email to prevent Supabase sending magic link
-      await fetch("/api/auth/confirm-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      }).catch(() => {})
-
-      // Send numeric verification code via our custom API
-      const otpSent = await sendEmailOTP()
-      if (otpSent) {
-        startResendTimer()
-        setShowEmailVerify(true)
+      if (!data?.session) {
+        setError("Login succeeded but no session was created.")
         setLoading(false)
         return
       }
 
-      // If sending fails, sign back in and proceed (fallback)
-      setError("Could not send verification email. Please try again.")
-      setLoading(false)
+      // Success - redirect directly
+      router.push(redirectTo)
+      router.refresh()
     } catch (err: any) {
       const msg = err?.message?.toLowerCase() || ""
       if (msg.includes("fetch") || msg.includes("network") || msg.includes("load failed") || err?.name === "TypeError") {
@@ -203,77 +129,7 @@ function LoginContent() {
       {/* Form */}
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-[380px]">
-          {showEmailVerify ? (
-            /* Email Verification Step */
-            <div>
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Mail className="h-5 w-5 text-primary" />
-              </div>
-              <h1 className="text-xl font-bold text-foreground">Email Verification</h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                {"We've sent a 6-digit verification code to "}
-                <span className="font-medium text-foreground">{email}</span>
-              </p>
-
-              {error && (
-                <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>
-              )}
-
-              <div className="mt-6 flex items-center justify-center gap-2">
-                {emailCode.map((digit, i) => (
-                  <input
-                    key={i}
-                    id={`email-code-${i}`}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleEmailCodeChange(i, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Backspace" && !digit && i > 0) {
-                        document.getElementById(`email-code-${i - 1}`)?.focus()
-                      }
-                    }}
-                    className="h-11 w-11 rounded-md border border-border bg-card text-center font-mono text-lg text-foreground outline-none focus:border-primary"
-                  />
-                ))}
-              </div>
-
-              <Button
-                onClick={handleEmailVerify}
-                disabled={loading || emailCode.join("").length !== 6}
-                className="mt-6 h-11 w-full bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & Log In"}
-              </Button>
-
-              <div className="mt-3 flex items-center justify-between">
-                <button
-                  onClick={() => { setShowEmailVerify(false); setEmailCode(["", "", "", "", "", ""]); setError(null) }}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Back to login
-                </button>
-                <button
-                  onClick={async () => {
-                    if (resendTimer > 0) return
-                    setError(null)
-                    const sent = await sendEmailOTP()
-                    if (sent) {
-                      startResendTimer()
-                      setEmailCode(["", "", "", "", "", ""])
-                    } else {
-                      setError("Failed to resend. Please wait and try again.")
-                    }
-                  }}
-                  disabled={resendTimer > 0}
-                  className={`text-xs ${resendTimer > 0 ? "text-muted-foreground" : "text-primary hover:underline"}`}
-                >
-                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend code"}
-                </button>
-              </div>
-            </div>
-          ) : !show2FA ? (
+          {!show2FA ? (
             <>
               <h1 className="text-2xl font-bold text-foreground">Welcome to Bybit</h1>
 

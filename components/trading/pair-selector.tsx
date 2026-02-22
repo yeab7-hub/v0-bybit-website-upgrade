@@ -70,11 +70,25 @@ const STOCK_PAIRS = [
   { symbol: "NVDA", base: "NVDA", name: "NVIDIA" },
 ]
 
-const CATEGORY_TABS: { key: AssetCategory; label: string; icon: typeof TrendingUp }[] = [
+const CFD_PAIRS = [
+  { symbol: "US30", base: "US30", name: "US Wall St 30" },
+  { symbol: "US500", base: "US500", name: "US 500" },
+  { symbol: "US100", base: "US100", name: "US Tech 100" },
+  { symbol: "UK100", base: "UK100", name: "UK 100" },
+  { symbol: "DE40", base: "DE40", name: "Germany 40" },
+  { symbol: "JP225", base: "JP225", name: "Japan 225" },
+  { symbol: "HK50", base: "HK50", name: "Hong Kong 50" },
+  { symbol: "VIX", base: "VIX", name: "Volatility Index" },
+]
+
+type AssetCategoryExtended = AssetCategory | "cfd"
+
+const CATEGORY_TABS: { key: AssetCategoryExtended; label: string; icon: typeof TrendingUp }[] = [
   { key: "crypto", label: "Crypto", icon: TrendingUp },
   { key: "forex", label: "Forex", icon: DollarSign },
   { key: "commodities", label: "Cmdty", icon: BarChart3 },
   { key: "stocks", label: "Stocks", icon: Landmark },
+  { key: "cfd", label: "CFD", icon: BarChart3 },
 ]
 
 interface PairSelectorProps {
@@ -86,60 +100,78 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
   const [tickers, setTickers] = useState<Map<string, TickerData>>(new Map())
   const [search, setSearch] = useState("")
   const [favorites, setFavorites] = useState<Set<string>>(new Set(["BTC", "ETH", "SOL"]))
-  const [activeCategory, setActiveCategory] = useState<AssetCategory>("crypto")
+  const [activeCategory, setActiveCategory] = useState<AssetCategoryExtended>("crypto")
   const wsRef = useRef<WebSocket | null>(null)
   const [connected, setConnected] = useState(false)
 
-  // Fetch initial crypto data from Binance REST API
+  // Fetch initial data from our own API (which tries CoinCap/Binance/CoinGecko)
   useEffect(() => {
-    const fetchTickers = async () => {
+    const fetchInitial = async () => {
       try {
-        const symbols = CRYPTO_PAIRS.map((p) => `"${p.symbol}"`).join(",")
-        const res = await fetch(
-          `https://api.binance.com/api/v3/ticker/24hr?symbols=[${symbols}]`
-        )
-        if (!res.ok) throw new Error("Binance API failed")
-        const data: Record<string, string>[] = await res.json()
+        const res = await fetch("/api/prices")
+        if (!res.ok) return
+        const data = await res.json()
         const map = new Map<string, TickerData>()
-        for (const t of data) {
-          const pair = CRYPTO_PAIRS.find((p) => p.symbol === t.symbol)
+
+        // Load crypto from our API
+        for (const item of data.crypto ?? []) {
+          const pair = CRYPTO_PAIRS.find((p) => p.base === item.symbol)
           if (!pair) continue
-          const price = parseFloat(t.lastPrice)
-          const open = parseFloat(t.openPrice)
           map.set(pair.symbol, {
-            symbol: pair.symbol,
-            base: pair.base,
-            name: pair.name,
-            price,
-            change24h: open > 0 ? ((price - open) / open) * 100 : 0,
-            volume: parseFloat(t.quoteVolume),
+            symbol: pair.symbol, base: pair.base, name: pair.name,
+            price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
             category: "crypto",
           })
         }
-        setTickers(map)
-      } catch {
-        for (const pair of CRYPTO_PAIRS.slice(0, 5)) {
-          try {
-            const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${pair.symbol}`)
-            if (!res.ok) continue
-            const t: Record<string, string> = await res.json()
-            const price = parseFloat(t.lastPrice)
-            const open = parseFloat(t.openPrice)
-            setTickers((prev) => {
-              const next = new Map(prev)
-              next.set(pair.symbol, {
-                symbol: pair.symbol, base: pair.base, name: pair.name, price,
-                change24h: open > 0 ? ((price - open) / open) * 100 : 0,
-                volume: parseFloat(t.quoteVolume),
-                category: "crypto",
-              })
-              return next
-            })
-          } catch { /* skip */ }
+
+        // Load forex
+        for (const item of data.forex ?? []) {
+          const pair = FOREX_PAIRS.find((p) => p.symbol === item.symbol)
+          if (!pair) continue
+          map.set(pair.symbol, {
+            symbol: pair.symbol, base: pair.base, name: pair.name,
+            price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+            category: "forex",
+          })
         }
-      }
+
+        // Load commodities
+        for (const item of data.commodities ?? []) {
+          const pair = COMMODITY_PAIRS.find((p) => p.symbol === item.symbol)
+          if (!pair) continue
+          map.set(pair.symbol, {
+            symbol: pair.symbol, base: pair.base, name: pair.name,
+            price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+            category: "commodities",
+          })
+        }
+
+        // Load stocks
+        for (const item of data.stocks ?? []) {
+          const pair = STOCK_PAIRS.find((p) => p.symbol === item.symbol)
+          if (!pair) continue
+          map.set(pair.symbol, {
+            symbol: pair.symbol, base: pair.base, name: pair.name,
+            price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+            category: "stocks",
+          })
+        }
+
+        // Load CFD
+        for (const item of data.cfd ?? []) {
+          const pair = CFD_PAIRS.find((p) => p.symbol === item.symbol)
+          if (!pair) continue
+          map.set(pair.symbol, {
+            symbol: pair.symbol, base: pair.base, name: pair.name,
+            price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+            category: "cfd",
+          })
+        }
+
+        setTickers(map)
+      } catch { /* ignore -- second effect will retry */ }
     }
-    fetchTickers()
+    fetchInitial()
   }, [])
 
   // Fetch forex/commodities/stocks from our prices API
@@ -177,6 +209,26 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
               symbol: pair.symbol, base: pair.base, name: pair.name,
               price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
               category: "stocks",
+            })
+          }
+          for (const item of data.cfd ?? []) {
+            const pair = CFD_PAIRS.find((p) => p.symbol === item.symbol)
+            if (!pair) continue
+            next.set(pair.symbol, {
+              symbol: pair.symbol, base: pair.base, name: pair.name,
+              price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+              category: "cfd",
+            })
+          }
+          // Also use crypto data from our API as fallback for when Binance direct fails
+          for (const item of data.crypto ?? []) {
+            const pair = CRYPTO_PAIRS.find((p) => p.base === item.symbol)
+            if (!pair) continue
+            if (next.has(pair.symbol)) continue // Don't overwrite Binance live data
+            next.set(pair.symbol, {
+              symbol: pair.symbol, base: pair.base, name: pair.name,
+              price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+              category: "crypto",
             })
           }
           return next
@@ -232,13 +284,15 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
     })
   }
 
-  const getPairsForCategory = (cat: AssetCategory) => {
+  const getPairsForCategory = (cat: AssetCategoryExtended) => {
     switch (cat) {
       case "crypto": return CRYPTO_PAIRS
       case "forex": return FOREX_PAIRS
       case "commodities": return COMMODITY_PAIRS
       case "stocks": return STOCK_PAIRS
-      case "favorites": return [...CRYPTO_PAIRS, ...FOREX_PAIRS, ...COMMODITY_PAIRS, ...STOCK_PAIRS]
+      case "cfd": return CFD_PAIRS
+      case "favorites": return [...CRYPTO_PAIRS, ...FOREX_PAIRS, ...COMMODITY_PAIRS, ...STOCK_PAIRS, ...CFD_PAIRS]
+      default: return CRYPTO_PAIRS
     }
   }
 

@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { ArrowDownUp, ChevronDown, Info, History, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
 
 const coins = [
   { symbol: "BTC", name: "Bitcoin", balance: "0.00000000", icon: "https://cdn.jsdelivr.net/gh/nicehash/cryptocurrency-icons/SVG/btc.svg" },
@@ -23,6 +24,7 @@ const recentConversions = [
 ]
 
 export default function ConvertPage() {
+  const { crypto } = useLivePrices(5000)
   const [fromCoin, setFromCoin] = useState(coins[0])
   const [toCoin, setToCoin] = useState(coins[2])
   const [amount, setAmount] = useState("")
@@ -36,10 +38,20 @@ export default function ConvertPage() {
     setToCoin(temp)
   }
 
-  const rate = fromCoin.symbol === "BTC" && toCoin.symbol === "USDT" ? 64900 :
-    fromCoin.symbol === "ETH" && toCoin.symbol === "USDT" ? 2400 :
-    fromCoin.symbol === "USDT" && toCoin.symbol === "BTC" ? 1 / 64900 : 1
-  const estimated = amount ? (parseFloat(amount) * rate).toFixed(toCoin.symbol === "BTC" ? 8 : 2) : "0.00"
+  // Get live USD price for a coin symbol
+  const getUsdPrice = (symbol: string): number => {
+    if (symbol === "USDT" || symbol === "USDC") return 1
+    const live = crypto.find((c) => c.symbol === symbol)
+    if (live) return live.price
+    // Fallback prices
+    const fallbacks: Record<string, number> = { BTC: 97842.50, ETH: 3456.78, SOL: 189.45, XRP: 2.87, BNB: 654.32, ADA: 0.9876 }
+    return fallbacks[symbol] ?? 1
+  }
+
+  const fromUsd = getUsdPrice(fromCoin.symbol)
+  const toUsd = getUsdPrice(toCoin.symbol)
+  const rate = toUsd > 0 ? fromUsd / toUsd : 1
+  const estimated = amount ? (parseFloat(amount) * rate).toFixed(toUsd >= 100 ? 4 : toUsd >= 1 ? 6 : 8) : "0.00"
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -138,7 +150,7 @@ export default function ConvertPage() {
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Info className="h-3 w-3" /> Rate
               </div>
-              <span className="text-xs text-foreground">1 {fromCoin.symbol} = {rate >= 1 ? rate.toLocaleString() : rate.toFixed(8)} {toCoin.symbol}</span>
+              <span className="text-xs text-foreground">1 {fromCoin.symbol} = {rate >= 1 ? formatPrice(rate) : rate.toFixed(8)} {toCoin.symbol}</span>
             </div>
 
             <Button className="mt-4 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90" size="lg">

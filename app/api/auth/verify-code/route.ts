@@ -11,13 +11,13 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createAdminClient()
 
-    // Look up the code
+    // Look up the code (column is "type" not "purpose")
     const { data: codeRecord, error: lookupError } = await supabase
       .from("verification_codes")
       .select("*")
       .eq("email", email.toLowerCase())
       .eq("code", code)
-      .eq("purpose", purpose)
+      .eq("type", purpose)
       .eq("used", false)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
         .select("used")
         .eq("email", email.toLowerCase())
         .eq("code", code)
+        .eq("type", purpose)
         .eq("used", true)
         .limit(1)
         .single()

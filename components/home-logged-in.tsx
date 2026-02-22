@@ -7,7 +7,7 @@ import {
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight, RefreshCw, Gift, CreditCard,
   Calendar, Coins, MoreHorizontal, Star, Check, Plus, RotateCcw,
 } from "lucide-react"
-import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, type PriceData } from "@/hooks/use-live-prices"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
@@ -32,7 +32,7 @@ type MarketTab = "favorites" | "hot" | "new" | "gainers" | "losers" | "turnover"
 type MarketSubTab = "spot" | "derivatives" | "forex" | "stocks" | "commodities" | "cfd"
 
 export function HomeLoggedIn({ user }: { user: User }) {
-  const { crypto, isLoading } = useLivePrices(5000)
+  const { crypto, forex, commodities, stocks, cfd, isLoading } = useLivePrices(5000)
   const [showBalance, setShowBalance] = useState(true)
   const [totalAssets, setTotalAssets] = useState(0)
   const [todayPnl, setTodayPnl] = useState({ amount: 0, percent: 0 })
@@ -40,7 +40,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
   const [subTab, setSubTab] = useState<MarketSubTab>("spot")
   const [eventIndex, setEventIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
-  const [favorites, setFavorites] = useState<string[]>(["BTC", "ETH", "SOL", "XRP", "SUI", "AVAX"])
+  const [favorites, setFavorites] = useState<string[]>(["BTC", "ETH", "SOL", "XRP", "AVAX", "EUR/USD", "XAU/USD", "AAPL", "US500"])
   const [unreadCount, setUnreadCount] = useState(0)
 
   const initials = (user.user_metadata?.full_name || user.email || "U").charAt(0).toUpperCase()
@@ -89,8 +89,20 @@ export function HomeLoggedIn({ user }: { user: User }) {
     { key: "turnover", label: "Turnover" },
   ]
 
+  const getDataForSubTab = (): PriceData[] => {
+    switch (subTab) {
+      case "spot": return crypto
+      case "derivatives": return crypto
+      case "forex": return forex
+      case "stocks": return stocks
+      case "commodities": return commodities
+      case "cfd": return cfd
+      default: return crypto
+    }
+  }
+
   const getFilteredCoins = () => {
-    let coins = [...crypto]
+    let coins = [...getDataForSubTab()]
     if (searchQuery) {
       coins = coins.filter(c => c.symbol.toLowerCase().includes(searchQuery.toLowerCase()) || c.name.toLowerCase().includes(searchQuery.toLowerCase()))
     }
@@ -236,13 +248,13 @@ export function HomeLoggedIn({ user }: { user: User }) {
               {filteredCoins.map((coin) => (
                 <Link
                   key={coin.symbol}
-                  href={`/trade?pair=${coin.symbol}USDT`}
+                  href={coin.category === "crypto" ? `/trade?pair=${coin.symbol}USDT` : `/trade?pair=${encodeURIComponent(coin.symbol)}`}
                   className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-secondary/30"
                 >
                   <div>
                     <div className="flex items-center gap-1">
                       <span className="text-sm font-bold text-foreground">{coin.symbol}</span>
-                      <span className="text-[11px] text-muted-foreground">/USDC</span>
+                      {coin.category === "crypto" && <span className="text-[11px] text-muted-foreground">/USDT</span>}
                     </div>
                     <div className="mt-0.5 flex items-center gap-1.5">
                       <span className="font-mono text-xs text-muted-foreground">{formatPrice(coin.price)}</span>
@@ -267,7 +279,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
             {filteredCoins.map((coin) => (
               <Link
                 key={coin.symbol}
-                href={`/trade?pair=${coin.symbol}USDT`}
+                href={coin.category === "crypto" ? `/trade?pair=${coin.symbol}USDT` : `/trade?pair=${encodeURIComponent(coin.symbol)}`}
                 className="flex items-center justify-between py-3 transition-colors hover:bg-secondary/20"
               >
                 <div className="flex items-center gap-3">
@@ -277,8 +289,8 @@ export function HomeLoggedIn({ user }: { user: User }) {
                   <div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-bold text-foreground">{coin.symbol}</span>
-                      <span className="text-[11px] text-muted-foreground">/ USDT</span>
-                      <span className="rounded bg-secondary px-1 py-0.5 text-[9px] font-medium text-muted-foreground">10x</span>
+                      {coin.category === "crypto" && <span className="text-[11px] text-muted-foreground">/ USDT</span>}
+                      {coin.category === "crypto" && <span className="rounded bg-secondary px-1 py-0.5 text-[9px] font-medium text-muted-foreground">10x</span>}
                     </div>
                     <span className="font-mono text-[11px] text-muted-foreground">
                       {((coin.volume || 0) / 1e6).toFixed(2)}M USDT

@@ -6,8 +6,15 @@ import { ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
 
+const HERO_FALLBACK = [
+  { id: "btc", symbol: "BTC", name: "Bitcoin", price: 97842.50, change24h: 2.34, volume: 28.5e9, marketCap: 1.92e12, category: "crypto" as const, sparkline: [96800, 97100, 96500, 97200, 97500, 97000, 97800, 97400, 97600, 97900] },
+  { id: "eth", symbol: "ETH", name: "Ethereum", price: 3456.78, change24h: 1.82, volume: 14.2e9, marketCap: 415e9, category: "crypto" as const, sparkline: [3400, 3420, 3380, 3450, 3440, 3460, 3430, 3470, 3450, 3460] },
+  { id: "sol", symbol: "SOL", name: "Solana", price: 189.45, change24h: -0.56, volume: 3.8e9, marketCap: 82e9, category: "crypto" as const, sparkline: [192, 191, 190, 189, 190, 188, 189, 190, 189, 189] },
+  { id: "xrp", symbol: "XRP", name: "XRP", price: 2.87, change24h: 3.12, volume: 5.1e9, marketCap: 148e9, category: "crypto" as const, sparkline: [2.78, 2.80, 2.82, 2.84, 2.83, 2.85, 2.86, 2.84, 2.87, 2.87] },
+]
+
 export function HeroSection() {
-  const { crypto, isLoading } = useLivePrices(5000)
+  const { crypto } = useLivePrices(15000)
   const [email, setEmail] = useState("")
   const topCoins = crypto.slice(0, 4)
 
@@ -63,58 +70,45 @@ export function HeroSection() {
 
           {/* Right -- Live price cards */}
           <div className="grid grid-cols-2 gap-3">
-            {(isLoading || topCoins.length === 0
-              ? Array.from({ length: 4 })
-              : topCoins
-            ).map((coin: any, i) => (
+            {topCoins.map((coin: any, i: number) => (
               <Link
-                key={coin?.id || i}
-                href={coin ? `/trade?pair=${coin.symbol}USDT` : "/trade"}
-                className="group rounded-lg border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-[0_0_20px_rgba(234,179,8,0.06)]"
+                key={coin.id || i}
+                href={`/trade?pair=${coin.symbol}USDT`}
+                className="group rounded-lg border border-border bg-secondary/60 p-4 transition-all hover:border-primary/30 hover:bg-secondary hover:shadow-[0_0_20px_rgba(234,179,8,0.06)]"
               >
-                {!coin ? (
-                  <>
-                    <div className="flex items-center gap-2"><div className="h-8 w-8 animate-pulse rounded-full bg-secondary" /><div className="h-3 w-14 animate-pulse rounded bg-secondary" /></div>
-                    <div className="mt-3 h-5 w-24 animate-pulse rounded bg-secondary" />
-                    <div className="mt-1.5 h-3 w-14 animate-pulse rounded bg-secondary" />
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-bold text-foreground">
-                        {coin.symbol.charAt(0)}
-                      </div>
-                      <div>
-                        <span className="text-sm font-medium text-foreground">{coin.symbol}</span>
-                        <span className="text-xs text-muted-foreground">/USDT</span>
-                      </div>
-                    </div>
-                    <div className="mt-3 font-mono text-lg font-semibold text-foreground">
-                      ${formatPrice(coin.price)}
-                    </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className={`font-mono text-xs font-medium ${coin.change24h >= 0 ? "text-success" : "text-destructive"}`}>
-                        {coin.change24h >= 0 ? "+" : ""}{coin.change24h.toFixed(2)}%
-                      </span>
-                      {coin.sparkline && coin.sparkline.length > 1 && (
-                        <svg viewBox="0 0 60 20" className="h-4 w-14" preserveAspectRatio="none">
-                          <path
-                            d={coin.sparkline.map((v: number, idx: number) => {
-                              const x = (idx / (coin.sparkline.length - 1)) * 60
-                              const mn = Math.min(...coin.sparkline)
-                              const mx = Math.max(...coin.sparkline)
-                              const y = 18 - ((v - mn) / (mx - mn || 1)) * 16
-                              return `${idx === 0 ? "M" : "L"}${x},${y}`
-                            }).join(" ")}
-                            fill="none"
-                            stroke={coin.change24h >= 0 ? "hsl(145,63%,49%)" : "hsl(0,84%,60%)"}
-                            strokeWidth="1.5"
-                          />
-                        </svg>
-                      )}
-                    </div>
-                  </>
-                )}
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-card text-xs font-bold text-foreground">
+                    {coin.symbol.charAt(0)}
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-foreground">{coin.symbol}</span>
+                    <span className="text-xs text-muted-foreground">/USDT</span>
+                  </div>
+                </div>
+                <div className="mt-3 font-mono text-lg font-semibold text-foreground">
+                  ${formatPrice(coin.price)}
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className={`font-mono text-xs font-medium ${coin.change24h >= 0 ? "text-success" : "text-destructive"}`}>
+                    {coin.change24h >= 0 ? "+" : ""}{coin.change24h.toFixed(2)}%
+                  </span>
+                  {coin.sparkline && coin.sparkline.length > 1 && (
+                    <svg viewBox="0 0 60 20" className="h-4 w-14" preserveAspectRatio="none">
+                      <path
+                        d={coin.sparkline.map((v: number, idx: number) => {
+                          const x = (idx / (coin.sparkline.length - 1)) * 60
+                          const mn = Math.min(...coin.sparkline)
+                          const mx = Math.max(...coin.sparkline)
+                          const y = 18 - ((v - mn) / (mx - mn || 1)) * 16
+                          return `${idx === 0 ? "M" : "L"}${x},${y}`
+                        }).join(" ")}
+                        fill="none"
+                        stroke={coin.change24h >= 0 ? "hsl(145,63%,49%)" : "hsl(0,84%,60%)"}
+                        strokeWidth="1.5"
+                      />
+                    </svg>
+                  )}
+                </div>
               </Link>
             ))}
           </div>

@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { MarketTicker } from "@/components/market-ticker"
-import { useLivePrices, formatPrice, formatVolume } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, formatVolume, type PriceData } from "@/hooks/use-live-prices"
 import { MarketAsset, formatAssetPrice } from "@/components/market-asset"
 import {
   Search, Star, TrendingUp, TrendingDown, ArrowUpDown,
@@ -13,9 +13,18 @@ import {
 } from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
 
+type AssetClass = "crypto" | "forex" | "commodities" | "stocks" | "cfd"
 type MarketCategory = "all" | "spot" | "derivatives" | "defi" | "metaverse" | "layer1" | "layer2" | "meme"
 type SortKey = "name" | "price" | "change" | "volume" | "marketCap"
 type SortDir = "asc" | "desc"
+
+const assetClassTabs: { id: AssetClass; label: string }[] = [
+  { id: "crypto", label: "Crypto" },
+  { id: "forex", label: "Forex" },
+  { id: "commodities", label: "Commodities" },
+  { id: "stocks", label: "Stocks" },
+  { id: "cfd", label: "CFD" },
+]
 
 const categoryFilters: { id: MarketCategory; label: string }[] = [
   { id: "all", label: "All" },
@@ -38,12 +47,26 @@ const categoryMap: Record<string, MarketCategory[]> = {
 }
 
 export default function MarketsPage() {
-  const { crypto, isLoading } = useLivePrices(5000)
+  const { crypto, forex, commodities, stocks, cfd, isLoading } = useLivePrices(5000)
   const [search, setSearch] = useState("")
+  const [assetClass, setAssetClass] = useState<AssetClass>("crypto")
   const [category, setCategory] = useState<MarketCategory>("all")
   const [sortKey, setSortKey] = useState<SortKey>("volume")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
-  const [favorites, setFavorites] = useState<Set<string>>(new Set(["BTC", "ETH", "SOL"]))
+  const [favorites, setFavorites] = useState<Set<string>>(new Set(["BTC", "ETH", "SOL", "EUR/USD", "XAU/USD", "AAPL"]))
+
+  const getAssetsForClass = (): PriceData[] => {
+    switch (assetClass) {
+      case "crypto": return crypto
+      case "forex": return forex
+      case "commodities": return commodities
+      case "stocks": return stocks
+      case "cfd": return cfd
+      default: return crypto
+    }
+  }
+
+  const currentAssets = getAssetsForClass()
 
   const toggleFav = (symbol: string) => {
     setFavorites((prev) => {
@@ -60,12 +83,12 @@ export default function MarketsPage() {
   }
 
   const filtered = useMemo(() => {
-    let list = [...crypto]
+    let list = [...currentAssets]
     if (search) {
       const q = search.toLowerCase()
       list = list.filter((c) => c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q))
     }
-    if (category !== "all" && category !== "spot" && category !== "derivatives") {
+    if (assetClass === "crypto" && category !== "all" && category !== "spot" && category !== "derivatives") {
       list = list.filter((c) => categoryMap[c.symbol]?.includes(category))
     }
     list.sort((a, b) => {
@@ -80,12 +103,12 @@ export default function MarketsPage() {
       return sortDir === "asc" ? cmp : -cmp
     })
     return list
-  }, [crypto, search, category, sortKey, sortDir])
+  }, [currentAssets, search, assetClass, category, sortKey, sortDir])
 
-  const topGainers = useMemo(() => [...crypto].sort((a, b) => b.change24h - a.change24h).slice(0, 5), [crypto])
-  const topLosers = useMemo(() => [...crypto].sort((a, b) => a.change24h - b.change24h).slice(0, 5), [crypto])
-  const hotCoins = useMemo(() => [...crypto].sort((a, b) => (b.volume * b.price) - (a.volume * a.price)).slice(0, 5), [crypto])
-  const newListings = useMemo(() => [...crypto].slice(-5).reverse(), [crypto])
+  const topGainers = useMemo(() => [...currentAssets].sort((a, b) => b.change24h - a.change24h).slice(0, 5), [currentAssets])
+  const topLosers = useMemo(() => [...currentAssets].sort((a, b) => a.change24h - b.change24h).slice(0, 5), [currentAssets])
+  const hotCoins = useMemo(() => [...currentAssets].sort((a, b) => (b.volume * b.price) - (a.volume * a.price)).slice(0, 5), [currentAssets])
+  const newListings = useMemo(() => [...currentAssets].slice(-5).reverse(), [currentAssets])
 
   const SortIcon = ({ field }: { field: SortKey }) => (
     <ArrowUpDown className={`h-3 w-3 ${sortKey === field ? "text-primary" : "text-muted-foreground/40"}`} />
@@ -99,8 +122,33 @@ export default function MarketsPage() {
         {/* Hero */}
         <section className="border-b border-border">
           <div className="mx-auto max-w-[1400px] px-4 py-8 lg:py-12">
-            <h1 className="text-balance text-3xl font-bold text-foreground lg:text-4xl">Cryptocurrency Prices</h1>
-            <p className="mt-2 text-muted-foreground">The global crypto market cap is <span className="font-semibold text-foreground">$2.84T</span>, a <span className="text-success">+2.34%</span> change over the last day.</p>
+            <h1 className="text-balance text-3xl font-bold text-foreground lg:text-4xl">
+              {assetClass === "crypto" ? "Cryptocurrency Prices" :
+               assetClass === "forex" ? "Forex Markets" :
+               assetClass === "commodities" ? "Commodities" :
+               assetClass === "stocks" ? "Stock Markets" : "CFD Markets"}
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              {assetClass === "crypto" ? <>The global crypto market cap is <span className="font-semibold text-foreground">$2.84T</span>, a <span className="text-success">+2.34%</span> change over the last day.</> :
+               assetClass === "forex" ? "Real-time foreign exchange rates for major, minor, and exotic currency pairs." :
+               assetClass === "commodities" ? "Live prices for gold, silver, oil, natural gas, and other commodities." :
+               assetClass === "stocks" ? "Track major US and global equity markets in real time." :
+               "Trade global indices and other CFD instruments with up to 100x leverage."}
+            </p>
+            {/* Asset class tabs */}
+            <div className="mt-6 flex items-center gap-1 overflow-x-auto rounded-lg bg-secondary p-1">
+              {assetClassTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => { setAssetClass(tab.id); setCategory("all"); setSearch(""); }}
+                  className={`shrink-0 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                    assetClass === tab.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -116,7 +164,7 @@ export default function MarketsPage() {
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </div>
                 {hotCoins.slice(0, 3).map((c) => (
-                  <Link key={c.symbol} href={`/trade?pair=${c.symbol}USDT`} className="flex items-center justify-between py-1.5">
+                  <Link key={c.symbol} href={c.category === "crypto" ? `/trade?pair=${c.symbol}USDT` : `/trade?pair=${encodeURIComponent(c.symbol)}`} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
                       <MarketAsset symbol={c.symbol} size={20} />
                       <span className="text-xs font-medium text-foreground">{c.symbol}</span>
@@ -136,7 +184,7 @@ export default function MarketsPage() {
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </div>
                 {topGainers.slice(0, 3).map((c) => (
-                  <Link key={c.symbol} href={`/trade?pair=${c.symbol}USDT`} className="flex items-center justify-between py-1.5">
+                  <Link key={c.symbol} href={c.category === "crypto" ? `/trade?pair=${c.symbol}USDT` : `/trade?pair=${encodeURIComponent(c.symbol)}`} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
                       <MarketAsset symbol={c.symbol} size={20} />
                       <span className="text-xs font-medium text-foreground">{c.symbol}</span>
@@ -154,7 +202,7 @@ export default function MarketsPage() {
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </div>
                 {topLosers.slice(0, 3).map((c) => (
-                  <Link key={c.symbol} href={`/trade?pair=${c.symbol}USDT`} className="flex items-center justify-between py-1.5">
+                  <Link key={c.symbol} href={c.category === "crypto" ? `/trade?pair=${c.symbol}USDT` : `/trade?pair=${encodeURIComponent(c.symbol)}`} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
                       <MarketAsset symbol={c.symbol} size={20} />
                       <span className="text-xs font-medium text-foreground">{c.symbol}</span>
@@ -172,7 +220,7 @@ export default function MarketsPage() {
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </div>
                 {newListings.slice(0, 3).map((c) => (
-                  <Link key={c.symbol} href={`/trade?pair=${c.symbol}USDT`} className="flex items-center justify-between py-1.5">
+                  <Link key={c.symbol} href={c.category === "crypto" ? `/trade?pair=${c.symbol}USDT` : `/trade?pair=${encodeURIComponent(c.symbol)}`} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
                       <MarketAsset symbol={c.symbol} size={20} />
                       <span className="text-xs font-medium text-foreground">{c.symbol}</span>
@@ -190,19 +238,21 @@ export default function MarketsPage() {
           <div className="mx-auto max-w-[1400px] px-4 py-6">
             {/* Filters */}
             <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="scrollbar-none flex items-center gap-1 overflow-x-auto">
-                {categoryFilters.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setCategory(cat.id)}
-                    className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                      category === cat.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
+              {assetClass === "crypto" && (
+                <div className="scrollbar-none flex items-center gap-1 overflow-x-auto">
+                  {categoryFilters.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setCategory(cat.id)}
+                      className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                        category === cat.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="relative max-w-xs">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
@@ -265,7 +315,7 @@ export default function MarketsPage() {
                             </button>
                           </td>
                           <td className="px-4 py-3">
-                            <Link href={`/trade?pair=${coin.symbol}USDT`} className="flex items-center gap-3">
+                            <Link href={coin.category === "crypto" ? `/trade?pair=${coin.symbol}USDT` : `/trade?pair=${encodeURIComponent(coin.symbol)}`} className="flex items-center gap-3">
                               <span className="w-6 text-right font-mono text-xs text-muted-foreground">{idx + 1}</span>
                               <MarketAsset symbol={coin.symbol} size={28} />
                               <div>
@@ -307,7 +357,7 @@ export default function MarketsPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <Link
-                              href={`/trade?pair=${coin.symbol}USDT`}
+                              href={coin.category === "crypto" ? `/trade?pair=${coin.symbol}USDT` : `/trade?pair=${encodeURIComponent(coin.symbol)}`}
                               className="rounded-md bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-all hover:bg-primary hover:text-primary-foreground hover:shadow-[0_0_12px_rgba(234,179,8,0.2)]"
                             >
                               Trade

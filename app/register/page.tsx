@@ -29,80 +29,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showTerms, setShowTerms] = useState(false)
-  const [showVerify, setShowVerify] = useState(false)
-  const [verifyCode, setVerifyCode] = useState(["", "", "", "", "", ""])
-  const [resendTimer, setResendTimer] = useState(0)
 
   const supabase = createClient()
-
-  const startResendTimer = () => {
-    setResendTimer(60)
-    const interval = setInterval(() => {
-      setResendTimer((t) => { if (t <= 1) { clearInterval(interval); return 0 }; return t - 1 })
-    }, 1000)
-  }
-
-  const handleVerifyCodeChange = (index: number, value: string) => {
-    if (value.length > 1) return
-    const newCode = [...verifyCode]
-    newCode[index] = value
-    setVerifyCode(newCode)
-    if (value && index < 5) document.getElementById(`signup-code-${index + 1}`)?.focus()
-  }
-
-  const sendSignupCode = async () => {
-    try {
-      const res = await fetch("/api/auth/send-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, purpose: "signup" }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        if (res.status === 429) setError("Please wait before requesting another code.")
-        return false
-      }
-      return data.success === true
-    } catch { return false }
-  }
-
-  const handleVerifySignup = async () => {
-    const code = verifyCode.join("")
-    if (code.length !== 6) { setError("Please enter the full 6-digit code."); return }
-    setLoading(true)
-    setError(null)
-    try {
-      // Verify numeric code via our custom API
-      const res = await fetch("/api/auth/verify-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code, purpose: "signup" }),
-      })
-      const result = await res.json()
-      if (!res.ok) {
-        setError(result.error || "Invalid verification code.")
-        setLoading(false)
-        return
-      }
-      // Code verified -- sign in with password
-      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
-      if (signInErr) {
-        // If email confirmation still pending, try once more after a short delay
-        await new Promise((r) => setTimeout(r, 1500))
-        const { error: retryErr } = await supabase.auth.signInWithPassword({ email, password })
-        if (retryErr) {
-          setError("Email verified! Please go to the login page to sign in.")
-          setLoading(false)
-          return
-        }
-      }
-      router.push("/dashboard")
-      router.refresh()
-    } catch (err: any) {
-      setError(err?.message || "Verification failed.")
-      setLoading(false)
-    }
-  }
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -115,73 +43,62 @@ export default function RegisterPage() {
       return
     }
 
-    const signUpOptions = {
-      email,
-      password,
-      options: {
-        data: { full_name: fullName, referral_code: referral || null },
-      },
-    }
-
-    let data: any, authError: any
     try {
-      const result = await supabase.auth.signUp(signUpOptions)
-      data = result.data
-      authError = result.error
-    } catch (firstErr: any) {
-      const m = firstErr?.message?.toLowerCase() || ""
-      const isTransient = m.includes("load failed") || m.includes("failed to fetch") || m.includes("networkerror") || firstErr?.name === "TypeError"
-      if (isTransient) {
-        await new Promise((r) => setTimeout(r, 1000))
-        try {
-          const retryResult = await supabase.auth.signUp(signUpOptions)
-          data = retryResult.data
-          authError = retryResult.error
-        } catch {
-          setError("Unable to connect. Please check your internet and try again.")
-          setLoading(false)
-          return
+      // Create user via server-side admin API (email pre-confirmed)
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+          referralCode: referral || null,
+        }),
+      })
+
+      const result = await res.json()
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          // User already exists -- try to just sign them in
+          const { error: existingSignIn } = await supabase.auth.signInWithPassword({ email, password })
+          if (!existingSignIn) {
+            router.push("/dashboard")
+            router.refresh()
+            return
+          }
+          setError("This email is already registered. Please go to the login page.")
+        } else {
+          setError(result.error || "Failed to create account.")
         }
-      } else {
-        setError(firstErr?.message || "An unexpected error occurred.")
         setLoading(false)
         return
       }
-    }
 
-    if (authError) {
-      if (authError.message === "Supabase not configured") {
-        setError("Authentication not configured. Check environment variables.")
-      } else if (authError.message.includes("already registered")) {
-        setError("This email is already registered. Please log in instead.")
-      } else {
-        setError(authError.message)
+      fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
+
+      // Sign in directly after account creation
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInErr) {
+        // Might need a moment for the user to propagate
+        await new Promise((r) => setTimeout(r, 1500))
+        const { error: retryErr } = await supabase.auth.signInWithPassword({ email, password })
+        if (retryErr) {
+          setError("Account created! Please go to the login page to sign in.")
+          setLoading(false)
+          return
+        }
       }
-      setLoading(false)
-      return
-    }
 
-    fetch("/api/notify-signup", { method: "POST" }).catch(() => {})
-
-    // Auto-confirm user's email via admin API to prevent Supabase magic link email
-    await fetch("/api/auth/confirm-user", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    }).catch(() => {})
-
-    if (data.session) {
-      await supabase.auth.signOut()
-    }
-
-    // Send our custom numeric verification code (not Supabase's)
-    const sent = await sendSignupCode()
-    if (sent) {
-      startResendTimer()
-      setShowVerify(true)
-      setLoading(false)
-    } else {
-      setError("Could not send verification email. Please try again.")
+      router.push("/dashboard")
+      router.refresh()
+    } catch (err: any) {
+      const msg = err?.message?.toLowerCase() || ""
+      if (msg.includes("fetch") || msg.includes("network")) {
+        setError("Unable to connect. Please check your internet and try again.")
+      } else {
+        setError(err?.message || "An unexpected error occurred.")
+      }
       setLoading(false)
     }
   }
@@ -206,83 +123,6 @@ export default function RegisterPage() {
 
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-[400px]">
-          {showVerify ? (
-            /* Email Verification Step */
-            <div>
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Mail className="h-5 w-5 text-primary" />
-              </div>
-              <h1 className="text-xl font-bold text-foreground">Verify Your Email</h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                {"We've sent a 6-digit verification code to "}
-                <span className="font-medium text-foreground">{email}</span>
-              </p>
-
-              {error && (
-                <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>
-              )}
-
-              <div className="mt-6 flex items-center justify-center gap-2">
-                {verifyCode.map((digit, i) => (
-                  <input
-                    key={i}
-                    id={`signup-code-${i}`}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleVerifyCodeChange(i, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Backspace" && !digit && i > 0) {
-                        document.getElementById(`signup-code-${i - 1}`)?.focus()
-                      }
-                    }}
-                    className="h-11 w-11 rounded-md border border-border bg-card text-center font-mono text-lg text-foreground outline-none focus:border-primary"
-                  />
-                ))}
-              </div>
-
-              <Button
-                onClick={handleVerifySignup}
-                disabled={loading || verifyCode.join("").length !== 6}
-                className="mt-6 h-11 w-full bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & Create Account"}
-              </Button>
-
-              <div className="mt-3 flex items-center justify-between">
-                <button
-                  onClick={() => { setShowVerify(false); setVerifyCode(["", "", "", "", "", ""]); setError(null) }}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={async () => {
-                    if (resendTimer > 0) return
-                    setError(null)
-                    const sent = await sendSignupCode()
-                    if (sent) {
-                      startResendTimer()
-                      setVerifyCode(["", "", "", "", "", ""])
-                    } else {
-                      setError("Failed to resend. Please wait and try again.")
-                    }
-                  }}
-                  disabled={resendTimer > 0}
-                  className={`text-xs ${resendTimer > 0 ? "text-muted-foreground" : "text-primary hover:underline"}`}
-                >
-                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend code"}
-                </button>
-              </div>
-
-              <p className="mt-6 text-center text-xs text-muted-foreground">
-                {"Didn't receive the email? Check your spam folder or "}
-                <button onClick={() => { setShowVerify(false); setError(null) }} className="text-primary hover:underline">try a different email</button>
-              </p>
-            </div>
-          ) : (
-          <>
           <h1 className="text-2xl font-bold text-foreground">Create Your Account</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">Join millions of traders worldwide</p>
 
@@ -406,8 +246,6 @@ export default function RegisterPage() {
           <p className="mt-6 text-center text-xs text-muted-foreground">
             Already have an account? <Link href="/login" className="font-medium text-primary hover:underline">Log In</Link>
           </p>
-          </>
-          )}
         </div>
       </div>
 

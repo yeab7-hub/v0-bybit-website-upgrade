@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 
-// This endpoint auto-confirms a user's email via the admin API
-// so Supabase doesn't send its own magic link email.
-// We handle verification ourselves with numeric OTP codes.
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json()
@@ -13,30 +10,37 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createAdminClient()
 
-    // Find user by email
+    // Find user by email using admin API
     const { data: { users }, error: listError } = await supabase.auth.admin.listUsers({
       page: 1,
       perPage: 1,
     })
 
-    // Use a more targeted approach - get user by email
-    const { data: userData, error: getUserError } = await supabase
+    // The admin listUsers doesn't support email filter in all versions,
+    // so we get all users in a small batch and find by email
+    // For better performance, try to look up in our profiles table first
+    let userId: string | null = null
+
+    // Method 1: Look up via profiles table (fastest)
+    const { data: profile } = await supabase
       .from("profiles")
       .select("id")
       .eq("email", email.toLowerCase())
       .single()
 
-    let userId: string | null = null
+    if (profile?.id) {
+      userId = profile.id
+    }
 
-    if (userData?.id) {
-      userId = userData.id
-    } else {
-      // Try listing all recent users and finding by email
+    // Method 2: Try admin API to list and find
+    if (!userId) {
       const { data: { users: allUsers } } = await supabase.auth.admin.listUsers({
         page: 1,
-        perPage: 50,
+        perPage: 100,
       })
-      const found = allUsers?.find(u => u.email?.toLowerCase() === email.toLowerCase())
+      const found = allUsers?.find(
+        (u) => u.email?.toLowerCase() === email.toLowerCase()
+      )
       userId = found?.id || null
     }
 
@@ -44,14 +48,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    // Auto-confirm the user's email via admin API
-    const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
-      email_confirm: true,
-    })
+    // Confirm the user's email
+    const { error: updateError } = await supabase.auth.admin.updateUserById(
+      userId,
+      { email_confirm: true }
+    )
 
     if (updateError) {
-      console.error("Failed to auto-confirm user:", updateError)
-      return NextResponse.json({ error: "Failed to confirm email" }, { status: 500 })
+      console.error("Failed to confirm user:", updateError)
+      return NextResponse.json({ error: "Failed to confirm" }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
