@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
-  ArrowLeft, ChevronDown, X, Settings2, BarChart3,
-  Loader2, Eye, EyeOff, ArrowUpDown, SlidersHorizontal,
-  TrendingUp, TrendingDown, Clock, CheckCircle2, Info,
-  Home, LineChart, Coins, Wallet, Menu, Share2, Copy,
+  ChevronDown, X, BarChart3,
+  Loader2, Eye, EyeOff, ArrowUpDown,
+  TrendingUp, Clock, CheckCircle2,
+  Menu, Share2, Copy, Info,
 } from "lucide-react"
 import { useLivePrices, formatPrice, formatVolume } from "@/hooks/use-live-prices"
 import { MarketAsset, formatAssetPrice } from "@/components/market-asset"
@@ -22,8 +22,8 @@ const percentages = [0, 25, 50, 75, 100]
 
 type OrderSide = "buy" | "sell"
 type OrderType = "Market" | "Limit" | "Stop-Limit"
-type BottomTab = "orders" | "positions" | "history" | "assets" | "pnl"
-type TradeMode = "Convert" | "Spot" | "Futures" | "Options" | "TradFi"
+type BottomTab = "orders" | "positions" | "history" | "assets"
+type TradeMode = "Spot" | "Futures" | "Options"
 
 export default function TradePage() {
   const searchParams = useSearchParams()
@@ -44,7 +44,10 @@ export default function TradePage() {
   const [tradeMode, setTradeMode] = useState<TradeMode>("Spot")
   const [marginEnabled, setMarginEnabled] = useState(false)
   const [postOnly, setPostOnly] = useState(false)
+  const [reduceOnly, setReduceOnly] = useState(false)
   const [tpsl, setTpsl] = useState("")
+  const [leverage, setLeverage] = useState("10x")
+  const [marginType, setMarginType] = useState("Cross")
 
   useEffect(() => {
     const p = searchParams.get("pair")
@@ -58,7 +61,7 @@ export default function TradePage() {
     } catch { /* not logged in */ }
   }, [])
 
-  const { crypto, forex, commodities, stocks } = useLivePrices(3000)
+  const { crypto, forex, commodities, stocks } = useLivePrices(15000)
   const allPrices = useMemo(() => [...crypto, ...forex, ...commodities, ...stocks], [crypto, forex, commodities, stocks])
 
   const isCryptoPair = selectedPair.endsWith("USDT") && !selectedPair.includes("/")
@@ -157,6 +160,7 @@ export default function TradePage() {
   }
 
   const isBuy = side === "buy"
+  const isFutures = tradeMode === "Futures"
 
   const handleShare = async (detail: any) => {
     const pnl = Number(detail.pnl) || 0
@@ -168,7 +172,7 @@ export default function TradePage() {
     }
   }
 
-  // Order book data
+  // Order book data via Binance WebSocket
   const [asks, setAsks] = useState<{ price: number; qty: number }[]>([])
   const [bids, setBids] = useState<{ price: number; qty: number }[]>([])
 
@@ -206,40 +210,63 @@ export default function TradePage() {
 
   const tradeModes: TradeMode[] = ["Spot", "Futures", "Options"]
 
-
-
   /* ====== ORDER BOOK ====== */
   const OrderBookPanel = (
     <div className="flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-2 py-1.5">
+      {/* Funding rate for futures */}
+      {isFutures && (
+        <div className="px-2 py-1.5 text-right">
+          <div className="text-[9px] text-muted-foreground">Funding Rate / Countdown</div>
+          <div className="font-mono text-[10px] text-foreground">-0.0013% / 02:35:40 (8h)</div>
+        </div>
+      )}
+      <div className="flex items-center justify-between px-2 py-1">
         <span className="text-[10px] text-muted-foreground">Price ({quoteAsset})</span>
-        <span className="text-[10px] text-muted-foreground">Qty ({baseAsset})</span>
+        <span className="text-[10px] text-muted-foreground">Quantity ({baseAsset})</span>
       </div>
+      {/* Asks (sells) - reversed so lowest ask is at bottom */}
       <div className="flex flex-col-reverse">
         {asks.slice(0, 8).map((a, i) => (
-          <div key={`a-${i}`} className="relative flex items-center justify-between px-2 py-[3px]">
+          <div key={`a-${i}`} className="relative flex items-center justify-between px-2 py-[2px]">
             <div className="pointer-events-none absolute inset-y-0 right-0 bg-destructive/8" style={{ width: `${(a.qty / maxQty) * 100}%` }} />
-            <span className="relative font-mono text-[12px] text-destructive">{fmtP(a.price)}</span>
-            <span className="relative font-mono text-[12px] text-foreground">{fmtQ(a.qty)}</span>
+            <span className="relative font-mono text-[11px] text-destructive">{fmtP(a.price)}</span>
+            <span className="relative font-mono text-[11px] text-foreground/80">{fmtQ(a.qty)}</span>
           </div>
         ))}
       </div>
-      <div className="flex items-center justify-between border-y border-border bg-secondary/20 px-2 py-2">
-        <span className={`font-mono text-base font-bold ${change24h >= 0 ? "text-success" : "text-destructive"}`}>{fmtP(livePrice)}</span>
-        <span className="text-[10px] text-muted-foreground">{"~"}{formatAssetPrice(livePrice, baseAsset)}</span>
+      {/* Spread / Current price */}
+      <div className="flex items-center justify-between border-y border-border bg-secondary/20 px-2 py-1.5">
+        <div className="flex items-center gap-1">
+          <span className={`font-mono text-base font-bold ${change24h >= 0 ? "text-success" : "text-destructive"}`}>{fmtP(livePrice)}</span>
+          <span className="text-[9px] text-muted-foreground">{">"}</span>
+        </div>
+        <span className="font-mono text-[10px] text-muted-foreground">{fmtP(livePrice * 0.99999)}</span>
       </div>
+      {/* Bids (buys) */}
       <div className="flex-1 overflow-hidden">
         {bids.slice(0, 8).map((b, i) => (
-          <div key={`b-${i}`} className="relative flex items-center justify-between px-2 py-[3px]">
+          <div key={`b-${i}`} className="relative flex items-center justify-between px-2 py-[2px]">
             <div className="pointer-events-none absolute inset-y-0 right-0 bg-success/8" style={{ width: `${(b.qty / maxQty) * 100}%` }} />
-            <span className="relative font-mono text-[12px] text-success">{fmtP(b.price)}</span>
-            <span className="relative font-mono text-[12px] text-foreground">{fmtQ(b.qty)}</span>
+            <span className="relative font-mono text-[11px] text-success">{fmtP(b.price)}</span>
+            <span className="relative font-mono text-[11px] text-foreground/80">{fmtQ(b.qty)}</span>
           </div>
         ))}
       </div>
-      <div className="flex items-center overflow-hidden rounded-sm">
-        <div className="flex items-center justify-start bg-success/15 px-1.5 py-1 text-[10px] font-semibold text-success" style={{ width: `${buyPct}%` }}>B {buyPct}%</div>
-        <div className="flex items-center justify-end bg-destructive/15 px-1.5 py-1 text-[10px] font-semibold text-destructive" style={{ width: `${sellPct}%` }}>{sellPct}% S</div>
+      {/* Buy/Sell ratio bar */}
+      <div className="flex items-center overflow-hidden rounded-sm mx-1 mb-1">
+        <div className="flex items-center justify-start bg-success/15 px-1.5 py-0.5 text-[9px] font-semibold text-success" style={{ width: `${buyPct}%` }}>B {buyPct}%</div>
+        <div className="flex items-center justify-end bg-destructive/15 px-1.5 py-0.5 text-[9px] font-semibold text-destructive" style={{ width: `${sellPct}%` }}>{sellPct}% S</div>
+      </div>
+      {/* Depth grouping */}
+      <div className="flex items-center justify-end gap-1 px-2 pb-1">
+        <select className="rounded bg-secondary/40 px-1.5 py-0.5 text-[10px] text-foreground outline-none">
+          <option>0.1</option>
+          <option>1</option>
+          <option>10</option>
+        </select>
+        <button className="rounded bg-secondary/40 p-0.5">
+          <BarChart3 className="h-3 w-3 text-muted-foreground" />
+        </button>
       </div>
     </div>
   )
@@ -247,22 +274,31 @@ export default function TradePage() {
   /* ====== ORDER FORM ====== */
   const OrderFormPanel = (
     <div className="flex flex-col p-3">
-      {/* Leverage + Borrow row */}
-      {marginEnabled && (
+      {/* Futures: Cross + Leverage selectors */}
+      {isFutures && (
         <div className="mb-3 flex gap-2">
-          <select className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-foreground outline-none">
-            <option>USDT 10x</option>
-            <option>USDT 5x</option>
-            <option>USDT 3x</option>
+          <select
+            value={marginType} onChange={(e) => setMarginType(e.target.value)}
+            className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-foreground outline-none"
+          >
+            <option>Cross</option>
+            <option>Isolated</option>
           </select>
-          <select className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-foreground outline-none">
-            <option>Borrow</option>
-            <option>Normal</option>
+          <select
+            value={leverage} onChange={(e) => setLeverage(e.target.value)}
+            className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-foreground outline-none"
+          >
+            <option>10x</option>
+            <option>5x</option>
+            <option>3x</option>
+            <option>20x</option>
+            <option>50x</option>
+            <option>100x</option>
           </select>
         </div>
       )}
 
-      {/* Available */}
+      {/* Available balance */}
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">Available</span>
         <span className="font-mono text-xs text-foreground">
@@ -271,105 +307,100 @@ export default function TradePage() {
         </span>
       </div>
 
-      {/* TP/SL */}
+      {/* Order Type selector */}
       <div className="mb-3 flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
-        <span className="text-xs text-muted-foreground">TP/SL</span>
-        <input type="text" value={tpsl} onChange={(e) => setTpsl(e.target.value)} placeholder="" className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none" />
-        <ChevronDown className="ml-1 h-3 w-3 text-muted-foreground" />
-      </div>
-
-      {/* Trigger Price (only for Stop-Limit) */}
-      {orderType === "Stop-Limit" && (
-        <div className="mb-3 flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
-          <span className="text-xs text-muted-foreground">Trigger Price</span>
-          <span className="ml-auto text-xs text-muted-foreground">USDT</span>
-        </div>
-      )}
-
-      {/* Price */}
-      <div className="mb-3 flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
-        <div className="flex flex-col">
-          <span className="text-[10px] text-muted-foreground">Price</span>
-          <input
-            type="text"
-            value={orderType === "Market" ? "Market" : price}
-            onChange={(e) => setPrice(e.target.value)}
-            readOnly={orderType === "Market"}
-            className="w-full bg-transparent font-mono text-sm text-foreground outline-none"
-          />
-        </div>
         <select value={orderType} onChange={(e) => setOrderType(e.target.value as OrderType)}
-          className="ml-auto rounded bg-transparent text-xs font-medium text-foreground outline-none">
+          className="w-full bg-transparent text-sm font-medium text-foreground outline-none">
           <option value="Limit">Limit</option>
           <option value="Market">Market</option>
           <option value="Stop-Limit">Stop-Limit</option>
         </select>
       </div>
 
-      {/* Quantity */}
+      {/* Price input */}
+      <div className="mb-3 flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
+        <span className="text-xs text-muted-foreground">Price</span>
+        <input
+          type="text"
+          value={orderType === "Market" ? "Market" : price}
+          onChange={(e) => setPrice(e.target.value)}
+          readOnly={orderType === "Market"}
+          className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none"
+        />
+        <span className="ml-2 text-xs text-muted-foreground">USDT</span>
+      </div>
+
+      {/* Quantity input */}
       <div className="mb-3 flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
         <span className="text-xs text-muted-foreground">Quantity</span>
         <input
           type="text" value={amount}
           onChange={(e) => { setAmount(e.target.value); setSliderPct(0) }}
-          placeholder=""
-          className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          placeholder="0.000"
+          className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
         />
+        <span className="ml-2 flex items-center gap-1 text-xs text-muted-foreground">
+          {baseAsset}
+          <ArrowUpDown className="h-3 w-3" />
+        </span>
       </div>
 
-      {/* Slider */}
+      {/* Percentage slider */}
       <div className="mb-3 flex items-center gap-0">
         {percentages.map((pct, i) => (
           <div key={pct} className="flex flex-1 items-center">
             <button
               onClick={() => handleSlider(pct)}
-              className={`h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${sliderPct >= pct ? "border-foreground bg-foreground" : "border-muted-foreground/40 bg-background"}`}
+              className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-colors ${sliderPct >= pct ? "border-foreground bg-foreground" : "border-muted-foreground/40 bg-background"}`}
             />
             {i < percentages.length - 1 && (
-              <div className={`h-0.5 flex-1 ${sliderPct > pct ? "bg-foreground" : "bg-muted-foreground/30"}`} />
+              <div className={`h-0.5 flex-1 ${sliderPct > pct ? "bg-foreground" : "bg-muted-foreground/20"}`} />
             )}
           </div>
         ))}
       </div>
 
-      {/* Order Value */}
-      <div className="mb-3 flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
-        <span className="text-xs text-muted-foreground">Order Value</span>
-        <span className="ml-auto font-mono text-xs text-foreground">{total > 0 ? total.toFixed(2) : ""}</span>
-        <span className="ml-1 text-xs text-muted-foreground">USDT</span>
-      </div>
-
-      {/* Max Buy / Borrowed / To Borrow info */}
-      <div className="mb-3 rounded-lg border border-border bg-secondary/20 px-3 py-2">
+      {/* Value / Cost / Liq. Price info box */}
+      <div className="mb-3 rounded-lg border border-border bg-secondary/20 px-3 py-2 text-[10px]">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground">Max. {isBuy ? "Buy" : "Sell"}</span>
-          <span className="font-mono text-[10px] text-foreground">{maxSell.toFixed(6)} {baseAsset}</span>
+          <span className="text-muted-foreground">Value</span>
+          <span className="font-mono text-foreground">{total > 0 ? `${total.toFixed(2)}` : "0/0"} USDT</span>
         </div>
-        {marginEnabled && (
-          <>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground">Borrowed Amount</span>
-              <span className="font-mono text-[10px] text-foreground">0 USDT</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground">To Borrow</span>
-              <span className="font-mono text-[10px] text-foreground">0.0000000 USDT</span>
-            </div>
-          </>
-        )}
+        <div className="mt-1 flex items-center justify-between">
+          <span className="text-muted-foreground">Cost</span>
+          <span className="font-mono text-foreground">{isFutures && total > 0 ? `${(total / parseInt(leverage)).toFixed(2)}` : "0/0"} USDT</span>
+        </div>
+        <div className="mt-1 flex items-center justify-between">
+          <span className="text-muted-foreground">Liq. Price</span>
+          <span className="font-mono text-primary cursor-pointer">Calculate</span>
+        </div>
       </div>
 
-      {/* Post-Only + GTC */}
-      <div className="mb-3 flex items-center justify-between">
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      {/* TP/SL */}
+      <label className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+        <input type="checkbox" className="h-3.5 w-3.5 rounded border-border accent-foreground" />
+        TP/SL
+      </label>
+
+      {/* Post-Only + Reduce-Only + GTC */}
+      <div className="mb-3 flex flex-col gap-1.5">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
           <input type="checkbox" checked={postOnly} onChange={(e) => setPostOnly(e.target.checked)} className="h-3.5 w-3.5 rounded border-border accent-foreground" />
           Post-Only
         </label>
-        <select className="rounded bg-transparent text-xs text-foreground outline-none">
-          <option>GTC</option>
-          <option>IOC</option>
-          <option>FOK</option>
-        </select>
+        {isFutures && (
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input type="checkbox" checked={reduceOnly} onChange={(e) => setReduceOnly(e.target.checked)} className="h-3.5 w-3.5 rounded border-border accent-foreground" />
+            Reduce-Only
+          </label>
+        )}
+        <div className="flex items-center justify-end">
+          <select className="rounded bg-transparent text-xs text-foreground outline-none">
+            <option>GTC</option>
+            <option>IOC</option>
+            <option>FOK</option>
+          </select>
+        </div>
       </div>
 
       {/* Feedback */}
@@ -379,14 +410,33 @@ export default function TradePage() {
         </div>
       )}
 
-      {/* Submit Button */}
-      <button
-        onClick={handleSubmit}
-        disabled={submitting || !parsedAmount}
-        className={`w-full rounded-lg py-3.5 text-sm font-semibold transition-colors disabled:opacity-40 ${isBuy ? "bg-success text-[#0a0e17]" : "bg-destructive text-white"}`}
-      >
-        {submitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : marginEnabled ? (isBuy ? "Margin Buy" : "Margin Sell") : (isBuy ? "Buy" : "Sell")}
-      </button>
+      {/* Submit Buttons - Long/Short for Futures, Buy/Sell for Spot */}
+      {isFutures ? (
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => { setSide("buy"); handleSubmit() }}
+            disabled={submitting || !parsedAmount}
+            className="w-full rounded-lg bg-success py-3.5 text-sm font-bold text-[#0a0e17] transition-colors disabled:opacity-40"
+          >
+            {submitting && side === "buy" ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Long"}
+          </button>
+          <button
+            onClick={() => { setSide("sell"); handleSubmit() }}
+            disabled={submitting || !parsedAmount}
+            className="w-full rounded-lg bg-destructive py-3.5 text-sm font-bold text-white transition-colors disabled:opacity-40"
+          >
+            {submitting && side === "sell" ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Short"}
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={handleSubmit}
+          disabled={submitting || !parsedAmount}
+          className={`w-full rounded-lg py-3.5 text-sm font-semibold transition-colors disabled:opacity-40 ${isBuy ? "bg-success text-[#0a0e17]" : "bg-destructive text-white"}`}
+        >
+          {submitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : (isBuy ? `Buy ${baseAsset}` : `Sell ${baseAsset}`)}
+        </button>
+      )}
     </div>
   )
 
@@ -394,13 +444,12 @@ export default function TradePage() {
   const BottomTabsPanel = (
     <div className="border-t border-border">
       <div className="scrollbar-none flex items-center gap-0 overflow-x-auto border-b border-border px-2">
-        {(["orders", "positions", "history", "assets", "pnl"] as BottomTab[]).map((t) => {
+        {(["orders", "positions", "history", "assets"] as BottomTab[]).map((t) => {
           const labels: Record<string, string> = {
-            orders: `Open Orders(${orders.length})`,
+            orders: `Orders(${orders.length})`,
             positions: `Positions(${trades.filter((tr: any) => tr.status === "open").length})`,
             history: "Trade History",
             assets: "Assets",
-            pnl: "Realized PnL",
           }
           return (
             <button key={t} onClick={() => setBottomTab(t)}
@@ -445,20 +494,11 @@ export default function TradePage() {
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-semibold text-foreground">{o.pair}</span>
                           <span className={`rounded px-1 py-0.5 text-[9px] font-bold uppercase ${o.side === "buy" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>{o.side}</span>
-                          <span className="rounded bg-muted px-1 py-0.5 text-[9px] capitalize text-muted-foreground">{o.order_type}</span>
                         </div>
                         <span className="text-[10px] text-muted-foreground">Qty: {remaining.toFixed(4)} @ ${Number(o.price).toLocaleString()}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <span className={`block font-mono text-xs font-semibold ${curPrice > Number(o.price) === (o.side === "buy") ? "text-success" : "text-destructive"}`}>
-                          {curPrice > 0 ? `$${formatPrice(curPrice)}` : "--"}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">Current</span>
-                      </div>
-                      <button onClick={(e) => { e.stopPropagation(); cancelOrder(o.id) }} className="rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:border-destructive hover:text-destructive">Cancel</button>
-                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); cancelOrder(o.id) }} className="rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:border-destructive hover:text-destructive">Cancel</button>
                   </button>
                 )
               })}
@@ -472,29 +512,43 @@ export default function TradePage() {
           ) : (
             <div className="flex flex-col">
               {trades.map((t: any) => {
-                const curPrice = allPrices.find((c) => c.symbol === t.pair?.split("/")[0])?.price ?? 0
                 const pnl = Number(t.pnl) || 0
                 return (
-                  <button key={t.id} onClick={() => setSelectedDetail({ ...t, _type: "trade", _curPrice: curPrice })} className="flex items-center justify-between border-b border-border/50 px-3 py-2.5 text-left active:bg-secondary/20">
+                  <button key={t.id} onClick={() => setSelectedDetail({ ...t, _type: "trade" })} className="flex items-center justify-between border-b border-border/50 px-3 py-2.5 text-left active:bg-secondary/20">
                     <div className="flex items-center gap-2">
                       <MarketAsset symbol={t.pair?.split("/")[0] || "BTC"} size={28} />
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-foreground">{t.pair}</span>
-                          <span className={`rounded px-1 py-0.5 text-[9px] font-bold uppercase ${t.side === "buy" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>{t.side}</span>
-                        </div>
-                        <span className="text-[10px] text-muted-foreground">{new Date(t.created_at).toLocaleString()}</span>
+                        <span className="text-xs font-semibold text-foreground">{t.pair}</span>
+                        <span className="ml-1 text-[9px] text-muted-foreground">{new Date(t.created_at).toLocaleString()}</span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`block font-mono text-xs font-semibold ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} USDT
-                      </span>
-                      <span className="font-mono text-[10px] text-muted-foreground">{Number(t.amount).toFixed(4)} @ ${Number(t.price).toLocaleString()}</span>
-                    </div>
+                    <span className={`font-mono text-xs font-semibold ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                      {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}
+                    </span>
                   </button>
                 )
               })}
+            </div>
+          )
+        )}
+
+        {bottomTab === "history" && (
+          trades.length === 0 ? (
+            <EmptyState icon={<Clock className="h-7 w-7 text-muted-foreground/40" />} text="No Trade History" />
+          ) : (
+            <div className="flex flex-col">
+              {trades.map((t: any) => (
+                <div key={t.id} className="flex items-center justify-between border-b border-border/50 px-3 py-2">
+                  <div>
+                    <span className="text-[11px] font-medium text-foreground">{t.pair}</span>
+                    <span className={`ml-2 text-[10px] font-semibold ${t.side === "buy" ? "text-success" : "text-destructive"}`}>{t.side?.toUpperCase()}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono text-[11px] text-foreground">${Number(t.price).toLocaleString()}</span>
+                    <span className="ml-2 font-mono text-[10px] text-muted-foreground">{Number(t.amount).toFixed(4)}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           )
         )}
@@ -513,92 +567,10 @@ export default function TradePage() {
                       <MarketAsset symbol={b.asset} size={28} />
                       <div>
                         <span className="text-xs font-semibold text-foreground">{b.asset}</span>
-                        <span className="block text-[10px] text-muted-foreground">{balanceVisible ? `${Number(b.available).toFixed(6)}` : "****"} avail</span>
+                        <span className="block text-[10px] text-muted-foreground">{balanceVisible ? `${Number(b.available).toFixed(4)}` : "****"}</span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="block font-mono text-xs font-semibold text-foreground">{balanceVisible ? `$${totalVal.toFixed(2)}` : "****"}</span>
-                      {Number(b.in_order) > 0 && <span className="text-[10px] text-muted-foreground">In order: {Number(b.in_order).toFixed(6)}</span>}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        )}
-
-        {bottomTab === "history" && (
-          trades.length === 0 ? (
-            <EmptyState icon={<Clock className="h-7 w-7 text-muted-foreground/40" />} text="No Trade History" />
-          ) : (
-            <div className="flex flex-col">
-              <div className="grid grid-cols-5 gap-1 border-b border-border px-3 py-2">
-                <span className="text-[10px] font-medium text-muted-foreground">Pair</span>
-                <span className="text-[10px] font-medium text-muted-foreground">Side</span>
-                <span className="text-[10px] font-medium text-muted-foreground">Price</span>
-                <span className="text-[10px] font-medium text-muted-foreground">Amount</span>
-                <span className="text-right text-[10px] font-medium text-muted-foreground">Time</span>
-              </div>
-              {trades.map((t: any) => (
-                <div key={t.id} className="grid grid-cols-5 gap-1 border-b border-border/50 px-3 py-2">
-                  <span className="text-[11px] font-medium text-foreground">{t.pair}</span>
-                  <span className={`text-[11px] font-semibold ${t.side === "buy" ? "text-success" : "text-destructive"}`}>{t.side?.toUpperCase()}</span>
-                  <span className="font-mono text-[11px] text-foreground">${Number(t.price).toLocaleString()}</span>
-                  <span className="font-mono text-[11px] text-foreground">{Number(t.amount).toFixed(4)}</span>
-                  <span className="text-right text-[10px] text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</span>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
-        {bottomTab === "pnl" && (
-          trades.length === 0 ? (
-            <EmptyState icon={<TrendingUp className="h-7 w-7 text-muted-foreground/40" />} text="No PnL Records" />
-          ) : (
-            <div className="flex flex-col">
-              {/* PnL Summary */}
-              <div className="grid grid-cols-3 gap-3 border-b border-border p-3">
-                <div className="rounded-lg bg-secondary/30 p-2.5">
-                  <p className="text-[10px] text-muted-foreground">Total Realized PnL</p>
-                  <p className={`font-mono text-sm font-bold ${trades.reduce((s: number, t: any) => s + (Number(t.pnl) || 0), 0) >= 0 ? "text-success" : "text-destructive"}`}>
-                    {trades.reduce((s: number, t: any) => s + (Number(t.pnl) || 0), 0) >= 0 ? "+" : ""}
-                    {trades.reduce((s: number, t: any) => s + (Number(t.pnl) || 0), 0).toFixed(2)} USDT
-                  </p>
-                </div>
-                <div className="rounded-lg bg-secondary/30 p-2.5">
-                  <p className="text-[10px] text-muted-foreground">Total Trades</p>
-                  <p className="font-mono text-sm font-bold text-foreground">{trades.length}</p>
-                </div>
-                <div className="rounded-lg bg-secondary/30 p-2.5">
-                  <p className="text-[10px] text-muted-foreground">Win Rate</p>
-                  <p className="font-mono text-sm font-bold text-foreground">
-                    {trades.length > 0 ? Math.round((trades.filter((t: any) => (Number(t.pnl) || 0) >= 0).length / trades.length) * 100) : 0}%
-                  </p>
-                </div>
-              </div>
-              {/* Individual PnL rows */}
-              {trades.map((t: any) => {
-                const pnl = Number(t.pnl) || 0
-                const pnlPct = Number(t.price) > 0 ? (pnl / (Number(t.price) * Number(t.amount))) * 100 : 0
-                return (
-                  <div key={t.id} className="flex items-center justify-between border-b border-border/50 px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <MarketAsset symbol={t.pair?.split("/")[0] || "BTC"} size={24} />
-                      <div>
-                        <span className="text-[11px] font-semibold text-foreground">{t.pair}</span>
-                        <span className="ml-1.5 text-[10px] text-muted-foreground">{t.side?.toUpperCase()}</span>
-                        <p className="text-[10px] text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-mono text-xs font-bold ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} USDT
-                      </p>
-                      <p className={`font-mono text-[10px] ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                        {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
-                      </p>
-                    </div>
+                    <span className="font-mono text-xs text-foreground">{balanceVisible ? `$${totalVal.toFixed(2)}` : "****"}</span>
                   </div>
                 )
               })}
@@ -611,7 +583,7 @@ export default function TradePage() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
-      {/* ===== TOP BAR - Trade Mode Tabs (Bybit style) ===== */}
+      {/* ===== TOP BAR - Trade Mode Tabs ===== */}
       <div className="flex items-center border-b border-border px-2 py-1.5 lg:px-4">
         <button onClick={() => router.push("/dashboard")} className="mr-2 rounded-lg p-1.5 lg:hidden">
           <Menu className="h-5 w-5 text-muted-foreground" />
@@ -619,7 +591,7 @@ export default function TradePage() {
         <div className="scrollbar-none flex items-center gap-1 overflow-x-auto">
           {tradeModes.map((m) => (
             <button key={m} onClick={() => setTradeMode(m)}
-              className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors ${tradeMode === m ? "text-foreground" : "text-muted-foreground"}`}
+              className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors ${tradeMode === m ? "font-bold text-foreground" : "text-muted-foreground"}`}
             >
               {m}
             </button>
@@ -641,10 +613,6 @@ export default function TradePage() {
           <Link href={`/trade/chart?pair=${selectedPair}`} className="rounded border border-border p-1.5 lg:hidden">
             <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
           </Link>
-          <div className="hidden items-center gap-1.5 lg:flex">
-            <button className="rounded border border-border p-1.5"><SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" /></button>
-            <button className="rounded border border-border p-1.5"><BarChart3 className="h-3.5 w-3.5 text-muted-foreground" /></button>
-          </div>
         </div>
       </div>
 
@@ -663,28 +631,22 @@ export default function TradePage() {
         </div>
       )}
 
-      {/* ===== MOBILE / TABLET: Buy/Sell + Margin Toggle ===== */}
+      {/* ===== MOBILE: Buy/Sell or Long/Short Toggle ===== */}
       <div className="flex flex-1 flex-col overflow-hidden lg:hidden">
-        {/* Buy/Sell Toggle + Margin */}
-        <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
-          <div className="flex overflow-hidden rounded-lg border border-border">
-            <button onClick={() => setSide("buy")} className={`px-6 py-2 text-sm font-semibold transition-colors ${isBuy ? "bg-success text-[#0a0e17]" : "text-muted-foreground"}`}>Buy</button>
-            <button onClick={() => setSide("sell")} className={`px-6 py-2 text-sm font-semibold transition-colors ${!isBuy ? "bg-destructive text-white" : "text-muted-foreground"}`}>Sell</button>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Margin</span>
-            <button onClick={() => setMarginEnabled(!marginEnabled)}
-              className={`relative h-5 w-9 rounded-full transition-colors ${marginEnabled ? "bg-[#f7a600]" : "bg-secondary"}`}>
-              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-foreground transition-transform ${marginEnabled ? "left-[18px]" : "left-0.5"}`} />
-            </button>
-          </div>
-        </div>
-
-        {/* Daily Interest - only when margin is on */}
-        {marginEnabled && (
-          <div className="flex items-center justify-end border-b border-border px-3 py-1">
-            <span className="text-[10px] text-muted-foreground">Daily Interest</span>
-            <span className="ml-2 font-mono text-[10px] text-foreground">0.00101178% | 0.00948185%</span>
+        {/* Buy/Sell Toggle + Margin (Spot) or nothing extra (Futures has Cross/leverage in form) */}
+        {!isFutures && (
+          <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
+            <div className="flex overflow-hidden rounded-lg border border-border">
+              <button onClick={() => setSide("buy")} className={`px-6 py-2 text-sm font-semibold transition-colors ${isBuy ? "bg-success text-[#0a0e17]" : "text-muted-foreground"}`}>Buy</button>
+              <button onClick={() => setSide("sell")} className={`px-6 py-2 text-sm font-semibold transition-colors ${!isBuy ? "bg-destructive text-white" : "text-muted-foreground"}`}>Sell</button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Margin</span>
+              <button onClick={() => setMarginEnabled(!marginEnabled)}
+                className={`relative h-5 w-9 rounded-full transition-colors ${marginEnabled ? "bg-[#f7a600]" : "bg-secondary"}`}>
+                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-foreground transition-transform ${marginEnabled ? "left-[18px]" : "left-0.5"}`} />
+              </button>
+            </div>
           </div>
         )}
 
@@ -702,7 +664,7 @@ export default function TradePage() {
         {BottomTabsPanel}
       </div>
 
-      {/* ===== DESKTOP: 3-column layout ===== */}
+      {/* ===== DESKTOP: 3-column layout with TradingView chart ===== */}
       <div className="hidden flex-1 overflow-hidden lg:flex">
         <div className="flex w-[260px] shrink-0 flex-col border-r border-border">
           {OrderBookPanel}
@@ -715,10 +677,14 @@ export default function TradePage() {
         </div>
         <div className="flex w-[300px] shrink-0 flex-col overflow-y-auto border-l border-border">
           <div className="flex items-center justify-between border-b border-border p-4">
-            <div className="flex overflow-hidden rounded-lg border border-border">
-              <button onClick={() => setSide("buy")} className={`px-5 py-2 text-sm font-semibold transition-colors ${isBuy ? "bg-success text-[#0a0e17]" : "text-muted-foreground"}`}>Buy</button>
-              <button onClick={() => setSide("sell")} className={`px-5 py-2 text-sm font-semibold transition-colors ${!isBuy ? "bg-destructive text-white" : "text-muted-foreground"}`}>Sell</button>
-            </div>
+            {isFutures ? (
+              <span className="text-sm font-bold text-foreground">Futures Order</span>
+            ) : (
+              <div className="flex overflow-hidden rounded-lg border border-border">
+                <button onClick={() => setSide("buy")} className={`px-5 py-2 text-sm font-semibold transition-colors ${isBuy ? "bg-success text-[#0a0e17]" : "text-muted-foreground"}`}>Buy</button>
+                <button onClick={() => setSide("sell")} className={`px-5 py-2 text-sm font-semibold transition-colors ${!isBuy ? "bg-destructive text-white" : "text-muted-foreground"}`}>Sell</button>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Margin</span>
               <button onClick={() => setMarginEnabled(!marginEnabled)}
@@ -758,33 +724,21 @@ export default function TradePage() {
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2.5">
-              <DetailCell label="Order Price" value={`$${Number(selectedDetail.price).toLocaleString()}`} />
-              {selectedDetail._curPrice > 0 && <DetailCell label="Current Price" value={`$${formatPrice(selectedDetail._curPrice)}`} />}
+              <DetailCell label="Price" value={`$${Number(selectedDetail.price).toLocaleString()}`} />
               <DetailCell label="Amount" value={`${Number(selectedDetail.amount).toFixed(6)} ${selectedDetail.pair?.split("/")[0]}`} />
-              <DetailCell label="Total" value={`$${Number(selectedDetail.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-              {selectedDetail.fee !== undefined && <DetailCell label="Fee" value={`$${Number(selectedDetail.fee).toFixed(4)}`} />}
+              <DetailCell label="Total" value={`$${(Number(selectedDetail.price) * Number(selectedDetail.amount)).toFixed(2)}`} />
               {selectedDetail.pnl !== undefined && (
                 <DetailCell label="P&L" value={`${Number(selectedDetail.pnl) >= 0 ? "+" : ""}${Number(selectedDetail.pnl).toFixed(2)} USDT`} valueClass={Number(selectedDetail.pnl) >= 0 ? "text-success" : "text-destructive"} />
               )}
-              {selectedDetail._type === "order" && (
-                <>
-                  <DetailCell label="Filled" value={`${Number(selectedDetail.filled).toFixed(6)}`} />
-                  <DetailCell label="Remaining" value={`${(Number(selectedDetail.amount) - Number(selectedDetail.filled)).toFixed(6)}`} />
-                </>
-              )}
-              {selectedDetail.created_at && <DetailCell label="Time" value={new Date(selectedDetail.created_at).toLocaleString()} />}
             </div>
             <div className="mt-4 flex gap-2">
               {selectedDetail._type === "order" ? (
                 <button onClick={() => { cancelOrder(selectedDetail.id); setSelectedDetail(null) }} className="flex-1 rounded-lg border border-destructive py-3 text-sm font-semibold text-destructive">Cancel Order</button>
               ) : (
                 <button onClick={() => handleShare(selectedDetail)} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground">
-                  <Share2 className="h-4 w-4" /> Share Trade
+                  <Share2 className="h-4 w-4" /> Share
                 </button>
               )}
-              <button onClick={() => handleShare(selectedDetail)} className="flex items-center justify-center rounded-lg border border-border px-4 py-3 text-muted-foreground hover:text-foreground">
-                <Copy className="h-4 w-4" />
-              </button>
             </div>
           </div>
         </div>
