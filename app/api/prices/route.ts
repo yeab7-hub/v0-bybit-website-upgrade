@@ -1,29 +1,57 @@
 import { NextResponse } from "next/server"
 
-// ─── CRYPTO: CoinGecko free API (primary) + Binance (fallback) ───
-const COINGECKO_URL =
-  "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=true&price_change_percentage=24h,7d"
+/*
+ * Crypto price sources (tried in order):
+ *   1. CoinCap v2 -- free, no key, generous limits, fast
+ *   2. Binance public ticker -- free, no key, can be geo-blocked
+ *   3. CoinGecko free -- free, no key, low rate limits (can 429)
+ *   4. Hardcoded fallback with drift simulation
+ */
 
-const BINANCE_TICKER = "https://api.binance.com/api/v3/ticker/24hr"
+// ─── Source 1: CoinCap v2 ───
+const COINCAP_URL = "https://api.coincap.io/v2/assets?limit=20"
 
-const CRYPTO_IDS: Record<string, { symbol: string; name: string }> = {
-  bitcoin: { symbol: "BTC", name: "Bitcoin" },
-  ethereum: { symbol: "ETH", name: "Ethereum" },
-  solana: { symbol: "SOL", name: "Solana" },
-  ripple: { symbol: "XRP", name: "XRP" },
-  binancecoin: { symbol: "BNB", name: "BNB" },
-  cardano: { symbol: "ADA", name: "Cardano" },
-  dogecoin: { symbol: "DOGE", name: "Dogecoin" },
-  avalanche_2: { symbol: "AVAX", name: "Avalanche" }, // CoinGecko uses "avalanche-2"
-  polkadot: { symbol: "DOT", name: "Polkadot" },
-  chainlink: { symbol: "LINK", name: "Chainlink" },
-  uniswap: { symbol: "UNI", name: "Uniswap" },
-  "matic-network": { symbol: "MATIC", name: "Polygon" },
-  tron: { symbol: "TRX", name: "TRON" },
-  toncoin: { symbol: "TON", name: "Toncoin" },
-  shiba_inu: { symbol: "SHIB", name: "Shiba Inu" }, // CoinGecko uses "shiba-inu"
+const COINCAP_MAP: Record<string, string> = {
+  bitcoin: "BTC", ethereum: "ETH", solana: "SOL", xrp: "XRP",
+  "binance-coin": "BNB", cardano: "ADA", dogecoin: "DOGE",
+  avalanche: "AVAX", polkadot: "DOT", chainlink: "LINK",
+  uniswap: "UNI", polygon: "MATIC", tron: "TRX", toncoin: "TON",
+  "shiba-inu": "SHIB", litecoin: "LTC", "bitcoin-cash": "BCH",
+  stellar: "XLM", monero: "XMR", "near-protocol": "NEAR",
 }
 
+async function fetchCoinCap(): Promise<any[] | null> {
+  try {
+    const res = await fetch(COINCAP_URL, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(6000),
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    if (!json.data || !Array.isArray(json.data)) return null
+    return json.data.map((coin: any) => {
+      const symbol = COINCAP_MAP[coin.id] || coin.symbol?.toUpperCase() || "?"
+      return {
+        id: coin.symbol?.toLowerCase() || coin.id,
+        symbol,
+        name: coin.name || symbol,
+        price: parseFloat(coin.priceUsd) || 0,
+        change24h: parseFloat(coin.changePercent24Hr) || 0,
+        volume: parseFloat(coin.volumeUsd24Hr) || 0,
+        marketCap: parseFloat(coin.marketCapUsd) || 0,
+        high24h: 0,
+        low24h: 0,
+        sparkline: [],
+        category: "crypto",
+      }
+    }).filter((c: any) => c.price > 0)
+  } catch {
+    return null
+  }
+}
+
+// ─── Source 2: Binance ───
+const BINANCE_TICKER = "https://api.binance.com/api/v3/ticker/24hr"
 const BINANCE_SYMBOLS = [
   { symbol: "BTCUSDT", base: "BTC", name: "Bitcoin" },
   { symbol: "ETHUSDT", base: "ETH", name: "Ethereum" },
@@ -36,11 +64,73 @@ const BINANCE_SYMBOLS = [
   { symbol: "DOTUSDT", base: "DOT", name: "Polkadot" },
   { symbol: "LINKUSDT", base: "LINK", name: "Chainlink" },
   { symbol: "UNIUSDT", base: "UNI", name: "Uniswap" },
-  { symbol: "MATICUSDT", base: "MATIC", name: "Polygon" },
   { symbol: "TRXUSDT", base: "TRX", name: "TRON" },
   { symbol: "TONUSDT", base: "TON", name: "Toncoin" },
   { symbol: "SHIBUSDT", base: "SHIB", name: "Shiba Inu" },
+  { symbol: "LTCUSDT", base: "LTC", name: "Litecoin" },
 ]
+
+async function fetchBinance(): Promise<any[] | null> {
+  try {
+    const symbols = BINANCE_SYMBOLS.map((s) => `"${s.symbol}"`).join(",")
+    const res = await fetch(`${BINANCE_TICKER}?symbols=[${symbols}]`, {
+      signal: AbortSignal.timeout(6000),
+    })
+    if (!res.ok) return null
+    const data: any[] = await res.json()
+    return data.map((ticker) => {
+      const info = BINANCE_SYMBOLS.find((s) => s.symbol === ticker.symbol)
+      const price = parseFloat(ticker.lastPrice)
+      const open = parseFloat(ticker.openPrice)
+      return {
+        id: info?.base?.toLowerCase() || "",
+        symbol: info?.base || ticker.symbol.replace("USDT", ""),
+        name: info?.name || "",
+        price,
+        change24h: open > 0 ? ((price - open) / open) * 100 : 0,
+        volume: parseFloat(ticker.quoteVolume) || 0,
+        marketCap: 0,
+        high24h: parseFloat(ticker.highPrice) || 0,
+        low24h: parseFloat(ticker.lowPrice) || 0,
+        sparkline: [],
+        category: "crypto",
+      }
+    }).filter((c) => c.price > 0).sort((a, b) => b.volume - a.volume)
+  } catch {
+    return null
+  }
+}
+
+// ─── Source 3: CoinGecko ───
+const COINGECKO_URL =
+  "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=true&price_change_percentage=24h,7d"
+
+async function fetchCoinGecko(): Promise<any[] | null> {
+  try {
+    const res = await fetch(COINGECKO_URL, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return null
+    const data: any[] = await res.json()
+    return data.map((coin) => ({
+      id: coin.symbol?.toLowerCase() || coin.id,
+      symbol: coin.symbol?.toUpperCase(),
+      name: coin.name,
+      price: coin.current_price ?? 0,
+      change24h: coin.price_change_percentage_24h ?? 0,
+      change7d: coin.price_change_percentage_7d_in_currency ?? 0,
+      volume: coin.total_volume ?? 0,
+      marketCap: coin.market_cap ?? 0,
+      high24h: coin.high_24h ?? 0,
+      low24h: coin.low_24h ?? 0,
+      sparkline: coin.sparkline_in_7d?.price?.slice(-24) ?? [],
+      category: "crypto",
+    })).filter((c: any) => c.price > 0)
+  } catch {
+    return null
+  }
+}
 
 // ─── Forex / Commodities / Stocks / CFD (drift-simulated) ───
 const FOREX_PAIRS = [
@@ -83,9 +173,10 @@ const CFDS = [
 // ─── Cache ───
 let cachedCrypto: any[] | null = null
 let cacheTime = 0
-const CACHE_DURATION = 15_000 // 15s -- CoinGecko free = 10-30 req/min
+const CACHE_TTL = 20_000 // 20 seconds
+let lastSource = "none"
 
-// ─── Drift state for non-crypto assets ───
+// ─── Drift for non-crypto ───
 const driftState = new Map<string, number>()
 function getDriftPrice(symbol: string, base: number) {
   const existing = driftState.get(symbol)
@@ -101,93 +192,50 @@ function getDriftPrice(symbol: string, base: number) {
   return { price: current, change: ((current - base) / base) * 100 }
 }
 
-// ─── Fetch helpers ───
-async function fetchCoinGecko(): Promise<any[] | null> {
-  try {
-    const res = await fetch(COINGECKO_URL, {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 15 },
-    })
-    if (!res.ok) return null
-    const data: any[] = await res.json()
-    return data.map((coin) => ({
-      id: coin.symbol?.toLowerCase() || coin.id,
-      symbol: coin.symbol?.toUpperCase(),
-      name: coin.name,
-      price: coin.current_price ?? 0,
-      change24h: coin.price_change_percentage_24h ?? 0,
-      change7d: coin.price_change_percentage_7d_in_currency ?? 0,
-      volume: coin.total_volume ?? 0,
-      marketCap: coin.market_cap ?? 0,
-      high24h: coin.high_24h ?? 0,
-      low24h: coin.low_24h ?? 0,
-      sparkline: coin.sparkline_in_7d?.price?.slice(-24) ?? [],
-      category: "crypto",
-    }))
-  } catch {
-    return null
-  }
-}
-
-async function fetchBinance(): Promise<any[] | null> {
-  try {
-    const symbols = BINANCE_SYMBOLS.map((s) => `"${s.symbol}"`).join(",")
-    const res = await fetch(`${BINANCE_TICKER}?symbols=[${symbols}]`, {
-      next: { revalidate: 10 },
-    })
-    if (!res.ok) return null
-    const data: any[] = await res.json()
-    return data.map((ticker) => {
-      const info = BINANCE_SYMBOLS.find((s) => s.symbol === ticker.symbol)
-      const price = parseFloat(ticker.lastPrice)
-      const open = parseFloat(ticker.openPrice)
-      return {
-        id: info?.base?.toLowerCase() || "",
-        symbol: info?.base || ticker.symbol.replace("USDT", ""),
-        name: info?.name || "",
-        price,
-        change24h: open > 0 ? ((price - open) / open) * 100 : 0,
-        volume: parseFloat(ticker.quoteVolume),
-        marketCap: 0,
-        high24h: parseFloat(ticker.highPrice),
-        low24h: parseFloat(ticker.lowPrice),
-        sparkline: [],
-        category: "crypto",
-      }
-    }).sort((a, b) => b.volume - a.volume)
-  } catch {
-    return null
-  }
-}
-
 export async function GET() {
   const now = Date.now()
 
-  // ── Crypto: Use cache if fresh ──
+  // ── Crypto ──
   let cryptoData: any[] | null = null
-  if (cachedCrypto && now - cacheTime < CACHE_DURATION) {
+
+  if (cachedCrypto && now - cacheTime < CACHE_TTL) {
     cryptoData = cachedCrypto
   } else {
-    // Try CoinGecko first (most reliable from Vercel edge)
-    cryptoData = await fetchCoinGecko()
+    // Try all sources concurrently -- use whichever responds first with data
+    const [coincapResult, binanceResult, geckoResult] = await Promise.allSettled([
+      fetchCoinCap(),
+      fetchBinance(),
+      fetchCoinGecko(),
+    ])
 
-    // Fallback to Binance if CoinGecko failed
-    if (!cryptoData || cryptoData.length === 0) {
-      cryptoData = await fetchBinance()
+    const coincapData = coincapResult.status === "fulfilled" ? coincapResult.value : null
+    const binanceData = binanceResult.status === "fulfilled" ? binanceResult.value : null
+    const geckoData = geckoResult.status === "fulfilled" ? geckoResult.value : null
+
+    // Pick best result (prefer CoinGecko for sparklines, then CoinCap, then Binance)
+    if (geckoData && geckoData.length > 0) {
+      cryptoData = geckoData
+      lastSource = "coingecko"
+    } else if (coincapData && coincapData.length > 0) {
+      cryptoData = coincapData
+      lastSource = "coincap"
+    } else if (binanceData && binanceData.length > 0) {
+      cryptoData = binanceData
+      lastSource = "binance"
     }
 
-    // Cache whatever we got
     if (cryptoData && cryptoData.length > 0) {
       cachedCrypto = cryptoData
       cacheTime = now
     } else if (cachedCrypto) {
-      // Use stale cache if everything failed
-      cryptoData = cachedCrypto
+      cryptoData = cachedCrypto // stale cache
+      lastSource = "stale-cache"
     }
   }
 
-  // Ultimate fallback with drift simulation
+  // Ultimate fallback
   if (!cryptoData || cryptoData.length === 0) {
+    lastSource = "fallback"
     const FB = [
       { s: "BTC", n: "Bitcoin", p: 97842.50, v: 28.5e9, m: 1.92e12 },
       { s: "ETH", n: "Ethereum", p: 3456.78, v: 14.2e9, m: 415e9 },
@@ -218,7 +266,7 @@ export async function GET() {
     })
   }
 
-  // ── Forex / Commodities / Stocks / CFD ──
+  // ── Other asset classes ──
   const forexData = FOREX_PAIRS.map((p) => {
     const { price, change } = getDriftPrice(p.symbol, p.base)
     return { id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name, price, change24h: change, volume: Math.round(2e9 + Math.random() * 5e9), marketCap: 0, category: "forex" }
@@ -242,6 +290,7 @@ export async function GET() {
     commodities: commodityData,
     stocks: stockData,
     cfd: cfdData,
+    source: lastSource,
     timestamp: now,
   })
 }

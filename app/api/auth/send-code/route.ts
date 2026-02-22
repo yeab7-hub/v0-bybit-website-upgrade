@@ -170,6 +170,7 @@ export async function POST(request: NextRequest) {
       type: purpose,
       expires_at: expiresAt,
       used: false,
+      attempts: 0,
     })
 
     if (insertError) {

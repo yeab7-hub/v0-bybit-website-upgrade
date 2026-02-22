@@ -74,12 +74,16 @@ function LoginContent() {
         body: JSON.stringify({ email, purpose: "login" }),
       })
       const data = await res.json()
+      console.log("[v0] send-code response:", res.status, data)
       if (!res.ok) {
         if (res.status === 429) setError("Please wait before requesting another code.")
         return false
       }
       return data.success === true
-    } catch { return false }
+    } catch (err) {
+      console.error("[v0] send-code fetch error:", err)
+      return false
+    }
   }
 
   const handleEmailVerify = async () => {
@@ -161,9 +165,17 @@ function LoginContent() {
         return
       }
 
-      // If sending fails, sign back in and proceed (fallback)
-      setError("Could not send verification email. Please try again.")
-      setLoading(false)
+      // If OTP sending fails, sign the user in directly as fallback
+      console.log("[v0] OTP send failed, falling back to direct sign-in")
+      const { error: fallbackErr } = await supabase.auth.signInWithPassword({ email, password })
+      if (fallbackErr) {
+        setError("Could not send verification email. Please try again.")
+        setLoading(false)
+        return
+      }
+      // Signed in successfully without OTP
+      router.push(redirectTo)
+      router.refresh()
     } catch (err: any) {
       const msg = err?.message?.toLowerCase() || ""
       if (msg.includes("fetch") || msg.includes("network") || msg.includes("load failed") || err?.name === "TypeError") {

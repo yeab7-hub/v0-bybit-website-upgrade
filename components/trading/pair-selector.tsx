@@ -104,56 +104,74 @@ export function PairSelector({ onSelectPair, activePair = "BTCUSDT" }: PairSelec
   const wsRef = useRef<WebSocket | null>(null)
   const [connected, setConnected] = useState(false)
 
-  // Fetch initial crypto data from Binance REST API
+  // Fetch initial data from our own API (which tries CoinCap/Binance/CoinGecko)
   useEffect(() => {
-    const fetchTickers = async () => {
+    const fetchInitial = async () => {
       try {
-        const symbols = CRYPTO_PAIRS.map((p) => `"${p.symbol}"`).join(",")
-        const res = await fetch(
-          `https://api.binance.com/api/v3/ticker/24hr?symbols=[${symbols}]`
-        )
-        if (!res.ok) throw new Error("Binance API failed")
-        const data: Record<string, string>[] = await res.json()
+        const res = await fetch("/api/prices")
+        if (!res.ok) return
+        const data = await res.json()
         const map = new Map<string, TickerData>()
-        for (const t of data) {
-          const pair = CRYPTO_PAIRS.find((p) => p.symbol === t.symbol)
+
+        // Load crypto from our API
+        for (const item of data.crypto ?? []) {
+          const pair = CRYPTO_PAIRS.find((p) => p.base === item.symbol)
           if (!pair) continue
-          const price = parseFloat(t.lastPrice)
-          const open = parseFloat(t.openPrice)
           map.set(pair.symbol, {
-            symbol: pair.symbol,
-            base: pair.base,
-            name: pair.name,
-            price,
-            change24h: open > 0 ? ((price - open) / open) * 100 : 0,
-            volume: parseFloat(t.quoteVolume),
+            symbol: pair.symbol, base: pair.base, name: pair.name,
+            price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
             category: "crypto",
           })
         }
-        setTickers(map)
-      } catch {
-        for (const pair of CRYPTO_PAIRS.slice(0, 5)) {
-          try {
-            const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${pair.symbol}`)
-            if (!res.ok) continue
-            const t: Record<string, string> = await res.json()
-            const price = parseFloat(t.lastPrice)
-            const open = parseFloat(t.openPrice)
-            setTickers((prev) => {
-              const next = new Map(prev)
-              next.set(pair.symbol, {
-                symbol: pair.symbol, base: pair.base, name: pair.name, price,
-                change24h: open > 0 ? ((price - open) / open) * 100 : 0,
-                volume: parseFloat(t.quoteVolume),
-                category: "crypto",
-              })
-              return next
-            })
-          } catch { /* skip */ }
+
+        // Load forex
+        for (const item of data.forex ?? []) {
+          const pair = FOREX_PAIRS.find((p) => p.symbol === item.symbol)
+          if (!pair) continue
+          map.set(pair.symbol, {
+            symbol: pair.symbol, base: pair.base, name: pair.name,
+            price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+            category: "forex",
+          })
         }
-      }
+
+        // Load commodities
+        for (const item of data.commodities ?? []) {
+          const pair = COMMODITY_PAIRS.find((p) => p.symbol === item.symbol)
+          if (!pair) continue
+          map.set(pair.symbol, {
+            symbol: pair.symbol, base: pair.base, name: pair.name,
+            price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+            category: "commodities",
+          })
+        }
+
+        // Load stocks
+        for (const item of data.stocks ?? []) {
+          const pair = STOCK_PAIRS.find((p) => p.symbol === item.symbol)
+          if (!pair) continue
+          map.set(pair.symbol, {
+            symbol: pair.symbol, base: pair.base, name: pair.name,
+            price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+            category: "stocks",
+          })
+        }
+
+        // Load CFD
+        for (const item of data.cfd ?? []) {
+          const pair = CFD_PAIRS.find((p) => p.symbol === item.symbol)
+          if (!pair) continue
+          map.set(pair.symbol, {
+            symbol: pair.symbol, base: pair.base, name: pair.name,
+            price: item.price, change24h: item.change24h, volume: item.volume ?? 0,
+            category: "cfd",
+          })
+        }
+
+        setTickers(map)
+      } catch { /* ignore -- second effect will retry */ }
     }
-    fetchTickers()
+    fetchInitial()
   }, [])
 
   // Fetch forex/commodities/stocks from our prices API

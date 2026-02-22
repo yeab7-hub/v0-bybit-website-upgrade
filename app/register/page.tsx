@@ -58,12 +58,16 @@ export default function RegisterPage() {
         body: JSON.stringify({ email, purpose: "signup" }),
       })
       const data = await res.json()
+      console.log("[v0] signup send-code response:", res.status, data)
       if (!res.ok) {
         if (res.status === 429) setError("Please wait before requesting another code.")
         return false
       }
       return data.success === true
-    } catch { return false }
+    } catch (err) {
+      console.error("[v0] signup send-code fetch error:", err)
+      return false
+    }
   }
 
   const handleVerifySignup = async () => {
@@ -146,8 +150,17 @@ export default function RegisterPage() {
         setShowVerify(true)
         setLoading(false)
       } else {
-        setError("Account created but could not send verification email. Please try logging in.")
-        setLoading(false)
+        // OTP send failed but account IS created and email-confirmed
+        // Sign user in directly as fallback
+        console.log("[v0] OTP send failed after signup, falling back to direct sign-in")
+        const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
+        if (signInErr) {
+          setError("Account created! Please go to login page to sign in.")
+          setLoading(false)
+          return
+        }
+        router.push("/dashboard")
+        router.refresh()
       }
     } catch (err: any) {
       const msg = err?.message?.toLowerCase() || ""
