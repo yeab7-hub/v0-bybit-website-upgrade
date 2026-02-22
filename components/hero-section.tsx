@@ -14,9 +14,9 @@ const HERO_FALLBACK = [
 ]
 
 export function HeroSection() {
-  const { crypto, isLoading } = useLivePrices(5000)
+  const { crypto } = useLivePrices(15000)
   const [email, setEmail] = useState("")
-  const topCoins = crypto.length > 0 ? crypto.slice(0, 4) : HERO_FALLBACK
+  const topCoins = crypto.slice(0, 4)
 
   return (
     <section className="relative overflow-hidden bg-background">

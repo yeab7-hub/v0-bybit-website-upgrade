@@ -86,7 +86,7 @@ const CFD_FALLBACK: PriceData[] = [
 ]
 
 export function MarketTable() {
-  const { crypto, forex, commodities, stocks, cfd, isLoading } = useLivePrices(5000)
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(15000)
   const [activeCategory, setActiveCategory] = useState("Crypto")
   const [activeCryptoTab, setActiveCryptoTab] = useState("Hot")
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
@@ -209,29 +209,7 @@ export function MarketTable() {
             </tr>
           </thead>
           <tbody>
-            {isLoading && assets.length === 0 ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <tr key={i} className="border-b border-border">
-                  <td className="px-4 py-4">
-                    <div className="h-4 w-6 animate-pulse rounded bg-secondary" />
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 animate-pulse rounded-full bg-secondary" />
-                      <div>
-                        <div className="h-4 w-20 animate-pulse rounded bg-secondary" />
-                        <div className="mt-1 h-3 w-10 animate-pulse rounded bg-secondary" />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4"><div className="ml-auto h-4 w-24 animate-pulse rounded bg-secondary" /></td>
-                  <td className="px-4 py-4"><div className="ml-auto h-4 w-16 animate-pulse rounded bg-secondary" /></td>
-                  <td className="hidden px-4 py-4 md:table-cell"><div className="ml-auto h-4 w-16 animate-pulse rounded bg-secondary" /></td>
-                  <td className="px-4 py-4"><div className="ml-auto h-4 w-16 animate-pulse rounded bg-secondary" /></td>
-                </tr>
-              ))
-            ) : (
-              assets.map((asset, index) => (
+            {assets.map((asset, index) => (
                 <tr
                   key={asset.id}
                   className="border-b border-border last:border-0 hover:bg-secondary/30"
@@ -312,8 +290,7 @@ export function MarketTable() {
                     </Link>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>
