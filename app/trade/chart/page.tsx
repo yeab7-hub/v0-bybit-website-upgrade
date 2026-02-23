@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, Suspense, Component, type ReactNode } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import {
@@ -10,6 +10,29 @@ import {
 import { BottomNav } from "@/components/bottom-nav"
 import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
 import { TradingViewChart } from "@/components/trading/tradingview-chart"
+
+/* Error boundary to prevent chart crashes from killing the page */
+class ChartErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() { return { hasError: true } }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-card">
+          <BarChart3 className="h-8 w-8 text-muted-foreground/40" />
+          <p className="text-xs text-muted-foreground">Chart temporarily unavailable</p>
+          <button onClick={() => this.setState({ hasError: false })} className="mt-1 rounded bg-secondary px-3 py-1.5 text-xs text-foreground">
+            Retry
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 export default function ChartPage() {
   return (
@@ -242,13 +265,15 @@ function ChartContent() {
 
           {/* TradingView chart - full width, prominent */}
           <div className="relative flex-1 border-b border-border" style={{ minHeight: "360px" }}>
-            <TradingViewChart
-              symbol={pair}
-              theme="dark"
-              interval={tvIntervalMap[selectedInterval] || "1"}
-              hideTopToolbar
-              className="h-full w-full"
-            />
+            <ChartErrorBoundary>
+              <TradingViewChart
+                symbol={pair}
+                theme="dark"
+                interval={tvIntervalMap[selectedInterval] || "1"}
+                hideTopToolbar
+                className="h-full w-full"
+              />
+            </ChartErrorBoundary>
           </div>
 
           {/* Volume indicator labels */}

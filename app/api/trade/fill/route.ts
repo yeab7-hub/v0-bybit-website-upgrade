@@ -125,7 +125,7 @@ export async function GET() {
       updated_at: new Date().toISOString()
     }).eq("id", order.id)
 
-    // Create trade record
+    // Create trade record -- buy = open position, sell = closed
     await adminSupabase.from("trades").insert({
       user_id: user.id,
       order_id: order.id,
@@ -135,7 +135,10 @@ export async function GET() {
       amount: remaining,
       total,
       fee,
-      pnl
+      pnl,
+      status: order.side === "buy" ? "open" : "closed",
+      close_price: order.side === "sell" ? fillPrice : null,
+      closed_at: order.side === "sell" ? new Date().toISOString() : null,
     })
 
     // Update balances

@@ -146,6 +146,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ trades: data ?? [] })
   }
 
+  if (type === "positions") {
+    const { data } = await adminSupabase.from("trades").select("*").eq("user_id", user.id).eq("status", "open").order("created_at", { ascending: false })
+    return NextResponse.json({ positions: data ?? [] })
+  }
+
+  if (type === "history") {
+    const { data } = await adminSupabase.from("trades").select("*").eq("user_id", user.id).eq("status", "closed").order("created_at", { ascending: false }).limit(50)
+    return NextResponse.json({ history: data ?? [] })
+  }
+
   // Open + partially_filled orders
   const { data } = await adminSupabase
     .from("orders")
@@ -290,10 +300,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert trade record
+    // Insert trade record -- buy = open position, sell = closed position
     await adminSupabase.from("trades").insert({
       user_id: user.id, order_id: order.id, pair, side,
-      price: execPrice, amount, total, fee, pnl
+      price: execPrice, amount, total, fee, pnl,
+      status: side === "buy" ? "open" : "closed",
+      close_price: side === "sell" ? execPrice : null,
+      closed_at: side === "sell" ? new Date().toISOString() : null,
     })
 
     // Update balances

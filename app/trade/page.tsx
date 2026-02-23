@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, Component, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -19,6 +19,23 @@ import useSWR, { mutate as globalMutate } from "swr"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 const percentages = [0, 25, 50, 75, 100]
+
+class ChartErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) { super(props); this.state = { hasError: false } }
+  static getDerivedStateFromError() { return { hasError: true } }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-card">
+          <BarChart3 className="h-8 w-8 text-muted-foreground/40" />
+          <p className="text-xs text-muted-foreground">Chart unavailable</p>
+          <button onClick={() => this.setState({ hasError: false })} className="rounded bg-secondary px-3 py-1 text-xs text-foreground">Retry</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 type OrderSide = "buy" | "sell"
 type OrderType = "Market" | "Limit" | "Stop-Limit"
@@ -74,11 +91,14 @@ export default function TradePage() {
 
   const { data: balData } = useSWR(user ? "/api/trade?type=balances" : null, fetcher, { refreshInterval: 5000 })
   const { data: ordersData } = useSWR(user ? "/api/trade?type=orders" : null, fetcher, { refreshInterval: 3000 })
-  const { data: tradesData } = useSWR(user ? "/api/trade?type=trades" : null, fetcher, { refreshInterval: 3000 })
+  const { data: positionsData } = useSWR(user ? "/api/trade?type=positions" : null, fetcher, { refreshInterval: 3000 })
+  const { data: historyData } = useSWR(user ? "/api/trade?type=history" : null, fetcher, { refreshInterval: 5000 })
 
   const balances = balData?.balances ?? []
   const orders = ordersData?.orders ?? []
-  const trades = tradesData?.trades ?? []
+  const positions = positionsData?.positions ?? []
+  const history = historyData?.history ?? []
+  const [closingId, setClosingId] = useState<string | null>(null)
   const quoteBalance = balances.find((b: any) => b.asset === quoteAsset)?.available ?? 0
   const baseBalance = balances.find((b: any) => b.asset === baseAsset)?.available ?? 0
 
@@ -109,7 +129,8 @@ export default function TradePage() {
         const data = await res.json()
         if (data.filled > 0) {
           globalMutate("/api/trade?type=orders")
-          globalMutate("/api/trade?type=trades")
+          globalMutate("/api/trade?type=positions")
+          globalMutate("/api/trade?type=history")
           globalMutate("/api/trade?type=balances")
         }
       } catch { /* ignore */ }
@@ -141,7 +162,8 @@ export default function TradePage() {
         setAmount(""); setSliderPct(0)
         globalMutate("/api/trade?type=balances")
         globalMutate("/api/trade?type=orders")
-        globalMutate("/api/trade?type=trades")
+        globalMutate("/api/trade?type=positions")
+        globalMutate("/api/trade?type=history")
       } else {
         setFeedback({ type: "error", msg: data.error || "Order failed" })
       }
@@ -157,6 +179,31 @@ export default function TradePage() {
     await fetch(`/api/trade?id=${orderId}`, { method: "DELETE" })
     globalMutate("/api/trade?type=orders")
     globalMutate("/api/trade?type=balances")
+  }
+
+  const closePosition = async (tradeId: string) => {
+    setClosingId(tradeId)
+    try {
+      const res = await fetch("/api/trade/close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tradeId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setFeedback({ type: "success", msg: data.message })
+        globalMutate("/api/trade?type=positions")
+        globalMutate("/api/trade?type=history")
+        globalMutate("/api/trade?type=balances")
+      } else {
+        setFeedback({ type: "error", msg: data.error || "Failed to close position" })
+      }
+    } catch {
+      setFeedback({ type: "error", msg: "Network error closing position" })
+    } finally {
+      setClosingId(null)
+      setTimeout(() => setFeedback(null), 4000)
+    }
   }
 
   const isBuy = side === "buy"
@@ -446,8 +493,8 @@ export default function TradePage() {
       <div className="scrollbar-none flex items-center gap-0 overflow-x-auto border-b border-border px-2">
         {(["orders", "positions", "history", "assets"] as BottomTab[]).map((t) => {
           const labels: Record<string, string> = {
-            orders: `Orders(${orders.length})`,
-            positions: `Positions(${trades.filter((tr: any) => tr.status === "open").length})`,
+            orders: `Open Orders(${orders.length})`,
+            positions: `Positions(${positions.length})`,
             history: "Trade History",
             assets: "Assets",
           }
@@ -478,81 +525,135 @@ export default function TradePage() {
       </div>
 
       <div className="h-[200px] overflow-y-auto lg:h-[280px]">
+        {/* ===== OPEN ORDERS TAB ===== */}
         {bottomTab === "orders" && (
           orders.length === 0 ? (
-            <EmptyState icon={<BarChart3 className="h-7 w-7 text-muted-foreground/40" />} text="No Available Data" />
+            <EmptyState icon={<BarChart3 className="h-7 w-7 text-muted-foreground/40" />} text="No Open Orders" />
           ) : (
             <div className="flex flex-col">
               {orders.map((o: any) => {
-                const curPrice = allPrices.find((c) => c.symbol === o.pair?.split("/")[0])?.price ?? 0
                 const remaining = Number(o.amount) - Number(o.filled)
                 return (
-                  <button key={o.id} onClick={() => setSelectedDetail({ ...o, _type: "order", _curPrice: curPrice })} className="flex items-center justify-between border-b border-border/50 px-3 py-2.5 text-left active:bg-secondary/20">
+                  <div key={o.id} className="flex items-center justify-between border-b border-border/50 px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <MarketAsset symbol={o.pair?.split("/")[0] || "BTC"} size={28} />
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-semibold text-foreground">{o.pair}</span>
                           <span className={`rounded px-1 py-0.5 text-[9px] font-bold uppercase ${o.side === "buy" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>{o.side}</span>
+                          <span className="rounded bg-secondary px-1 py-0.5 text-[9px] text-muted-foreground">{o.order_type}</span>
                         </div>
                         <span className="text-[10px] text-muted-foreground">Qty: {remaining.toFixed(4)} @ ${Number(o.price).toLocaleString()}</span>
                       </div>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); cancelOrder(o.id) }} className="rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:border-destructive hover:text-destructive">Cancel</button>
-                  </button>
+                    <button onClick={() => cancelOrder(o.id)} className="rounded-md border border-border px-2.5 py-1 text-[10px] text-muted-foreground active:border-destructive active:text-destructive">Cancel</button>
+                  </div>
                 )
               })}
             </div>
           )
         )}
 
+        {/* ===== OPEN POSITIONS TAB -- live unrealized P&L ===== */}
         {bottomTab === "positions" && (
-          trades.length === 0 ? (
-            <EmptyState icon={<TrendingUp className="h-7 w-7 text-muted-foreground/40" />} text="No Available Data" />
+          positions.length === 0 ? (
+            <EmptyState icon={<TrendingUp className="h-7 w-7 text-muted-foreground/40" />} text="No Open Positions" />
           ) : (
             <div className="flex flex-col">
-              {trades.map((t: any) => {
-                const pnl = Number(t.pnl) || 0
+              {positions.map((pos: any) => {
+                const entryPrice = Number(pos.price)
+                const qty = Number(pos.amount)
+                const base = pos.pair?.split("/")[0] || "BTC"
+                const curPrice = allPrices.find((c) => c.symbol === base)?.price ?? entryPrice
+                const unrealizedPnl = (curPrice - entryPrice) * qty
+                const pnlPct = entryPrice > 0 ? ((curPrice - entryPrice) / entryPrice) * 100 : 0
+                const isClosing = closingId === pos.id
+
                 return (
-                  <button key={t.id} onClick={() => setSelectedDetail({ ...t, _type: "trade" })} className="flex items-center justify-between border-b border-border/50 px-3 py-2.5 text-left active:bg-secondary/20">
-                    <div className="flex items-center gap-2">
-                      <MarketAsset symbol={t.pair?.split("/")[0] || "BTC"} size={28} />
-                      <div>
-                        <span className="text-xs font-semibold text-foreground">{t.pair}</span>
-                        <span className="ml-1 text-[9px] text-muted-foreground">{new Date(t.created_at).toLocaleString()}</span>
+                  <div key={pos.id} className="border-b border-border/50 px-3 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MarketAsset symbol={base} size={28} />
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-foreground">{pos.pair}</span>
+                            <span className="rounded bg-success/10 px-1 py-0.5 text-[9px] font-bold text-success">LONG</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <span>Entry: ${entryPrice.toLocaleString()}</span>
+                            <span>Qty: {qty.toFixed(4)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <div className={`font-mono text-xs font-bold ${unrealizedPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                            {unrealizedPnl >= 0 ? "+" : ""}{unrealizedPnl.toFixed(2)} USDT
+                          </div>
+                          <div className={`font-mono text-[10px] ${pnlPct >= 0 ? "text-success" : "text-destructive"}`}>
+                            {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => closePosition(pos.id)}
+                          disabled={isClosing}
+                          className="rounded-md border border-destructive px-2 py-1 text-[10px] font-semibold text-destructive disabled:opacity-50"
+                        >
+                          {isClosing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Close"}
+                        </button>
                       </div>
                     </div>
-                    <span className={`font-mono text-xs font-semibold ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                      {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}
-                    </span>
-                  </button>
+                    {/* Live price bar */}
+                    <div className="mt-1.5 flex items-center gap-3 text-[9px] text-muted-foreground">
+                      <span>Mark: ${curPrice.toLocaleString()}</span>
+                      <span>Liq: --</span>
+                      <span>{new Date(pos.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
                 )
               })}
             </div>
           )
         )}
 
+        {/* ===== TRADE HISTORY TAB -- closed trades with realized P&L ===== */}
         {bottomTab === "history" && (
-          trades.length === 0 ? (
+          history.length === 0 ? (
             <EmptyState icon={<Clock className="h-7 w-7 text-muted-foreground/40" />} text="No Trade History" />
           ) : (
             <div className="flex flex-col">
-              {trades.map((t: any) => (
-                <div key={t.id} className="flex items-center justify-between border-b border-border/50 px-3 py-2">
-                  <div>
-                    <span className="text-[11px] font-medium text-foreground">{t.pair}</span>
-                    <span className={`ml-2 text-[10px] font-semibold ${t.side === "buy" ? "text-success" : "text-destructive"}`}>{t.side?.toUpperCase()}</span>
+              {history.map((t: any) => {
+                const pnl = Number(t.pnl) || 0
+                return (
+                  <div key={t.id} onClick={() => setSelectedDetail({ ...t, _type: "trade" })} className="flex items-center justify-between border-b border-border/50 px-3 py-2.5 active:bg-secondary/20">
+                    <div className="flex items-center gap-2">
+                      <MarketAsset symbol={t.pair?.split("/")[0] || "BTC"} size={24} />
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-medium text-foreground">{t.pair}</span>
+                          <span className={`text-[9px] font-bold ${t.side === "buy" ? "text-success" : "text-destructive"}`}>{t.side?.toUpperCase()}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
+                          <span>${Number(t.price).toLocaleString()}</span>
+                          {t.close_price && <span>{"=>"} ${Number(t.close_price).toLocaleString()}</span>}
+                          <span>{Number(t.amount).toFixed(4)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className={`font-mono text-xs font-semibold ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}
+                      </span>
+                      <div className="text-[9px] text-muted-foreground">{new Date(t.closed_at || t.created_at).toLocaleDateString()}</div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-mono text-[11px] text-foreground">${Number(t.price).toLocaleString()}</span>
-                    <span className="ml-2 font-mono text-[10px] text-muted-foreground">{Number(t.amount).toFixed(4)}</span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )
         )}
 
+        {/* ===== ASSETS TAB ===== */}
         {bottomTab === "assets" && (
           balances.filter((b: any) => Number(b.available) > 0 || Number(b.in_order) > 0).length === 0 ? (
             <EmptyState icon={<BarChart3 className="h-7 w-7 text-muted-foreground/40" />} text="No Assets" />
@@ -567,7 +668,10 @@ export default function TradePage() {
                       <MarketAsset symbol={b.asset} size={28} />
                       <div>
                         <span className="text-xs font-semibold text-foreground">{b.asset}</span>
-                        <span className="block text-[10px] text-muted-foreground">{balanceVisible ? `${Number(b.available).toFixed(4)}` : "****"}</span>
+                        <span className="block text-[10px] text-muted-foreground">{balanceVisible ? `${Number(b.available).toFixed(4)} avail` : "****"}</span>
+                        {Number(b.in_order) > 0 && (
+                          <span className="text-[9px] text-muted-foreground/60">{balanceVisible ? `${Number(b.in_order).toFixed(4)} in order` : ""}</span>
+                        )}
                       </div>
                     </div>
                     <span className="font-mono text-xs text-foreground">{balanceVisible ? `$${totalVal.toFixed(2)}` : "****"}</span>
@@ -671,7 +775,9 @@ export default function TradePage() {
         </div>
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 border-b border-border bg-card">
-            <TradingViewChart symbol={selectedPair.replace("/", "")} theme="dark" />
+            <ChartErrorBoundary>
+              <TradingViewChart symbol={selectedPair.replace("/", "")} theme="dark" />
+            </ChartErrorBoundary>
           </div>
           {BottomTabsPanel}
         </div>
@@ -715,9 +821,11 @@ export default function TradePage() {
             </div>
             <div className="mb-4 flex items-center gap-2">
               {selectedDetail._type === "order" ? (
-                <span className="flex items-center gap-1 rounded-full bg-[#f7a600]/10 px-2.5 py-1 text-[10px] font-semibold text-[#f7a600]"><Clock className="h-3 w-3" />Open</span>
+                <span className="flex items-center gap-1 rounded-full bg-[#f7a600]/10 px-2.5 py-1 text-[10px] font-semibold text-[#f7a600]"><Clock className="h-3 w-3" />Pending</span>
+              ) : selectedDetail.status === "open" ? (
+                <span className="flex items-center gap-1 rounded-full bg-[#f7a600]/10 px-2.5 py-1 text-[10px] font-semibold text-[#f7a600]"><TrendingUp className="h-3 w-3" />Open Position</span>
               ) : (
-                <span className="flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-[10px] font-semibold text-success"><CheckCircle2 className="h-3 w-3" />Filled</span>
+                <span className="flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-[10px] font-semibold text-success"><CheckCircle2 className="h-3 w-3" />Closed</span>
               )}
               <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${selectedDetail.side === "buy" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
                 {selectedDetail.side?.toUpperCase()}
@@ -731,9 +839,23 @@ export default function TradePage() {
                 <DetailCell label="P&L" value={`${Number(selectedDetail.pnl) >= 0 ? "+" : ""}${Number(selectedDetail.pnl).toFixed(2)} USDT`} valueClass={Number(selectedDetail.pnl) >= 0 ? "text-success" : "text-destructive"} />
               )}
             </div>
+            {/* Close price and date for closed trades */}
+            {selectedDetail.close_price && (
+              <div className="mt-2 grid grid-cols-2 gap-2.5">
+                <DetailCell label="Close Price" value={`$${Number(selectedDetail.close_price).toLocaleString()}`} />
+                <DetailCell label="Closed At" value={selectedDetail.closed_at ? new Date(selectedDetail.closed_at).toLocaleString() : "N/A"} />
+              </div>
+            )}
             <div className="mt-4 flex gap-2">
               {selectedDetail._type === "order" ? (
                 <button onClick={() => { cancelOrder(selectedDetail.id); setSelectedDetail(null) }} className="flex-1 rounded-lg border border-destructive py-3 text-sm font-semibold text-destructive">Cancel Order</button>
+              ) : selectedDetail.status === "open" ? (
+                <button
+                  onClick={() => { closePosition(selectedDetail.id); setSelectedDetail(null) }}
+                  className="flex-1 rounded-lg bg-destructive py-3 text-sm font-semibold text-white"
+                >
+                  Close Position at Market
+                </button>
               ) : (
                 <button onClick={() => handleShare(selectedDetail)} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground">
                   <Share2 className="h-4 w-4" /> Share
