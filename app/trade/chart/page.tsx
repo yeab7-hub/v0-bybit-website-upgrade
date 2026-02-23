@@ -32,7 +32,7 @@ function ChartContent() {
   const searchParams = useSearchParams()
   const pair = searchParams?.get("pair") || "BTCUSDT"
   const symbol = pair.replace("USDT", "")
-  const { crypto } = useLivePrices(15000)
+  const { crypto } = useLivePrices(5000)
   const coin = crypto?.find((c) => c.symbol === symbol) || crypto?.[0] || null
   const [activeTab, setActiveTab] = useState<ChartTab>("chart")
   const [selectedInterval, setSelectedInterval] = useState<TimeInterval>("1m")
@@ -235,7 +235,7 @@ function ChartContent() {
           </div>
 
           {/* TradingView chart - full width, prominent */}
-          <div className="relative flex-1 border-b border-border" style={{ minHeight: "360px" }}>
+          <div className="relative flex-1 border-b border-border" style={{ minHeight: "420px" }}>
             <TradingViewChart
               symbol={pair}
               theme="dark"

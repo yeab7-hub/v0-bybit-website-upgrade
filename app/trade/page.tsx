@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -61,8 +61,9 @@ export default function TradePage() {
     } catch { /* not logged in */ }
   }, [])
 
-  const { crypto, forex, commodities, stocks } = useLivePrices(15000)
-  const allPrices = useMemo(() => [...crypto, ...forex, ...commodities, ...stocks], [crypto, forex, commodities, stocks])
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
+  // No memo -- always recompute so WebSocket price updates are reflected immediately in positions
+  const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
 
   const isCryptoPair = selectedPair.endsWith("USDT") && !selectedPair.includes("/")
   const pairDisplay = isCryptoPair ? selectedPair.replace("USDT", "/USDT") : selectedPair
@@ -827,28 +828,40 @@ export default function TradePage() {
                 {selectedDetail.side?.toUpperCase()}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <DetailCell label={selectedDetail.status === "open" ? "Entry Price" : "Order Price"} value={`$${Number(selectedDetail.price).toLocaleString()}`} />
-              {selectedDetail.status === "open" && selectedDetail._curPrice ? (
-                <DetailCell label="Current Price" value={`$${Number(selectedDetail._curPrice).toLocaleString()}`} />
-              ) : (
-                <DetailCell label="Current Price" value={livePrice > 0 ? `$${formatPrice(livePrice)}` : "--"} />
-              )}
-              <DetailCell label="Amount" value={`${Number(selectedDetail.amount).toFixed(6)} ${selectedDetail.pair?.split("/")[0]}`} />
-              <DetailCell label="Total" value={`$${(Number(selectedDetail.price) * Number(selectedDetail.amount)).toFixed(2)}`} />
-              {selectedDetail.fee !== undefined && (
-                <DetailCell label="Fee" value={`$${Number(selectedDetail.fee).toFixed(4)}`} />
-              )}
-              {selectedDetail.status === "open" && selectedDetail._unrealizedPnl !== undefined ? (
-                <DetailCell
-                  label="Unrealized P&L"
-                  value={`${Number(selectedDetail._unrealizedPnl) >= 0 ? "+" : ""}${Number(selectedDetail._unrealizedPnl).toFixed(2)} USDT`}
-                  valueClass={Number(selectedDetail._unrealizedPnl) >= 0 ? "text-success" : "text-destructive"}
-                />
-              ) : selectedDetail.pnl !== undefined ? (
-                <DetailCell label="P&L" value={`${Number(selectedDetail.pnl) >= 0 ? "+" : ""}${Number(selectedDetail.pnl).toFixed(2)} USDT`} valueClass={Number(selectedDetail.pnl) >= 0 ? "text-success" : "text-destructive"} />
-              ) : null}
-            </div>
+            {(() => {
+              const detailBase = selectedDetail.pair?.split("/")[0] || "BTC"
+              const detailEntryPrice = Number(selectedDetail.price)
+              const detailQty = Number(selectedDetail.amount)
+              // Always get the LATEST live price for this asset
+              const detailLivePrice = allPrices.find((c) => c.symbol === detailBase)?.price ?? detailEntryPrice
+              const detailPnl = selectedDetail.status === "open"
+                ? (detailLivePrice - detailEntryPrice) * detailQty
+                : Number(selectedDetail.pnl) || 0
+              const detailPnlPct = detailEntryPrice > 0
+                ? ((detailLivePrice - detailEntryPrice) / detailEntryPrice) * 100
+                : 0
+
+              return (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <DetailCell label={selectedDetail.status === "open" ? "Entry Price" : "Order Price"} value={`$${detailEntryPrice.toLocaleString()}`} />
+                  <DetailCell label="Current Price" value={detailLivePrice > 0 ? `$${formatPrice(detailLivePrice)}` : "--"} />
+                  <DetailCell label="Amount" value={`${detailQty.toFixed(6)} ${detailBase}`} />
+                  <DetailCell label="Total" value={`$${(detailEntryPrice * detailQty).toFixed(2)}`} />
+                  {selectedDetail.fee !== undefined && (
+                    <DetailCell label="Fee" value={`$${Number(selectedDetail.fee).toFixed(4)}`} />
+                  )}
+                  {selectedDetail.status === "open" ? (
+                    <DetailCell
+                      label="Unrealized P&L"
+                      value={`${detailPnl >= 0 ? "+" : ""}${detailPnl.toFixed(2)} USDT (${detailPnlPct >= 0 ? "+" : ""}${detailPnlPct.toFixed(2)}%)`}
+                      valueClass={detailPnl >= 0 ? "text-success" : "text-destructive"}
+                    />
+                  ) : selectedDetail.pnl !== undefined ? (
+                    <DetailCell label="P&L" value={`${detailPnl >= 0 ? "+" : ""}${detailPnl.toFixed(2)} USDT`} valueClass={detailPnl >= 0 ? "text-success" : "text-destructive"} />
+                  ) : null}
+                </div>
+              )
+            })()}
             <div className="mt-2">
               <DetailCell label="Time" value={new Date(selectedDetail.created_at).toLocaleString()} />
             </div>
