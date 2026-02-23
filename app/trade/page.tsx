@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, Component, type ReactNode } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -19,23 +19,6 @@ import useSWR, { mutate as globalMutate } from "swr"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 const percentages = [0, 25, 50, 75, 100]
-
-class ChartErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
-  constructor(props: { children: ReactNode }) { super(props); this.state = { hasError: false } }
-  static getDerivedStateFromError() { return { hasError: true } }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-card">
-          <BarChart3 className="h-8 w-8 text-muted-foreground/40" />
-          <p className="text-xs text-muted-foreground">Chart unavailable</p>
-          <button onClick={() => this.setState({ hasError: false })} className="rounded bg-secondary px-3 py-1 text-xs text-foreground">Retry</button>
-        </div>
-      )
-    }
-    return this.props.children
-  }
-}
 
 type OrderSide = "buy" | "sell"
 type OrderType = "Market" | "Limit" | "Stop-Limit"
@@ -164,6 +147,12 @@ export default function TradePage() {
         globalMutate("/api/trade?type=orders")
         globalMutate("/api/trade?type=positions")
         globalMutate("/api/trade?type=history")
+        // Auto-switch to the right tab: buy fills create positions, sell fills go to history
+        if (data.executed) {
+          setBottomTab(side === "buy" ? "positions" : "history")
+        } else {
+          setBottomTab("orders") // Limit order placed, show in open orders
+        }
       } else {
         setFeedback({ type: "error", msg: data.error || "Order failed" })
       }
@@ -570,7 +559,11 @@ export default function TradePage() {
                 const isClosing = closingId === pos.id
 
                 return (
-                  <div key={pos.id} className="border-b border-border/50 px-3 py-2.5">
+                  <div
+                    key={pos.id}
+                    onClick={() => setSelectedDetail({ ...pos, _type: "trade", _curPrice: curPrice, _unrealizedPnl: unrealizedPnl, _pnlPct: pnlPct })}
+                    className="border-b border-border/50 px-3 py-2.5 active:bg-secondary/20"
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <MarketAsset symbol={base} size={28} />
@@ -595,7 +588,7 @@ export default function TradePage() {
                           </div>
                         </div>
                         <button
-                          onClick={() => closePosition(pos.id)}
+                          onClick={(e) => { e.stopPropagation(); closePosition(pos.id) }}
                           disabled={isClosing}
                           className="rounded-md border border-destructive px-2 py-1 text-[10px] font-semibold text-destructive disabled:opacity-50"
                         >
@@ -775,9 +768,7 @@ export default function TradePage() {
         </div>
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 border-b border-border bg-card">
-            <ChartErrorBoundary>
-              <TradingViewChart symbol={selectedPair.replace("/", "")} theme="dark" />
-            </ChartErrorBoundary>
+            <TradingViewChart symbol={selectedPair.replace("/", "")} theme="dark" />
           </div>
           {BottomTabsPanel}
         </div>
@@ -813,7 +804,12 @@ export default function TradePage() {
                 <div>
                   <h3 className="text-base font-bold text-foreground">{selectedDetail.pair}</h3>
                   <p className="text-xs capitalize text-muted-foreground">
-                    {selectedDetail._type === "order" ? `${selectedDetail.order_type} ${selectedDetail.side} order` : `${selectedDetail.side} trade`}
+                    {selectedDetail._type === "order"
+                      ? `${selectedDetail.order_type} ${selectedDetail.side} Order`
+                      : selectedDetail.status === "open"
+                        ? `Open ${selectedDetail.side === "buy" ? "Long" : "Short"} Position`
+                        : `${selectedDetail.side} Trade (Closed)`
+                    }
                   </p>
                 </div>
               </div>
@@ -832,12 +828,29 @@ export default function TradePage() {
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2.5">
-              <DetailCell label="Price" value={`$${Number(selectedDetail.price).toLocaleString()}`} />
+              <DetailCell label={selectedDetail.status === "open" ? "Entry Price" : "Order Price"} value={`$${Number(selectedDetail.price).toLocaleString()}`} />
+              {selectedDetail.status === "open" && selectedDetail._curPrice ? (
+                <DetailCell label="Current Price" value={`$${Number(selectedDetail._curPrice).toLocaleString()}`} />
+              ) : (
+                <DetailCell label="Current Price" value={livePrice > 0 ? `$${formatPrice(livePrice)}` : "--"} />
+              )}
               <DetailCell label="Amount" value={`${Number(selectedDetail.amount).toFixed(6)} ${selectedDetail.pair?.split("/")[0]}`} />
               <DetailCell label="Total" value={`$${(Number(selectedDetail.price) * Number(selectedDetail.amount)).toFixed(2)}`} />
-              {selectedDetail.pnl !== undefined && (
-                <DetailCell label="P&L" value={`${Number(selectedDetail.pnl) >= 0 ? "+" : ""}${Number(selectedDetail.pnl).toFixed(2)} USDT`} valueClass={Number(selectedDetail.pnl) >= 0 ? "text-success" : "text-destructive"} />
+              {selectedDetail.fee !== undefined && (
+                <DetailCell label="Fee" value={`$${Number(selectedDetail.fee).toFixed(4)}`} />
               )}
+              {selectedDetail.status === "open" && selectedDetail._unrealizedPnl !== undefined ? (
+                <DetailCell
+                  label="Unrealized P&L"
+                  value={`${Number(selectedDetail._unrealizedPnl) >= 0 ? "+" : ""}${Number(selectedDetail._unrealizedPnl).toFixed(2)} USDT`}
+                  valueClass={Number(selectedDetail._unrealizedPnl) >= 0 ? "text-success" : "text-destructive"}
+                />
+              ) : selectedDetail.pnl !== undefined ? (
+                <DetailCell label="P&L" value={`${Number(selectedDetail.pnl) >= 0 ? "+" : ""}${Number(selectedDetail.pnl).toFixed(2)} USDT`} valueClass={Number(selectedDetail.pnl) >= 0 ? "text-success" : "text-destructive"} />
+              ) : null}
+            </div>
+            <div className="mt-2">
+              <DetailCell label="Time" value={new Date(selectedDetail.created_at).toLocaleString()} />
             </div>
             {/* Close price and date for closed trades */}
             {selectedDetail.close_price && (
