@@ -30,17 +30,17 @@ type TimeInterval = "Time" | "15m" | "1h" | "4h" | "1D" | "1m"
 
 function ChartContent() {
   const searchParams = useSearchParams()
-  const pair = searchParams.get("pair") || "BTCUSDT"
+  const pair = searchParams?.get("pair") || "BTCUSDT"
   const symbol = pair.replace("USDT", "")
   const { crypto } = useLivePrices(15000)
-  const coin = crypto.find((c) => c.symbol === symbol) || crypto[0]
+  const coin = crypto?.find((c) => c.symbol === symbol) || crypto?.[0] || null
   const [activeTab, setActiveTab] = useState<ChartTab>("chart")
   const [selectedInterval, setSelectedInterval] = useState<TimeInterval>("1m")
 
   const price = coin?.price ?? 0
   const change = coin?.change24h ?? 0
-  const high24h = price * 1.015
-  const low24h = price * 0.985
+  const high24h = price > 0 ? price * 1.015 : 0
+  const low24h = price > 0 ? price * 0.985 : 0
   const turnover = coin?.volume ?? 0
 
   const tabs: ChartTab[] = ["chart", "overview", "data", "feed"]
@@ -98,14 +98,8 @@ function ChartContent() {
             <span className="text-lg font-bold text-foreground">{pair}</span>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </div>
-          <span
-            className={`text-sm font-medium ${change >= 0 ? "text-destructive" : "text-destructive"}`}
-            style={{ color: change >= 0 ? undefined : undefined }}
-          >
-            <span className={change >= 0 ? "text-success" : "text-destructive"}>
-              {change >= 0 ? "+" : ""}
-              {change.toFixed(2)}%
-            </span>
+          <span className={`text-sm font-medium ${change >= 0 ? "text-success" : "text-destructive"}`}>
+            {change >= 0 ? "+" : ""}{change.toFixed(2)}%
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -162,10 +156,10 @@ function ChartContent() {
                     change >= 0 ? "text-success" : "text-destructive"
                   }`}
                 >
-                  {formatPrice(price)}
+                  {price > 0 ? formatPrice(price) : "--"}
                 </div>
                 <div className="text-[11px] text-muted-foreground">
-                  Mark Price {formatPrice(price * 1.0001)}
+                  Mark Price {price > 0 ? formatPrice(price * 1.0001) : "--"}
                 </div>
               </div>
               <div className="space-y-1 text-right">
