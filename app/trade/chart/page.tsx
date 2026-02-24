@@ -8,7 +8,7 @@ import {
   Grid3X3, Loader2, BarChart3, Settings2, Maximize2,
 } from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
-import { useLivePrices, formatPrice, findPrice, type PriceData } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, safeFindPrice, type PriceData } from "@/hooks/use-live-prices"
 import { TradingViewChart } from "@/components/trading/tradingview-chart"
 
 export default function ChartPage() {
@@ -43,8 +43,7 @@ function ChartContent() {
 
   const { crypto, forex, commodities, stocks, cfd } = useLivePrices(3000)
 
-  // Build a single flat array -- put NON-crypto categories FIRST so they
-  // take priority over crypto in findPrice (prevents XAU/USD matching BTC).
+  // Build a single flat array -- put NON-crypto categories FIRST
   const allPrices: PriceData[] = [
     ...(commodities ?? []),
     ...(forex ?? []),
@@ -53,29 +52,13 @@ function ChartContent() {
     ...(crypto ?? []),
   ]
 
-  // Try direct category lookup first for known non-crypto pairs,
-  // then fall back to universal findPrice.
-  const normalizedPair = rawPair.trim()
-  const coin: PriceData | null = (() => {
-    // Direct exact match in specific categories for non-crypto pairs
-    const commMatch = commodities?.find(c => c.symbol === normalizedPair)
-    if (commMatch) return commMatch
-    const fxMatch = forex?.find(c => c.symbol === normalizedPair)
-    if (fxMatch) return fxMatch
-    const stockMatch = stocks?.find(c => c.symbol === normalizedPair)
-    if (stockMatch) return stockMatch
-    const cfdMatch = cfd?.find(c => c.symbol === normalizedPair)
-    if (cfdMatch) return cfdMatch
-    const cryptoMatch = crypto?.find(c => c.symbol === normalizedPair || c.symbol + "USDT" === normalizedPair.replace("/", ""))
-    if (cryptoMatch) return cryptoMatch
-    // Fallback to universal lookup
-    return findPrice(allPrices, normalizedPair)
-  })()
+  // safeFindPrice guarantees non-crypto pairs (XAU/USD, EUR/USD, etc.)
+  // NEVER accidentally resolve to a crypto price like BTC
+  const coin = safeFindPrice(allPrices, rawPair)
 
   const [activeTab, setActiveTab] = useState<ChartTab>("chart")
   const [selectedInterval, setSelectedInterval] = useState<TimeInterval>("1m")
 
-  // Use the coin's actual price -- if findPrice returns null, default to 0
   const price = coin?.price ?? 0
   const change = coin?.change24h ?? 0
   const high24h = coin?.high24h || (price > 0 ? price * 1.015 : 0)

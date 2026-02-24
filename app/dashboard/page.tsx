@@ -9,7 +9,7 @@ import {
   ArrowLeftRight, Home, TrendingUp, LineChart, Wallet,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { useLivePrices, formatPrice, formatVolume, findPrice, type PriceData } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, formatVolume, safeFindPrice, type PriceData } from "@/hooks/use-live-prices"
 import { MarketAsset, formatAssetPrice } from "@/components/market-asset"
 import useSWR from "swr"
 
@@ -17,7 +17,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 function getPriceForSymbol(allPrices: PriceData[], symbol: string): number {
   if (symbol === "USDT" || symbol === "USDC") return 1
-  return findPrice(allPrices, symbol)?.price ?? 0
+  return safeFindPrice(allPrices, symbol)?.price ?? 0
 }
 
 const MARKET_TABS = ["Favorites", "Hot", "New", "Gainers", "Losers", "Turnover"] as const
