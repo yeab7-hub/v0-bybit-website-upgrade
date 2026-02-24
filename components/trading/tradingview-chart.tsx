@@ -147,7 +147,7 @@ try {
   // Show spinner while waiting for client mount or if symbol is invalid
   if (!mounted || !tvSymbol) {
     return (
-      <div className={`flex h-full w-full items-center justify-center bg-background ${className || ""}`} style={{ minHeight: "300px" }}>
+      <div className={`flex h-full w-full items-center justify-center bg-background ${className || ""}`}>
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     )
@@ -155,7 +155,7 @@ try {
 
   if (hasError) {
     return (
-      <div className={`flex h-full w-full flex-col items-center justify-center gap-3 bg-card ${className || ""}`} style={{ minHeight: "300px" }}>
+      <div className={`flex h-full w-full flex-col items-center justify-center gap-3 bg-card ${className || ""}`}>
         <BarChart3 className="h-8 w-8 text-muted-foreground/40" />
         <p className="text-xs text-muted-foreground">Chart temporarily unavailable</p>
         <button onClick={() => { setHasError(false); setLoaded(false) }} className="rounded bg-secondary px-4 py-1.5 text-xs text-foreground">
@@ -168,7 +168,7 @@ try {
   return (
     <div
       className={`relative overflow-hidden ${className || ""}`}
-      style={{ width: "100%", height: "100%", minHeight: "300px" }}
+      style={{ width: "100%", height: "100%" }}
     >
       {!loaded && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
@@ -179,7 +179,7 @@ try {
         srcDoc={srcdoc}
         onLoad={() => setLoaded(true)}
         onError={() => setHasError(true)}
-        style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+        style={{ width: "100%", height: "100%", border: "none", display: "block", minHeight: 0 }}
         sandbox="allow-scripts allow-same-origin allow-popups"
         loading="eager"
         title="TradingView Chart"

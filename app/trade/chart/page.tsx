@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense, useCallback } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import {
@@ -15,7 +15,7 @@ export default function ChartPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex min-h-[100dvh] items-center justify-center bg-background">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       }
@@ -43,7 +43,6 @@ function ChartContent() {
 
   const { crypto, forex, commodities, stocks, cfd } = useLivePrices(3000)
 
-  // Build a single flat array -- put NON-crypto categories FIRST
   const allPrices: PriceData[] = [
     ...(commodities ?? []),
     ...(forex ?? []),
@@ -52,14 +51,11 @@ function ChartContent() {
     ...(crypto ?? []),
   ]
 
-  // safeFindPrice guarantees non-crypto pairs (XAU/USD, EUR/USD, etc.)
-  // NEVER accidentally resolve to a crypto price like BTC
   const coin = safeFindPrice(allPrices, rawPair)
 
   const [activeTab, setActiveTab] = useState<ChartTab>("chart")
   const [selectedInterval, setSelectedInterval] = useState<TimeInterval>("1m")
 
-  // If price data hasn't resolved yet, show a loading state
   if (!coin && allPrices.length === 0) {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background">
@@ -75,7 +71,6 @@ function ChartContent() {
   const low24h = coin?.low24h || (price > 0 ? price * 0.985 : 0)
   const turnover = coin?.volume ?? 0
 
-  // Display name for the pair
   const displayPair = coin?.symbol
     ? (coin.symbol.includes("/") ? coin.symbol : coin.symbol + "/USDT")
     : (rawPair.includes("/") ? rawPair : rawPair.replace("USDT", "/USDT"))
@@ -84,9 +79,9 @@ function ChartContent() {
   const intervals: TimeInterval[] = ["Time", "15m", "1h", "4h", "1D", "1m"]
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-background">
-      {/* Top navigation */}
-      <div className="scrollbar-none flex items-center gap-1 overflow-x-auto border-b border-border px-3 py-2">
+    <div className="flex h-[100dvh] flex-col bg-background">
+      {/* Top navigation - fixed height */}
+      <div className="flex-none scrollbar-none flex items-center gap-1 overflow-x-auto border-b border-border px-3 py-2">
         <button className="rounded-lg p-1.5">
           <div className="flex h-6 w-6 items-center justify-center rounded bg-[#f7a600]">
             <span className="text-[10px] font-bold text-background">{"="}</span>
@@ -108,8 +103,8 @@ function ChartContent() {
         })}
       </div>
 
-      {/* Pair header */}
-      <div className="flex items-center justify-between px-4 py-2.5">
+      {/* Pair header - fixed height */}
+      <div className="flex-none flex items-center justify-between px-4 py-2">
         <div>
           <div className="flex items-center gap-1.5">
             <span className="text-lg font-bold text-foreground">{displayPair}</span>
@@ -132,11 +127,11 @@ function ChartContent() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center border-b border-border px-4">
+      {/* Tabs - fixed height */}
+      <div className="flex-none flex items-center border-b border-border px-4">
         {tabs.map((t) => (
           <button key={t} onClick={() => setActiveTab(t)}
-            className={`border-b-2 px-4 pb-2.5 pt-1 text-sm font-medium capitalize transition-colors ${
+            className={`border-b-2 px-4 pb-2 pt-1 text-sm font-medium capitalize transition-colors ${
               activeTab === t ? "border-foreground text-foreground" : "border-transparent text-muted-foreground"
             }`}
           >
@@ -150,32 +145,33 @@ function ChartContent() {
         </div>
       </div>
 
-      {activeTab === "chart" && (
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Price info */}
-          <div className="px-4 py-3">
-            <div className="flex items-center justify-between">
+      {/* Main content area -- takes all remaining space between header and bottom nav */}
+      {activeTab === "chart" ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {/* Price info - compact */}
+          <div className="flex-none px-4 py-2">
+            <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                   Last Traded Price <ChevronDown className="h-2.5 w-2.5" />
                 </div>
-                <div className={`font-mono text-[28px] font-bold leading-tight ${change >= 0 ? "text-success" : "text-destructive"}`}>
+                <div className={`font-mono text-[26px] font-bold leading-tight ${change >= 0 ? "text-success" : "text-destructive"}`}>
                   {price > 0 ? formatPrice(price) : "--"}
                 </div>
                 <div className="text-[11px] text-muted-foreground">
                   Mark Price {price > 0 ? formatPrice(price * 1.0001) : "--"}
                 </div>
               </div>
-              <div className="space-y-1 text-right">
-                <div className="flex items-center justify-between gap-4">
+              <div className="space-y-0.5 text-right">
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-[10px] text-muted-foreground">24h High</span>
                   <span className="font-mono text-[11px] text-foreground">{high24h > 0 ? formatPrice(high24h) : "--"}</span>
                 </div>
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-[10px] text-muted-foreground">24h Low</span>
                   <span className="font-mono text-[11px] text-foreground">{low24h > 0 ? formatPrice(low24h) : "--"}</span>
                 </div>
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-[10px] text-muted-foreground">24h Turnover</span>
                   <span className="font-mono text-[11px] text-foreground">
                     {turnover >= 1e9 ? `${(turnover / 1e9).toFixed(2)}B` : turnover >= 1e6 ? `${(turnover / 1e6).toFixed(2)}M` : turnover > 0 ? turnover.toLocaleString() : "--"}
@@ -186,7 +182,7 @@ function ChartContent() {
           </div>
 
           {/* Time intervals */}
-          <div className="flex items-center border-y border-border px-2 py-1.5">
+          <div className="flex-none flex items-center border-y border-border px-2 py-1">
             <div className="scrollbar-none flex flex-1 items-center gap-0.5 overflow-x-auto">
               {intervals.map((iv) => (
                 <button key={iv} onClick={() => setSelectedInterval(iv)}
@@ -199,7 +195,7 @@ function ChartContent() {
               ))}
             </div>
             <div className="flex items-center gap-1 border-l border-border pl-2">
-              <span className="text-muted-foreground">Depth</span>
+              <span className="text-xs text-muted-foreground">Depth</span>
               <div className="mx-1 h-4 w-px bg-border" />
               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
               <Eye className="h-3.5 w-3.5 text-muted-foreground" />
@@ -208,14 +204,14 @@ function ChartContent() {
           </div>
 
           {/* MA labels */}
-          <div className="flex items-center gap-3 px-4 py-1.5 text-[10px]">
+          <div className="flex-none flex items-center gap-3 px-4 py-1 text-[10px]">
             <span className="text-[#f7a600]">MA7: {price > 0 ? formatPrice(price * 0.9998) : "--"}</span>
             <span className="text-[#e040fb]">MA14: {price > 0 ? formatPrice(price * 1.0001) : "--"}</span>
             <span className="text-[#29b6f6]">MA28: {price > 0 ? formatPrice(price * 0.9995) : "--"}</span>
           </div>
 
-          {/* TradingView Chart - responsive: min 50vh on mobile, flex-1 on desktop */}
-          <div className="relative flex-1 border-b border-border" style={{ minHeight: "max(50vh, 400px)" }}>
+          {/* TradingView Chart -- THIS is the key: flex-1 + min-h-0 makes it fill remaining space */}
+          <div className="min-h-0 flex-1">
             <TradingViewChart
               key={`${rawPair}-${selectedInterval}`}
               symbol={rawPair}
@@ -226,23 +222,8 @@ function ChartContent() {
             />
           </div>
 
-          {/* Volume labels */}
-          <div className="flex shrink-0 items-center gap-3 px-4 py-1.5 text-[10px]">
-            <span className="text-[#f7a600]">VOLUME: {turnover > 0 ? (turnover / 1e9).toFixed(3) : "0.000"}</span>
-            <span className="text-[#e040fb]">MA5: {turnover > 0 ? (turnover * 0.85 / 1e9).toFixed(3) : "0.000"}</span>
-            <span className="text-[#29b6f6]">MA10: {turnover > 0 ? (turnover * 0.75 / 1e9).toFixed(3) : "0.000"}</span>
-          </div>
-
-          {/* Indicator tabs */}
-          <div className="scrollbar-none flex shrink-0 items-center gap-3 overflow-x-auto border-t border-border px-4 py-2 text-[11px]">
-            {["MA", "EMA", "BOLL", "Mark", "SAR", "MAVOL", "MACD"].map((ind, i) => (
-              <span key={ind} className={i === 0 ? "font-semibold text-foreground" : "text-muted-foreground"}>{ind}</span>
-            ))}
-            <div className="ml-auto"><Maximize2 className="h-3.5 w-3.5 text-muted-foreground" /></div>
-          </div>
-
           {/* Bottom action bar */}
-          <div className="flex shrink-0 items-center gap-2 border-t border-border bg-background px-3 py-2.5">
+          <div className="flex-none flex items-center gap-2 border-t border-border bg-background px-3 py-2">
             <Link href={`/trade?pair=${rawPair}`} className="flex flex-col items-center gap-0.5 px-3">
               <BarChart3 className="h-5 w-5 text-muted-foreground" />
               <span className="text-[10px] text-muted-foreground">Tools</span>
@@ -259,10 +240,8 @@ function ChartContent() {
             </Link>
           </div>
         </div>
-      )}
-
-      {activeTab === "overview" && (
-        <div className="flex-1 p-4">
+      ) : activeTab === "overview" ? (
+        <div className="flex-1 overflow-y-auto p-4">
           <div className="rounded-xl bg-card p-4">
             <h3 className="text-sm font-semibold text-foreground">Contract Details</h3>
             <div className="mt-3 space-y-2.5">
@@ -277,10 +256,8 @@ function ChartContent() {
             </div>
           </div>
         </div>
-      )}
-
-      {activeTab === "data" && (
-        <div className="flex-1 p-4">
+      ) : activeTab === "data" ? (
+        <div className="flex-1 overflow-y-auto p-4">
           <div className="rounded-xl bg-card p-4">
             <h3 className="text-sm font-semibold text-foreground">Market Data</h3>
             <div className="mt-3 space-y-2.5">
@@ -297,14 +274,13 @@ function ChartContent() {
             </div>
           </div>
         </div>
-      )}
-
-      {activeTab === "feed" && (
+      ) : (
         <div className="flex flex-1 items-center justify-center p-4">
           <p className="text-center text-sm text-muted-foreground">Community feed coming soon</p>
         </div>
       )}
 
+      {/* Bottom nav is ALWAYS the last element and fixed height */}
       <BottomNav />
     </div>
   )
