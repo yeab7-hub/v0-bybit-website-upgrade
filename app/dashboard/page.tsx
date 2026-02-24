@@ -120,7 +120,7 @@ export default function DashboardPage() {
       {/* ===== TOP BAR ===== */}
       <header className="sticky top-0 z-40 bg-background px-4 pb-2 pt-3 lg:px-8">
         <div className="mx-auto flex max-w-7xl items-center gap-3">
-          <Link href="/wallet" className="shrink-0">
+          <Link href="/account/settings" className="shrink-0">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-sky-600">
               <span className="text-sm font-bold text-white">{displayName}</span>
             </div>

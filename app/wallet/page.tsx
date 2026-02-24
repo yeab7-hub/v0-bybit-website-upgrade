@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 import useSWR from "swr"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -36,6 +37,20 @@ export default function WalletPage() {
   const [search, setSearch] = useState("")
   const [showBal, setShowBal] = useState(true)
   const [assetView, setAssetView] = useState<"asset" | "account">("asset")
+  const [user, setUser] = useState<any>(null)
+
+  useEffect(() => {
+    try {
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data }) => { if (data.user) setUser(data.user) }).catch(() => {})
+    } catch {}
+  }, [])
+
+  const userInitial = useMemo(() => {
+    if (!user) return "U"
+    const name = user.user_metadata?.full_name || user.email || "U"
+    return name.charAt(0).toUpperCase()
+  }, [user])
 
   const { data: balances, mutate: mutBal } = useSWR("/api/trade?type=balances", fetcher, { refreshInterval: 8000 })
   const { data: transactions, mutate: mutTx } = useSWR("/api/transactions", fetcher, { refreshInterval: 8000 })
@@ -75,8 +90,8 @@ export default function WalletPage() {
       <div className="flex items-center justify-between border-b border-border px-4 py-3 lg:hidden">
         <BybitLogo className="h-5" />
         <div className="flex items-center gap-2">
-          <Link href="/dashboard" className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
-            {"U"}
+          <Link href="/account/settings" className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+            {userInitial}
           </Link>
           <Link href="/dashboard" className="p-1 text-muted-foreground">
             <X className="h-5 w-5 rotate-45" />
