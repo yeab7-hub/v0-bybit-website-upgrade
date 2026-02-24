@@ -62,15 +62,27 @@ export default function TradePage() {
   }, [])
 
   const { crypto, forex, commodities, stocks, cfd } = useLivePrices(8000)
-  // Always recompute so WebSocket + micro-drift updates are reflected immediately in positions
-  const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
+  // Put non-crypto first so commodity/forex pairs take priority in findPrice
+  const allPrices = [...(commodities ?? []), ...(forex ?? []), ...(stocks ?? []), ...(cfd ?? []), ...(crypto ?? [])]
 
   const isCryptoPair = selectedPair.endsWith("USDT") && !selectedPair.includes("/")
   const pairDisplay = isCryptoPair ? selectedPair.replace("USDT", "/USDT") : selectedPair
   const baseAsset = isCryptoPair ? selectedPair.replace("USDT", "") : selectedPair.split("/")[0] || selectedPair
   const quoteAsset = isCryptoPair ? "USDT" : (selectedPair.split("/")[1] || "USD")
 
-  const liveCoin = findPrice(allPrices, selectedPair)
+  // Direct category lookup first, then universal findPrice fallback
+  const liveCoin = (() => {
+    const p = selectedPair.trim()
+    const cm = commodities?.find(c => c.symbol === p)
+    if (cm) return cm
+    const fx = forex?.find(c => c.symbol === p)
+    if (fx) return fx
+    const st = stocks?.find(c => c.symbol === p)
+    if (st) return st
+    const cf = cfd?.find(c => c.symbol === p)
+    if (cf) return cf
+    return findPrice(allPrices, p)
+  })()
   const livePrice = liveCoin?.price ?? 0
   const change24h = liveCoin?.change24h ?? 0
 

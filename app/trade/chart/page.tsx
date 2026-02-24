@@ -43,16 +43,34 @@ function ChartContent() {
 
   const { crypto, forex, commodities, stocks, cfd } = useLivePrices(3000)
 
-  // Build a single flat array of ALL prices
-  const allPrices: PriceData[] = []
-  if (crypto?.length) allPrices.push(...crypto)
-  if (forex?.length) allPrices.push(...forex)
-  if (commodities?.length) allPrices.push(...commodities)
-  if (stocks?.length) allPrices.push(...stocks)
-  if (cfd?.length) allPrices.push(...cfd)
+  // Build a single flat array -- put NON-crypto categories FIRST so they
+  // take priority over crypto in findPrice (prevents XAU/USD matching BTC).
+  const allPrices: PriceData[] = [
+    ...(commodities ?? []),
+    ...(forex ?? []),
+    ...(stocks ?? []),
+    ...(cfd ?? []),
+    ...(crypto ?? []),
+  ]
 
-  // Universal lookup -- handles "BTCUSDT", "BTC", "EUR/USD", "EURUSD", "XAU/USD", etc.
-  const coin = findPrice(allPrices, rawPair)
+  // Try direct category lookup first for known non-crypto pairs,
+  // then fall back to universal findPrice.
+  const normalizedPair = rawPair.trim()
+  const coin: PriceData | null = (() => {
+    // Direct exact match in specific categories for non-crypto pairs
+    const commMatch = commodities?.find(c => c.symbol === normalizedPair)
+    if (commMatch) return commMatch
+    const fxMatch = forex?.find(c => c.symbol === normalizedPair)
+    if (fxMatch) return fxMatch
+    const stockMatch = stocks?.find(c => c.symbol === normalizedPair)
+    if (stockMatch) return stockMatch
+    const cfdMatch = cfd?.find(c => c.symbol === normalizedPair)
+    if (cfdMatch) return cfdMatch
+    const cryptoMatch = crypto?.find(c => c.symbol === normalizedPair || c.symbol + "USDT" === normalizedPair.replace("/", ""))
+    if (cryptoMatch) return cryptoMatch
+    // Fallback to universal lookup
+    return findPrice(allPrices, normalizedPair)
+  })()
 
   const [activeTab, setActiveTab] = useState<ChartTab>("chart")
   const [selectedInterval, setSelectedInterval] = useState<TimeInterval>("1m")
@@ -203,8 +221,8 @@ function ChartContent() {
             <span className="text-[#29b6f6]">MA28: {price > 0 ? formatPrice(price * 0.9995) : "--"}</span>
           </div>
 
-          {/* TradingView Chart - responsive height using flex-1 to fill all remaining space */}
-          <div className="relative flex-1 border-b border-border" style={{ minHeight: "280px" }}>
+          {/* TradingView Chart - responsive: min 50vh on mobile, flex-1 on desktop */}
+          <div className="relative flex-1 border-b border-border" style={{ minHeight: "max(50vh, 400px)" }}>
             <TradingViewChart
               key={`${rawPair}-${selectedInterval}`}
               symbol={rawPair}

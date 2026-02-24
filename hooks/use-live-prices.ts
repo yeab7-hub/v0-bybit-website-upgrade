@@ -259,39 +259,49 @@ export function findPrice(allPrices: PriceData[], pair: string): PriceData | nul
   if (!pair || !allPrices?.length) return null
   const p = pair.trim()
 
-  // 1. Exact match
+  // 1. Exact match (highest priority)
   const exact = allPrices.find((c) => c.symbol === p)
   if (exact) return exact
 
-  // 2. Try with slash removed: "EUR/USD" -> "EURUSD"
+  // 2. Slash-removed match: "EUR/USD" -> "EURUSD" or vice versa
   const noSlash = p.replace(/\//g, "")
   const matchNoSlash = allPrices.find((c) => c.symbol.replace(/\//g, "") === noSlash)
   if (matchNoSlash) return matchNoSlash
 
-  // 3. Try adding slash patterns for forex/commodities:
-  //    "EURUSD" -> "EUR/USD", "XAUUSD" -> "XAU/USD"
-  if (noSlash.length >= 6) {
+  // 3. Try inserting slash for forex/commodities: "EURUSD" -> "EUR/USD", "XAUUSD" -> "XAU/USD"
+  if (!p.includes("/") && noSlash.length >= 6) {
     const withSlash3 = noSlash.slice(0, 3) + "/" + noSlash.slice(3)
     const match3 = allPrices.find((c) => c.symbol === withSlash3)
     if (match3) return match3
   }
 
-  // 4. Try stripping "USDT" for crypto: "BTCUSDT" -> "BTC"
+  // 4. Strip "USDT" suffix for crypto: "BTCUSDT" -> "BTC"
   if (noSlash.endsWith("USDT")) {
-    const base = noSlash.replace("USDT", "")
-    const matchBase = allPrices.find((c) => c.symbol === base)
+    const base = noSlash.slice(0, -4)
+    const matchBase = allPrices.find((c) => c.symbol === base && c.category === "crypto")
     if (matchBase) return matchBase
+    // Also check without category restriction
+    const matchBaseAny = allPrices.find((c) => c.symbol === base)
+    if (matchBaseAny) return matchBaseAny
   }
 
-  // 5. Try just the base symbol (first part before / or USDT)
-  const base = p.includes("/") ? p.split("/")[0] : p.replace("USDT", "")
-  const matchBase2 = allPrices.find((c) => c.symbol === base)
-  if (matchBase2) return matchBase2
+  // 5. Base symbol extraction -- but ONLY match if the input looks like
+  // a crypto pair (e.g. "BTC/USDT") to avoid "XAU/USD" -> "XAU" -> wrong crypto
+  if (p.includes("/")) {
+    const [base, quote] = p.split("/")
+    if (quote === "USDT" || quote === "USDC" || quote === "BUSD") {
+      const matchCrypto = allPrices.find((c) => c.symbol === base && c.category === "crypto")
+      if (matchCrypto) return matchCrypto
+    }
+  }
 
   // 6. Case-insensitive fallback
   const pLower = p.toLowerCase()
-  const caseMatch = allPrices.find((c) => c.symbol.toLowerCase() === pLower ||
-    c.symbol.replace(/\//g, "").toLowerCase() === noSlash.toLowerCase())
+  const noSlashLower = noSlash.toLowerCase()
+  const caseMatch = allPrices.find((c) =>
+    c.symbol.toLowerCase() === pLower ||
+    c.symbol.replace(/\//g, "").toLowerCase() === noSlashLower
+  )
   if (caseMatch) return caseMatch
 
   return null
