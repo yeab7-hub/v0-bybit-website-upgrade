@@ -259,42 +259,114 @@ export function findPrice(allPrices: PriceData[], pair: string): PriceData | nul
   if (!pair || !allPrices?.length) return null
   const p = pair.trim()
 
-  // 1. Exact match
+  // 1. Exact match (highest priority)
   const exact = allPrices.find((c) => c.symbol === p)
   if (exact) return exact
 
-  // 2. Try with slash removed: "EUR/USD" -> "EURUSD"
+  // 2. Slash-removed match: "EUR/USD" -> "EURUSD" or vice versa
   const noSlash = p.replace(/\//g, "")
   const matchNoSlash = allPrices.find((c) => c.symbol.replace(/\//g, "") === noSlash)
   if (matchNoSlash) return matchNoSlash
 
-  // 3. Try adding slash patterns for forex/commodities:
-  //    "EURUSD" -> "EUR/USD", "XAUUSD" -> "XAU/USD"
-  if (noSlash.length >= 6) {
+  // 3. Try inserting slash for forex/commodities: "EURUSD" -> "EUR/USD", "XAUUSD" -> "XAU/USD"
+  if (!p.includes("/") && noSlash.length >= 6) {
     const withSlash3 = noSlash.slice(0, 3) + "/" + noSlash.slice(3)
     const match3 = allPrices.find((c) => c.symbol === withSlash3)
     if (match3) return match3
   }
 
-  // 4. Try stripping "USDT" for crypto: "BTCUSDT" -> "BTC"
+  // 4. Strip "USDT" suffix for crypto: "BTCUSDT" -> "BTC"
   if (noSlash.endsWith("USDT")) {
-    const base = noSlash.replace("USDT", "")
-    const matchBase = allPrices.find((c) => c.symbol === base)
+    const base = noSlash.slice(0, -4)
+    const matchBase = allPrices.find((c) => c.symbol === base && c.category === "crypto")
     if (matchBase) return matchBase
+    // Also check without category restriction
+    const matchBaseAny = allPrices.find((c) => c.symbol === base)
+    if (matchBaseAny) return matchBaseAny
   }
 
-  // 5. Try just the base symbol (first part before / or USDT)
-  const base = p.includes("/") ? p.split("/")[0] : p.replace("USDT", "")
-  const matchBase2 = allPrices.find((c) => c.symbol === base)
-  if (matchBase2) return matchBase2
+  // 5. Base symbol extraction -- but ONLY match if the input looks like
+  // a crypto pair (e.g. "BTC/USDT") to avoid "XAU/USD" -> "XAU" -> wrong crypto
+  if (p.includes("/")) {
+    const [base, quote] = p.split("/")
+    if (quote === "USDT" || quote === "USDC" || quote === "BUSD") {
+      const matchCrypto = allPrices.find((c) => c.symbol === base && c.category === "crypto")
+      if (matchCrypto) return matchCrypto
+    }
+  }
 
   // 6. Case-insensitive fallback
   const pLower = p.toLowerCase()
-  const caseMatch = allPrices.find((c) => c.symbol.toLowerCase() === pLower ||
-    c.symbol.replace(/\//g, "").toLowerCase() === noSlash.toLowerCase())
+  const noSlashLower = noSlash.toLowerCase()
+  const caseMatch = allPrices.find((c) =>
+    c.symbol.toLowerCase() === pLower ||
+    c.symbol.replace(/\//g, "").toLowerCase() === noSlashLower
+  )
   if (caseMatch) return caseMatch
 
   return null
+}
+
+/* ================================================================
+   Known non-crypto base prices -- used as a guard to prevent
+   XAU/USD, EUR/USD etc. from accidentally showing BTC price
+   ================================================================ */
+export const NON_CRYPTO_BASE: Record<string, { price: number; category: string; name: string }> = {
+  "XAU/USD": { price: 2924.5, category: "commodity", name: "Gold" },
+  "XAG/USD": { price: 32.78, category: "commodity", name: "Silver" },
+  "WTI": { price: 71.24, category: "commodity", name: "Crude Oil WTI" },
+  "BRENT": { price: 74.89, category: "commodity", name: "Brent Crude" },
+  "NG": { price: 3.42, category: "commodity", name: "Natural Gas" },
+  "HG": { price: 4.52, category: "commodity", name: "Copper" },
+  "EUR/USD": { price: 1.0842, category: "forex", name: "EUR/USD" },
+  "GBP/USD": { price: 1.2634, category: "forex", name: "GBP/USD" },
+  "USD/JPY": { price: 149.85, category: "forex", name: "USD/JPY" },
+  "AUD/USD": { price: 0.6543, category: "forex", name: "AUD/USD" },
+  "USD/CHF": { price: 0.8821, category: "forex", name: "USD/CHF" },
+  "USD/CAD": { price: 1.3612, category: "forex", name: "USD/CAD" },
+  "NZD/USD": { price: 0.6102, category: "forex", name: "NZD/USD" },
+  "AAPL": { price: 232.4, category: "stock", name: "Apple Inc." },
+  "MSFT": { price: 412.65, category: "stock", name: "Microsoft" },
+  "GOOGL": { price: 178.2, category: "stock", name: "Alphabet" },
+  "AMZN": { price: 215.8, category: "stock", name: "Amazon" },
+  "TSLA": { price: 348.9, category: "stock", name: "Tesla" },
+  "NVDA": { price: 138.5, category: "stock", name: "NVIDIA" },
+  "META": { price: 582.3, category: "stock", name: "Meta Platforms" },
+  "US30": { price: 42850, category: "cfd", name: "US Wall St 30" },
+  "US500": { price: 5920, category: "cfd", name: "US 500" },
+  "US100": { price: 21150, category: "cfd", name: "US Tech 100" },
+  "UK100": { price: 8415, category: "cfd", name: "UK 100" },
+  "DE40": { price: 22340, category: "cfd", name: "Germany 40" },
+  "JP225": { price: 38750, category: "cfd", name: "Japan 225" },
+  "HK50": { price: 22480, category: "cfd", name: "Hong Kong 50" },
+  "VIX": { price: 15.8, category: "cfd", name: "Volatility Index" },
+}
+
+/** Safely resolve a price for any pair symbol. If the pair is a known
+ *  non-crypto asset, this function guarantees it will NEVER return a
+ *  crypto price (e.g. BTC) by mistake. */
+export function safeFindPrice(allPrices: PriceData[], pair: string): PriceData | null {
+  const p = pair?.trim()
+  if (!p) return null
+  const nonCrypto = NON_CRYPTO_BASE[p]
+  const live = findPrice(allPrices, p)
+
+  if (nonCrypto) {
+    // Only accept live data if it's NOT crypto (prevents XAU/USD -> BTC fallback)
+    if (live && live.category !== "crypto") return live
+    // Return a synthetic PriceData from base prices
+    return {
+      id: p.toLowerCase().replace("/", "-"),
+      symbol: p,
+      name: nonCrypto.name,
+      price: nonCrypto.price,
+      change24h: 0,
+      volume: 0,
+      marketCap: 0,
+      category: nonCrypto.category as PriceData["category"],
+    }
+  }
+  return live
 }
 
 /* ================================================================

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useLivePrices, findPrice } from "@/hooks/use-live-prices"
+import { useLivePrices, safeFindPrice } from "@/hooks/use-live-prices"
 
 interface Trade {
   id: string
@@ -18,7 +18,7 @@ export function TradeHistory() {
   const [trades, setTrades] = useState<Trade[]>([])
   const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
   const allAssets = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
-  const btcPrice = findPrice(allAssets, "BTC")?.price ?? 97432.5
+  const btcPrice = safeFindPrice(allAssets, "BTC")?.price ?? 97432.5
 
   // Generate initial trades on mount
   useEffect(() => {

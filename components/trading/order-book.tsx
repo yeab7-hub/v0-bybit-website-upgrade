@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
-import { useLivePrices, formatPrice, findPrice } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, safeFindPrice } from "@/hooks/use-live-prices"
 
 interface OrderLevel {
   price: number
@@ -19,7 +19,7 @@ export function OrderBook({ symbol = "BTCUSDT" }: OrderBookProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("both")
   const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
   const allAssets = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
-  const livePrice = findPrice(allAssets, symbol)?.price ?? 0
+  const livePrice = safeFindPrice(allAssets, symbol)?.price ?? 0
 
   const [asks, setAsks] = useState<OrderLevel[]>([])
   const [bids, setBids] = useState<OrderLevel[]>([])

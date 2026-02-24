@@ -8,7 +8,7 @@ import {
   Grid3X3, Loader2, BarChart3, Settings2, Maximize2,
 } from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
-import { useLivePrices, formatPrice, findPrice, type PriceData } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, safeFindPrice, type PriceData } from "@/hooks/use-live-prices"
 import { TradingViewChart } from "@/components/trading/tradingview-chart"
 
 export default function ChartPage() {
@@ -43,21 +43,22 @@ function ChartContent() {
 
   const { crypto, forex, commodities, stocks, cfd } = useLivePrices(3000)
 
-  // Build a single flat array of ALL prices
-  const allPrices: PriceData[] = []
-  if (crypto?.length) allPrices.push(...crypto)
-  if (forex?.length) allPrices.push(...forex)
-  if (commodities?.length) allPrices.push(...commodities)
-  if (stocks?.length) allPrices.push(...stocks)
-  if (cfd?.length) allPrices.push(...cfd)
+  // Build a single flat array -- put NON-crypto categories FIRST
+  const allPrices: PriceData[] = [
+    ...(commodities ?? []),
+    ...(forex ?? []),
+    ...(stocks ?? []),
+    ...(cfd ?? []),
+    ...(crypto ?? []),
+  ]
 
-  // Universal lookup -- handles "BTCUSDT", "BTC", "EUR/USD", "EURUSD", "XAU/USD", etc.
-  const coin = findPrice(allPrices, rawPair)
+  // safeFindPrice guarantees non-crypto pairs (XAU/USD, EUR/USD, etc.)
+  // NEVER accidentally resolve to a crypto price like BTC
+  const coin = safeFindPrice(allPrices, rawPair)
 
   const [activeTab, setActiveTab] = useState<ChartTab>("chart")
   const [selectedInterval, setSelectedInterval] = useState<TimeInterval>("1m")
 
-  // Use the coin's actual price -- if findPrice returns null, default to 0
   const price = coin?.price ?? 0
   const change = coin?.change24h ?? 0
   const high24h = coin?.high24h || (price > 0 ? price * 1.015 : 0)
@@ -203,8 +204,8 @@ function ChartContent() {
             <span className="text-[#29b6f6]">MA28: {price > 0 ? formatPrice(price * 0.9995) : "--"}</span>
           </div>
 
-          {/* TradingView Chart - responsive height using flex-1 to fill all remaining space */}
-          <div className="relative flex-1 border-b border-border" style={{ minHeight: "280px" }}>
+          {/* TradingView Chart - responsive: min 50vh on mobile, flex-1 on desktop */}
+          <div className="relative flex-1 border-b border-border" style={{ minHeight: "max(50vh, 400px)" }}>
             <TradingViewChart
               key={`${rawPair}-${selectedInterval}`}
               symbol={rawPair}
