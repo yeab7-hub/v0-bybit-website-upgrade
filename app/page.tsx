@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { MarketTicker } from "@/components/market-ticker"
@@ -18,34 +18,55 @@ import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
 export default function HomePage() {
+  const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    try {
-      const supabase = createClient()
-      supabase.auth.getUser().then(({ data }) => {
-        setUser(data.user)
-        setLoading(false)
-      }).catch(() => setLoading(false))
-    } catch { setLoading(false) }
+    let cancelled = false
+    const checkAuth = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user: u } } = await supabase.auth.getUser()
+        if (cancelled) return
+        if (u) {
+          setUser(u)
+        }
+      } catch {
+        // Auth check failed -- show landing page
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+          setAuthChecked(true)
+        }
+      }
+    }
+    checkAuth()
+    return () => { cancelled = true }
   }, [])
 
-  if (loading) {
+  // Loading state -- short spinner, never blocks more than 2s
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setLoading(false)
+      setAuthChecked(true)
+    }, 2000)
+    return () => clearTimeout(timeout)
+  }, [])
+
+  if (loading && !authChecked) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <MarketTicker />
-        <div className="flex items-center justify-center py-32">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
+      <div className="flex min-h-[100dvh] items-center justify-center bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     )
   }
 
+  // Logged-in users see the full interactive dashboard
   if (user) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-[100dvh] bg-background">
         <Header />
         <MarketTicker />
         <main className="pb-14 lg:pb-0">
@@ -57,8 +78,9 @@ export default function HomePage() {
     )
   }
 
+  // Not logged in -- show the marketing landing page
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-[100dvh] bg-background">
       <Header />
       <MarketTicker />
       <main>
