@@ -73,13 +73,12 @@ const INITIAL_DATA: PricesResponse = {
 }
 
 /* ================================================================
-   Symbol-to-ID map for Binance WebSocket
+   Binance WebSocket for crypto
    ================================================================ */
 const BINANCE_SYMBOLS = [
   "btcusdt", "ethusdt", "solusdt", "xrpusdt", "bnbusdt",
   "adausdt", "dogeusdt", "avaxusdt", "dotusdt", "linkusdt",
 ]
-
 const SYMBOL_MAP: Record<string, string> = {
   btcusdt: "BTC", ethusdt: "ETH", solusdt: "SOL", xrpusdt: "XRP",
   bnbusdt: "BNB", adausdt: "ADA", dogeusdt: "DOGE", avaxusdt: "AVAX",
@@ -102,44 +101,65 @@ const restFetcher = async (url: string) => {
 }
 
 /* ================================================================
-   Hook: useLivePrices
-   - Primary:  Binance public WebSocket (real-time, <100ms)
-   - Fallback: /api/prices REST polling (every 30s)
+   Micro-drift: simulate real-time price ticks for non-WebSocket
+   assets (forex, commodities, stocks, CFD) on the client side.
+   Updates every 500ms with small random movement around the
+   last known REST price.
    ================================================================ */
-export function useLivePrices(refreshInterval = 30000) {
-  // REST fallback via SWR (slower interval since WebSocket is primary)
+function applyMicroDrift(items: PriceData[], driftMap: Map<string, number>): PriceData[] {
+  return items.map((item) => {
+    const base = item.price
+    if (base <= 0) return item
+    const prev = driftMap.get(item.symbol) ?? base
+    // Volatility factor per asset class
+    const vol = item.category === "forex" ? 0.00002 : item.category === "commodity" ? 0.0003 : item.category === "stock" ? 0.0002 : 0.0003
+    const drift = prev + (Math.random() - 0.49) * base * vol
+    // Clamp within +-0.5% of base REST price
+    const clamped = Math.max(base * 0.995, Math.min(base * 1.005, drift))
+    driftMap.set(item.symbol, clamped)
+    const change = base > 0 ? ((clamped - base) / base) * 100 + item.change24h : item.change24h
+    return { ...item, price: clamped, change24h: change }
+  })
+}
+
+/* ================================================================
+   Hook: useLivePrices
+   - Primary:  Binance WebSocket (real-time crypto, <100ms)
+   - Secondary: REST /api/prices polling (all assets, every N seconds)
+   - Client tick: 500ms micro-drift for non-crypto assets
+   ================================================================ */
+export function useLivePrices(refreshInterval = 10000) {
   const { data: restData } = useSWR<PricesResponse | null>(
     "/api/prices",
     restFetcher,
     {
       refreshInterval,
       revalidateOnFocus: false,
-      dedupingInterval: 15000,
+      dedupingInterval: 8000,
       fallbackData: INITIAL_DATA,
       keepPreviousData: true,
       errorRetryCount: 2,
-      errorRetryInterval: 15000,
+      errorRetryInterval: 10000,
       revalidateOnReconnect: true,
     }
   )
 
-  // Real-time WebSocket prices override
-  const [wsOverrides, setWsOverrides] = useState<Record<string, { price: number; change24h: number }>>(
-    {}
-  )
+  // Crypto WebSocket overrides
+  const [wsOverrides, setWsOverrides] = useState<Record<string, { price: number; change24h: number; high24h?: number; low24h?: number }>>({})
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null)
   const mountedRef = useRef(true)
 
+  // Client-side micro-drift state for non-crypto
+  const [tickCount, setTickCount] = useState(0)
+  const driftMapRef = useRef(new Map<string, number>())
+
   const connectWebSocket = useCallback(() => {
     if (!mountedRef.current) return
-    // Close existing
     if (wsRef.current) {
       try { wsRef.current.close() } catch {}
     }
-
     try {
-      // Binance combined streams: miniTicker for all tracked symbols
       const streams = BINANCE_SYMBOLS.map((s) => `${s}@miniTicker`).join("/")
       const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${streams}`)
       wsRef.current = ws
@@ -148,72 +168,82 @@ export function useLivePrices(refreshInterval = 30000) {
         try {
           const msg = JSON.parse(event.data)
           if (msg.e !== "24hrMiniTicker") return
-
-          const sym = msg.s?.toLowerCase() // e.g. "btcusdt"
+          const sym = msg.s?.toLowerCase()
           const mapped = SYMBOL_MAP[sym]
           if (!mapped) return
-
-          const price = parseFloat(msg.c) // Current close price
-          const open = parseFloat(msg.o)  // Open price 24h ago
+          const price = parseFloat(msg.c)
+          const open = parseFloat(msg.o)
+          const high = parseFloat(msg.h)
+          const low = parseFloat(msg.l)
           if (!price || price <= 0) return
-
           const change24h = open > 0 ? ((price - open) / open) * 100 : 0
-
           setWsOverrides((prev) => ({
             ...prev,
-            [mapped]: { price, change24h },
+            [mapped]: { price, change24h, high24h: high, low24h: low },
           }))
         } catch {}
       }
-
-      ws.onerror = () => {
-        // Silently fail -- REST fallback will keep working
-      }
-
+      ws.onerror = () => {}
       ws.onclose = () => {
-        // Auto-reconnect after 5 seconds
         if (mountedRef.current) {
-          reconnectTimeout.current = setTimeout(connectWebSocket, 5000)
+          reconnectTimeout.current = setTimeout(connectWebSocket, 3000)
         }
       }
-    } catch {
-      // WebSocket not available (e.g. SSR) -- REST fallback handles it
-    }
+    } catch {}
   }, [])
 
+  // WebSocket lifecycle
   useEffect(() => {
     mountedRef.current = true
     connectWebSocket()
-
     return () => {
       mountedRef.current = false
-      if (wsRef.current) {
-        try { wsRef.current.close() } catch {}
-      }
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current)
-      }
+      if (wsRef.current) { try { wsRef.current.close() } catch {} }
+      if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current)
     }
   }, [connectWebSocket])
 
-  // Merge: start with REST/fallback data, then overlay WebSocket real-time prices
+  // 500ms micro-drift tick for non-crypto assets
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setTickCount((c) => c + 1)
+    }, 500)
+    return () => clearInterval(iv)
+  }, [])
+
+  // Merge everything
   const baseData = restData || INITIAL_DATA
 
+  // Crypto: overlay WebSocket real-time prices
   const crypto = (baseData.crypto?.length ? baseData.crypto : FALLBACK_CRYPTO).map((coin) => {
     const override = wsOverrides[coin.symbol]
     if (override) {
-      return { ...coin, price: override.price, change24h: override.change24h }
+      return {
+        ...coin,
+        price: override.price,
+        change24h: override.change24h,
+        high24h: override.high24h || coin.high24h,
+        low24h: override.low24h || coin.low24h,
+      }
     }
     return coin
   })
 
+  // Non-crypto: apply client-side micro-drift so prices tick every 500ms
+  // The tickCount dependency forces re-computation
+  void tickCount // eslint -- force dependency
+  const forex = applyMicroDrift(baseData.forex?.length ? baseData.forex : FALLBACK_FOREX, driftMapRef.current)
+  const commodities = applyMicroDrift(baseData.commodities?.length ? baseData.commodities : FALLBACK_COMMODITIES, driftMapRef.current)
+  const stocks = applyMicroDrift(baseData.stocks?.length ? baseData.stocks : FALLBACK_STOCKS, driftMapRef.current)
+  const cfdArr = applyMicroDrift(baseData.cfd?.length ? baseData.cfd : FALLBACK_CFD, driftMapRef.current)
+
   return {
-    data: { ...baseData, crypto },
+    data: { ...baseData, crypto, forex, commodities, stocks, cfd: cfdArr },
     crypto,
-    forex: baseData.forex?.length ? baseData.forex : FALLBACK_FOREX,
-    commodities: baseData.commodities?.length ? baseData.commodities : FALLBACK_COMMODITIES,
-    stocks: baseData.stocks?.length ? baseData.stocks : FALLBACK_STOCKS,
-    cfd: baseData.cfd?.length ? baseData.cfd : FALLBACK_CFD,
+    forex,
+    commodities,
+    stocks,
+    cfd: cfdArr,
     isLoading: false,
     isError: false,
   }

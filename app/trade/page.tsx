@@ -61,8 +61,8 @@ export default function TradePage() {
     } catch { /* not logged in */ }
   }, [])
 
-  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
-  // No memo -- always recompute so WebSocket price updates are reflected immediately in positions
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(8000)
+  // Always recompute so WebSocket + micro-drift updates are reflected immediately in positions
   const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
 
   const isCryptoPair = selectedPair.endsWith("USDT") && !selectedPair.includes("/")
@@ -553,11 +553,18 @@ export default function TradePage() {
               {positions.map((pos: any) => {
                 const entryPrice = Number(pos.price)
                 const qty = Number(pos.amount)
-                const base = pos.pair?.split("/")[0] || "BTC"
-                const curPrice = allPrices.find((c) => c.symbol === base)?.price ?? entryPrice
-                const unrealizedPnl = (curPrice - entryPrice) * qty
-                const pnlPct = entryPrice > 0 ? ((curPrice - entryPrice) / entryPrice) * 100 : 0
+                const pairStr = pos.pair || "BTC/USDT"
+                const base = pairStr.split("/")[0] || "BTC"
+                // Look up price using the full pair symbol first (for forex/commodities like "XAU/USD"), then fallback to base symbol (for crypto like "BTC")
+                const curPrice = allPrices.find((c) => c.symbol === pairStr)?.price
+                  ?? allPrices.find((c) => c.symbol === base)?.price
+                  ?? entryPrice
+                const isSell = pos.side === "sell"
+                const unrealizedPnl = isSell ? (entryPrice - curPrice) * qty : (curPrice - entryPrice) * qty
+                const pnlPct = entryPrice > 0 ? (isSell ? ((entryPrice - curPrice) / entryPrice) * 100 : ((curPrice - entryPrice) / entryPrice) * 100) : 0
                 const isClosing = closingId === pos.id
+                // Determine the correct logo symbol -- use full pair for forex/commodities/cfds, base for crypto
+                const logoSymbol = allPrices.find((c) => c.symbol === pairStr) ? pairStr : base
 
                 return (
                   <div
@@ -567,11 +574,11 @@ export default function TradePage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <MarketAsset symbol={base} size={28} />
+                        <MarketAsset symbol={logoSymbol} size={28} />
                         <div>
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-semibold text-foreground">{pos.pair}</span>
-                            <span className="rounded bg-success/10 px-1 py-0.5 text-[9px] font-bold text-success">LONG</span>
+                            <span className={`rounded px-1 py-0.5 text-[9px] font-bold ${pos.side === "sell" ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>{pos.side === "sell" ? "SHORT" : "LONG"}</span>
                           </div>
                           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                             <span>Entry: ${entryPrice.toLocaleString()}</span>
@@ -621,7 +628,7 @@ export default function TradePage() {
                 return (
                   <div key={t.id} onClick={() => setSelectedDetail({ ...t, _type: "trade" })} className="flex items-center justify-between border-b border-border/50 px-3 py-2.5 active:bg-secondary/20">
                     <div className="flex items-center gap-2">
-                      <MarketAsset symbol={t.pair?.split("/")[0] || "BTC"} size={24} />
+                      <MarketAsset symbol={(() => { const hp = t.pair || "BTC/USDT"; const hb = hp.split("/")[0] || "BTC"; return allPrices.find((c) => c.symbol === hp) ? hp : hb })() } size={24} />
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] font-medium text-foreground">{t.pair}</span>
@@ -801,7 +808,7 @@ export default function TradePage() {
           <div className="w-full max-w-lg rounded-t-3xl border-t border-border bg-card p-5 pb-8 lg:rounded-2xl lg:border" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <MarketAsset symbol={selectedDetail.pair?.split("/")[0] || "BTC"} size={36} />
+                <MarketAsset symbol={(() => { const p = selectedDetail.pair || "BTC/USDT"; const b = p.split("/")[0] || "BTC"; return allPrices.find((c) => c.symbol === p) ? p : b })() } size={36} />
                 <div>
                   <h3 className="text-base font-bold text-foreground">{selectedDetail.pair}</h3>
                   <p className="text-xs capitalize text-muted-foreground">
@@ -829,16 +836,20 @@ export default function TradePage() {
               </span>
             </div>
             {(() => {
-              const detailBase = selectedDetail.pair?.split("/")[0] || "BTC"
+              const detailPair = selectedDetail.pair || "BTC/USDT"
+              const detailBase = detailPair.split("/")[0] || "BTC"
               const detailEntryPrice = Number(selectedDetail.price)
               const detailQty = Number(selectedDetail.amount)
-              // Always get the LATEST live price for this asset
-              const detailLivePrice = allPrices.find((c) => c.symbol === detailBase)?.price ?? detailEntryPrice
+              const detailIsSell = selectedDetail.side === "sell"
+              // Always get the LATEST live price - try full pair first (forex/commodities), then base (crypto)
+              const detailLivePrice = allPrices.find((c) => c.symbol === detailPair)?.price
+                ?? allPrices.find((c) => c.symbol === detailBase)?.price
+                ?? detailEntryPrice
               const detailPnl = selectedDetail.status === "open"
-                ? (detailLivePrice - detailEntryPrice) * detailQty
+                ? (detailIsSell ? (detailEntryPrice - detailLivePrice) * detailQty : (detailLivePrice - detailEntryPrice) * detailQty)
                 : Number(selectedDetail.pnl) || 0
               const detailPnlPct = detailEntryPrice > 0
-                ? ((detailLivePrice - detailEntryPrice) / detailEntryPrice) * 100
+                ? (detailIsSell ? ((detailEntryPrice - detailLivePrice) / detailEntryPrice) * 100 : ((detailLivePrice - detailEntryPrice) / detailEntryPrice) * 100)
                 : 0
 
               return (

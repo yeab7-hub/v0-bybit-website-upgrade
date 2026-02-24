@@ -31,16 +31,22 @@ type TimeInterval = "Time" | "15m" | "1h" | "4h" | "1D" | "1m"
 function ChartContent() {
   const searchParams = useSearchParams()
   const pair = searchParams?.get("pair") || "BTCUSDT"
-  const symbol = pair.replace("USDT", "")
-  const { crypto } = useLivePrices(5000)
-  const coin = crypto?.find((c) => c.symbol === symbol) || crypto?.[0] || null
+  // Derive base symbol for price lookup - handle both "BTCUSDT" and "XAU/USD" formats
+  const baseSymbol = pair.includes("/") ? pair : pair.replace("USDT", "")
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(3000)
+  // Search ALL asset types, not just crypto
+  const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
+  const coin = allPrices.find((c) => c.symbol === baseSymbol) ||
+               allPrices.find((c) => c.symbol === pair) ||
+               allPrices.find((c) => c.symbol === pair.replace("/", "")) ||
+               crypto?.[0] || null
   const [activeTab, setActiveTab] = useState<ChartTab>("chart")
   const [selectedInterval, setSelectedInterval] = useState<TimeInterval>("1m")
 
   const price = coin?.price ?? 0
   const change = coin?.change24h ?? 0
-  const high24h = price > 0 ? price * 1.015 : 0
-  const low24h = price > 0 ? price * 0.985 : 0
+  const high24h = coin?.high24h || (price > 0 ? price * 1.015 : 0)
+  const low24h = coin?.low24h || (price > 0 ? price * 0.985 : 0)
   const turnover = coin?.volume ?? 0
 
   const tabs: ChartTab[] = ["chart", "overview", "data", "feed"]
@@ -95,7 +101,9 @@ function ChartContent() {
       <div className="flex items-center justify-between px-4 py-2.5">
         <div>
           <div className="flex items-center gap-1.5">
-            <span className="text-lg font-bold text-foreground">{pair}</span>
+            <span className="text-lg font-bold text-foreground">
+              {pair.includes("/") ? pair : pair.replace("USDT", "/USDT")}
+            </span>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </div>
           <span className={`text-sm font-medium ${change >= 0 ? "text-success" : "text-destructive"}`}>
