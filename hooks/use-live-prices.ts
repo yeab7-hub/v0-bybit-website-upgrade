@@ -250,6 +250,54 @@ export function useLivePrices(refreshInterval = 10000) {
 }
 
 /* ================================================================
+   Universal price lookup -- handles ALL pair formats
+   Call with any format: "BTCUSDT", "BTC/USDT", "BTC", "EUR/USD",
+   "EURUSD", "XAU/USD", "XAUUSD", "AAPL", "US30", etc.
+   Returns the matching PriceData or null.
+   ================================================================ */
+export function findPrice(allPrices: PriceData[], pair: string): PriceData | null {
+  if (!pair || !allPrices?.length) return null
+  const p = pair.trim()
+
+  // 1. Exact match
+  const exact = allPrices.find((c) => c.symbol === p)
+  if (exact) return exact
+
+  // 2. Try with slash removed: "EUR/USD" -> "EURUSD"
+  const noSlash = p.replace(/\//g, "")
+  const matchNoSlash = allPrices.find((c) => c.symbol.replace(/\//g, "") === noSlash)
+  if (matchNoSlash) return matchNoSlash
+
+  // 3. Try adding slash patterns for forex/commodities:
+  //    "EURUSD" -> "EUR/USD", "XAUUSD" -> "XAU/USD"
+  if (noSlash.length >= 6) {
+    const withSlash3 = noSlash.slice(0, 3) + "/" + noSlash.slice(3)
+    const match3 = allPrices.find((c) => c.symbol === withSlash3)
+    if (match3) return match3
+  }
+
+  // 4. Try stripping "USDT" for crypto: "BTCUSDT" -> "BTC"
+  if (noSlash.endsWith("USDT")) {
+    const base = noSlash.replace("USDT", "")
+    const matchBase = allPrices.find((c) => c.symbol === base)
+    if (matchBase) return matchBase
+  }
+
+  // 5. Try just the base symbol (first part before / or USDT)
+  const base = p.includes("/") ? p.split("/")[0] : p.replace("USDT", "")
+  const matchBase2 = allPrices.find((c) => c.symbol === base)
+  if (matchBase2) return matchBase2
+
+  // 6. Case-insensitive fallback
+  const pLower = p.toLowerCase()
+  const caseMatch = allPrices.find((c) => c.symbol.toLowerCase() === pLower ||
+    c.symbol.replace(/\//g, "").toLowerCase() === noSlash.toLowerCase())
+  if (caseMatch) return caseMatch
+
+  return null
+}
+
+/* ================================================================
    Helpers
    ================================================================ */
 export function formatPrice(price: number): string {

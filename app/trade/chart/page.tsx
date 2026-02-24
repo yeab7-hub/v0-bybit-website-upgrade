@@ -8,7 +8,7 @@ import {
   Grid3X3, Loader2, BarChart3, Settings2, Maximize2,
 } from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
-import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, findPrice } from "@/hooks/use-live-prices"
 import { TradingViewChart } from "@/components/trading/tradingview-chart"
 
 export default function ChartPage() {
@@ -31,15 +31,10 @@ type TimeInterval = "Time" | "15m" | "1h" | "4h" | "1D" | "1m"
 function ChartContent() {
   const searchParams = useSearchParams()
   const pair = searchParams?.get("pair") || "BTCUSDT"
-  // Derive base symbol for price lookup - handle both "BTCUSDT" and "XAU/USD" formats
-  const baseSymbol = pair.includes("/") ? pair : pair.replace("USDT", "")
   const { crypto, forex, commodities, stocks, cfd } = useLivePrices(3000)
-  // Search ALL asset types, not just crypto
   const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
-  const coin = allPrices.find((c) => c.symbol === baseSymbol) ||
-               allPrices.find((c) => c.symbol === pair) ||
-               allPrices.find((c) => c.symbol === pair.replace("/", "")) ||
-               crypto?.[0] || null
+  // Universal price lookup -- handles "BTCUSDT", "EUR/USD", "EURUSD", "XAU/USD", "AAPL", etc.
+  const coin = findPrice(allPrices, pair)
   const [activeTab, setActiveTab] = useState<ChartTab>("chart")
   const [selectedInterval, setSelectedInterval] = useState<TimeInterval>("1m")
 
@@ -102,7 +97,7 @@ function ChartContent() {
         <div>
           <div className="flex items-center gap-1.5">
             <span className="text-lg font-bold text-foreground">
-              {pair.includes("/") ? pair : pair.replace("USDT", "/USDT")}
+              {coin?.name ? `${pair.includes("/") ? pair : pair.replace("USDT", "/USDT")}` : pair}
             </span>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </div>
