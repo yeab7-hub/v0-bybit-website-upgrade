@@ -9,7 +9,7 @@ import {
   TrendingUp, Clock, CheckCircle2,
   Menu, Share2, Copy, Info,
 } from "lucide-react"
-import { useLivePrices, formatPrice, formatVolume } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, formatVolume, findPrice } from "@/hooks/use-live-prices"
 import { MarketAsset, formatAssetPrice } from "@/components/market-asset"
 import { PairSelector } from "@/components/trading/pair-selector"
 import { TradingViewChart } from "@/components/trading/tradingview-chart"
@@ -61,8 +61,8 @@ export default function TradePage() {
     } catch { /* not logged in */ }
   }, [])
 
-  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
-  // No memo -- always recompute so WebSocket price updates are reflected immediately in positions
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(8000)
+  // Always recompute so WebSocket + micro-drift updates are reflected immediately in positions
   const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
 
   const isCryptoPair = selectedPair.endsWith("USDT") && !selectedPair.includes("/")
@@ -70,8 +70,9 @@ export default function TradePage() {
   const baseAsset = isCryptoPair ? selectedPair.replace("USDT", "") : selectedPair.split("/")[0] || selectedPair
   const quoteAsset = isCryptoPair ? "USDT" : (selectedPair.split("/")[1] || "USD")
 
-  const livePrice = allPrices.find((a) => a.symbol === baseAsset || a.symbol === selectedPair)?.price ?? 0
-  const change24h = allPrices.find((a) => a.symbol === baseAsset || a.symbol === selectedPair)?.change24h ?? 0
+  const liveCoin = findPrice(allPrices, selectedPair)
+  const livePrice = liveCoin?.price ?? 0
+  const change24h = liveCoin?.change24h ?? 0
 
   const { data: balData } = useSWR(user ? "/api/trade?type=balances" : null, fetcher, { refreshInterval: 5000 })
   const { data: ordersData } = useSWR(user ? "/api/trade?type=orders" : null, fetcher, { refreshInterval: 3000 })
@@ -553,11 +554,15 @@ export default function TradePage() {
               {positions.map((pos: any) => {
                 const entryPrice = Number(pos.price)
                 const qty = Number(pos.amount)
-                const base = pos.pair?.split("/")[0] || "BTC"
-                const curPrice = allPrices.find((c) => c.symbol === base)?.price ?? entryPrice
-                const unrealizedPnl = (curPrice - entryPrice) * qty
-                const pnlPct = entryPrice > 0 ? ((curPrice - entryPrice) / entryPrice) * 100 : 0
+                const pairStr = pos.pair || "BTC/USDT"
+                // Universal price lookup handles all formats
+                const posCoin = findPrice(allPrices, pairStr)
+                const curPrice = posCoin?.price ?? entryPrice
+                const isSell = pos.side === "sell"
+                const unrealizedPnl = isSell ? (entryPrice - curPrice) * qty : (curPrice - entryPrice) * qty
+                const pnlPct = entryPrice > 0 ? (isSell ? ((entryPrice - curPrice) / entryPrice) * 100 : ((curPrice - entryPrice) / entryPrice) * 100) : 0
                 const isClosing = closingId === pos.id
+                const logoSymbol = posCoin?.symbol ?? pairStr.split("/")[0] ?? "BTC"
 
                 return (
                   <div
@@ -567,11 +572,11 @@ export default function TradePage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <MarketAsset symbol={base} size={28} />
+                        <MarketAsset symbol={logoSymbol} size={28} />
                         <div>
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-semibold text-foreground">{pos.pair}</span>
-                            <span className="rounded bg-success/10 px-1 py-0.5 text-[9px] font-bold text-success">LONG</span>
+                            <span className={`rounded px-1 py-0.5 text-[9px] font-bold ${pos.side === "sell" ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>{pos.side === "sell" ? "SHORT" : "LONG"}</span>
                           </div>
                           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                             <span>Entry: ${entryPrice.toLocaleString()}</span>
@@ -621,7 +626,7 @@ export default function TradePage() {
                 return (
                   <div key={t.id} onClick={() => setSelectedDetail({ ...t, _type: "trade" })} className="flex items-center justify-between border-b border-border/50 px-3 py-2.5 active:bg-secondary/20">
                     <div className="flex items-center gap-2">
-                      <MarketAsset symbol={t.pair?.split("/")[0] || "BTC"} size={24} />
+                      <MarketAsset symbol={findPrice(allPrices, t.pair || "BTC/USDT")?.symbol ?? (t.pair?.split("/")[0] || "BTC")} size={24} />
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] font-medium text-foreground">{t.pair}</span>
@@ -801,7 +806,7 @@ export default function TradePage() {
           <div className="w-full max-w-lg rounded-t-3xl border-t border-border bg-card p-5 pb-8 lg:rounded-2xl lg:border" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <MarketAsset symbol={selectedDetail.pair?.split("/")[0] || "BTC"} size={36} />
+                <MarketAsset symbol={findPrice(allPrices, selectedDetail.pair || "BTC/USDT")?.symbol ?? (selectedDetail.pair?.split("/")[0] || "BTC")} size={36} />
                 <div>
                   <h3 className="text-base font-bold text-foreground">{selectedDetail.pair}</h3>
                   <p className="text-xs capitalize text-muted-foreground">
@@ -829,16 +834,19 @@ export default function TradePage() {
               </span>
             </div>
             {(() => {
-              const detailBase = selectedDetail.pair?.split("/")[0] || "BTC"
+              const detailPair = selectedDetail.pair || "BTC/USDT"
+              const detailBase = detailPair.split("/")[0] || "BTC"
               const detailEntryPrice = Number(selectedDetail.price)
               const detailQty = Number(selectedDetail.amount)
-              // Always get the LATEST live price for this asset
-              const detailLivePrice = allPrices.find((c) => c.symbol === detailBase)?.price ?? detailEntryPrice
+              const detailIsSell = selectedDetail.side === "sell"
+              // Universal price lookup -- handles all formats
+              const detailCoin = findPrice(allPrices, detailPair)
+              const detailLivePrice = detailCoin?.price ?? detailEntryPrice
               const detailPnl = selectedDetail.status === "open"
-                ? (detailLivePrice - detailEntryPrice) * detailQty
+                ? (detailIsSell ? (detailEntryPrice - detailLivePrice) * detailQty : (detailLivePrice - detailEntryPrice) * detailQty)
                 : Number(selectedDetail.pnl) || 0
               const detailPnlPct = detailEntryPrice > 0
-                ? ((detailLivePrice - detailEntryPrice) / detailEntryPrice) * 100
+                ? (detailIsSell ? ((detailEntryPrice - detailLivePrice) / detailEntryPrice) * 100 : ((detailLivePrice - detailEntryPrice) / detailEntryPrice) * 100)
                 : 0
 
               return (

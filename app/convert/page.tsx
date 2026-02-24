@@ -6,7 +6,7 @@ import { Footer } from "@/components/footer"
 import { ArrowDownUp, ChevronDown, Info, History, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, findPrice } from "@/hooks/use-live-prices"
 
 const coins = [
   { symbol: "BTC", name: "Bitcoin", balance: "0.00000000", icon: "https://cdn.jsdelivr.net/gh/nicehash/cryptocurrency-icons/SVG/btc.svg" },
@@ -24,7 +24,8 @@ const recentConversions = [
 ]
 
 export default function ConvertPage() {
-  const { crypto } = useLivePrices(5000)
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
+  const allLivePrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
   const [fromCoin, setFromCoin] = useState(coins[0])
   const [toCoin, setToCoin] = useState(coins[2])
   const [amount, setAmount] = useState("")
@@ -41,7 +42,7 @@ export default function ConvertPage() {
   // Get live USD price for a coin symbol
   const getUsdPrice = (symbol: string): number => {
     if (symbol === "USDT" || symbol === "USDC") return 1
-    const live = crypto.find((c) => c.symbol === symbol)
+    const live = findPrice(allLivePrices, symbol)
     if (live) return live.price
     // Fallback prices
     const fallbacks: Record<string, number> = { BTC: 97842.50, ETH: 3456.78, SOL: 189.45, XRP: 2.87, BNB: 654.32, ADA: 0.9876 }

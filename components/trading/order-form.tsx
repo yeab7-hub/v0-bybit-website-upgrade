@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, findPrice } from "@/hooks/use-live-prices"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2 } from "lucide-react"
 import useSWR, { mutate as globalMutate } from "swr"
@@ -27,10 +27,9 @@ export function OrderForm({ pair = "BTC/USDT" }: { pair?: string }) {
   const baseAsset = pair.split("/")[0]
   const quoteAsset = pair.split("/")[1] || "USDT"
 
-  const { crypto, forex, commodities, stocks } = useLivePrices(5000)
-  const allAssets = [...crypto, ...forex, ...commodities, ...stocks]
-  const livePrice = allAssets.find((a) => a.symbol === baseAsset || a.symbol === pair)?.price
-    ?? crypto.find((c) => c.symbol === baseAsset)?.price ?? 0
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
+  const allAssets = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
+  const livePrice = findPrice(allAssets, pair)?.price ?? 0
 
   const { data: balData } = useSWR(user ? "/api/trade?type=balances" : null, fetcher, { refreshInterval: 5000 })
   const balances = balData?.balances ?? []
