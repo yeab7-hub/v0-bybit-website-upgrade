@@ -9,15 +9,15 @@ import {
   ArrowLeftRight, Home, TrendingUp, LineChart, Wallet,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { useLivePrices, formatPrice, formatVolume, type PriceData } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, formatVolume, findPrice, type PriceData } from "@/hooks/use-live-prices"
 import { MarketAsset, formatAssetPrice } from "@/components/market-asset"
 import useSWR from "swr"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-function getPriceForSymbol(crypto: PriceData[], symbol: string): number {
+function getPriceForSymbol(allPrices: PriceData[], symbol: string): number {
   if (symbol === "USDT" || symbol === "USDC") return 1
-  return crypto.find((c) => c.symbol === symbol)?.price ?? 0
+  return findPrice(allPrices, symbol)?.price ?? 0
 }
 
 const MARKET_TABS = ["Favorites", "Hot", "New", "Gainers", "Losers", "Turnover"] as const
@@ -27,7 +27,8 @@ export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<{ email?: string; full_name?: string; kyc_status?: string } | null>(null)
   const [balanceVisible, setBalanceVisible] = useState(true)
-  const { crypto, forex, commodities, stocks, isLoading: priceLoading } = useLivePrices(5000)
+  const { crypto, forex, commodities, stocks, cfd, isLoading: priceLoading } = useLivePrices(5000)
+  const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
   const { data: balData } = useSWR("/api/trade?type=balances", fetcher, { refreshInterval: 5000 })
   const { data: tradeData } = useSWR("/api/trade?type=trades", fetcher, { refreshInterval: 10000 })
 
@@ -53,7 +54,7 @@ export default function DashboardPage() {
   const totalUsd = useMemo(() => {
     return balances.reduce((sum: number, b: { asset: string; available: number; in_order: number }) => {
       const total = Number(b.available) + Number(b.in_order)
-      return sum + total * getPriceForSymbol(crypto, b.asset)
+      return sum + total * getPriceForSymbol(allPrices, b.asset)
     }, 0)
   }, [balances, crypto])
 

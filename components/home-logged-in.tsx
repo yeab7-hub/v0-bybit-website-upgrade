@@ -7,7 +7,7 @@ import {
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight, RefreshCw, Gift, CreditCard,
   Calendar, Coins, MoreHorizontal, Star, Check, Plus, RotateCcw,
 } from "lucide-react"
-import { useLivePrices, formatPrice, type PriceData } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, findPrice, type PriceData } from "@/hooks/use-live-prices"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
@@ -59,7 +59,8 @@ export function HomeLoggedIn({ user }: { user: User }) {
     supabase.from("balances").select("*").then(({ data }) => {
       if (data && data.length > 0) {
         const total = data.reduce((s: number, b: any) => {
-          const coin = crypto.find((c: any) => c.symbol === b.asset)
+          const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
+    const coin = findPrice(allPrices, b.asset)
           const price = coin ? coin.price : b.asset === "USDT" ? 1 : 0
           return s + Number(b.available || 0) * price + Number(b.in_order || 0) * price
         }, 0)

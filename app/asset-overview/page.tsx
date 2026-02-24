@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, ArrowUpDown, Download, Upload, RefreshCw, Plus, ChevronRight, Home, LineChart, TrendingUp, Coins, Wallet } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, findPrice } from "@/hooks/use-live-prices"
 import { MarketAsset } from "@/components/market-asset"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -18,7 +18,8 @@ export default function AssetOverviewPage() {
   const [user, setUser] = useState<any>(null)
   const [visible, setVisible] = useState(true)
   const [activeTab, setActiveTab] = useState<"overview" | "spot" | "funding" | "earn">("overview")
-  const { crypto } = useLivePrices(5000)
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
+  const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
 
   useEffect(() => {
     try {
@@ -32,10 +33,11 @@ export default function AssetOverviewPage() {
 
   const totalValue = useMemo(() => {
     return balances.reduce((sum: number, b: any) => {
-      const price = b.asset === "USDT" ? 1 : (crypto.find((c) => c.symbol === b.asset)?.price ?? 0)
+      const price = b.asset === "USDT" ? 1 : (findPrice(allPrices, b.asset)?.price ?? 0)
       return sum + (Number(b.available) + Number(b.in_order)) * price
     }, 0)
-  }, [balances, crypto])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [balances, allPrices.length])
 
   const tabs = ["overview", "spot", "funding", "earn"] as const
   const bottomNav = [
@@ -63,7 +65,7 @@ export default function AssetOverviewPage() {
             {visible ? `$${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "****"}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {visible ? `${"\u2248"} ${(totalValue / (crypto.find(c => c.symbol === "BTC")?.price || 96000)).toFixed(8)} BTC` : "****"}
+            {visible ? `${"\u2248"} ${(totalValue / (findPrice(allPrices, "BTC")?.price || 96000)).toFixed(8)} BTC` : "****"}
           </p>
 
           <div className="mt-5 flex items-center gap-2">
@@ -129,7 +131,7 @@ export default function AssetOverviewPage() {
           ) : (
             <div className="flex flex-col">
               {balances.filter((b: any) => Number(b.available) > 0 || Number(b.in_order) > 0).map((b: any) => {
-                const price = b.asset === "USDT" ? 1 : (crypto.find((c) => c.symbol === b.asset)?.price ?? 0)
+                const price = b.asset === "USDT" ? 1 : (findPrice(allPrices, b.asset)?.price ?? 0)
                 const total = Number(b.available) + Number(b.in_order)
                 const usdVal = total * price
                 return (

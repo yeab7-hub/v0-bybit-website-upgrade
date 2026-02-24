@@ -3,7 +3,7 @@
 import useSWR, { mutate as globalMutate } from "swr"
 import { useState, useEffect } from "react"
 import { X, Loader2, TrendingUp, TrendingDown, Clock, CheckCircle2, ArrowUpDown, Info, CircleDot } from "lucide-react"
-import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
+import { useLivePrices, formatPrice, findPrice } from "@/hooks/use-live-prices"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -18,7 +18,8 @@ export function OpenOrders() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [selectedTrade, setSelectedTrade] = useState<any>(null)
 
-  const { crypto } = useLivePrices(3000)
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(3000)
+  const allAssets = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
 
   const orders = ordersData?.orders ?? []
   const trades = tradesData?.trades ?? []
@@ -68,9 +69,9 @@ export function OpenOrders() {
 
   // Calculate live unrealized P&L for open orders
   const unrealizedPnl = orders.reduce((sum: number, o: { pair: string; side: string; price: number; amount: number; filled: number }) => {
-    const baseAsset = o.pair.split("/")[0]
-    const currentPrice = crypto.find((c) => c.symbol === baseAsset)?.price ?? 0
-    if (currentPrice > 0 && o.side === "buy") {
+  const baseAsset = o.pair.split("/")[0]
+  const currentPrice = findPrice(allAssets, o.pair)?.price ?? 0
+  if (currentPrice > 0 && o.side === "buy") {
       return sum + (currentPrice - Number(o.price)) * Number(o.amount - o.filled)
     }
     if (currentPrice > 0 && o.side === "sell") {
@@ -140,8 +141,7 @@ export function OpenOrders() {
               </thead>
               <tbody>
                 {orders.map((o: { id: string; pair: string; order_type: string; side: string; price: number; amount: number; filled: number; total: number }) => {
-                  const baseAsset = o.pair.split("/")[0]
-                  const currentPrice = crypto.find((c) => c.symbol === baseAsset)?.price ?? 0
+                  const currentPrice = findPrice(allAssets, o.pair)?.price ?? 0
                   const remaining = Number(o.amount) - Number(o.filled)
                   const uPnl = o.side === "buy"
                     ? (currentPrice - Number(o.price)) * remaining
@@ -235,7 +235,7 @@ export function OpenOrders() {
                   .filter((b: { available: number; in_order: number }) => Number(b.available) > 0 || Number(b.in_order) > 0)
                   .map((b: { asset: string; available: number; in_order: number }) => {
                     const total = Number(b.available) + Number(b.in_order)
-                    const price = b.asset === "USDT" ? 1 : (crypto.find((c) => c.symbol === b.asset)?.price ?? 0)
+                    const price = b.asset === "USDT" ? 1 : (findPrice(allAssets, b.asset)?.price ?? 0)
                     const usdValue = total * price
                     return (
                       <tr key={b.asset} className="border-b border-border/50 hover:bg-secondary/30">
@@ -262,8 +262,7 @@ export function OpenOrders() {
       {/* ===== Order Detail Modal ===== */}
       {selectedOrder && (() => {
         const o = selectedOrder
-        const baseAsset = o.pair.split("/")[0]
-        const currentPrice = crypto.find((c: { symbol: string }) => c.symbol === baseAsset)?.price ?? 0
+        const currentPrice = findPrice(allAssets, o.pair)?.price ?? 0
         const remaining = Number(o.amount) - Number(o.filled)
         const fillPercent = Number(o.amount) > 0 ? (Number(o.filled) / Number(o.amount)) * 100 : 0
         const uPnl = o.side === "buy"

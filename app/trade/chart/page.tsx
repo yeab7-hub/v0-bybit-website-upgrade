@@ -203,11 +203,10 @@ function ChartContent() {
             <span className="text-[#29b6f6]">MA28: {price > 0 ? formatPrice(price * 0.9995) : "--"}</span>
           </div>
 
-          {/* TradingView Chart - responsive: 55vh on mobile, 65vh on tablet, flexible on desktop */}
-          <div className="relative border-b border-border"
-            style={{ height: "clamp(300px, 55dvh, 700px)" }}
-          >
+          {/* TradingView Chart - responsive height using flex-1 to fill all remaining space */}
+          <div className="relative flex-1 border-b border-border" style={{ minHeight: "280px" }}>
             <TradingViewChart
+              key={`${rawPair}-${selectedInterval}`}
               symbol={rawPair}
               theme="dark"
               interval={tvIntervalMap[selectedInterval] || "1"}
@@ -217,14 +216,14 @@ function ChartContent() {
           </div>
 
           {/* Volume labels */}
-          <div className="flex items-center gap-3 px-4 py-1.5 text-[10px]">
+          <div className="flex shrink-0 items-center gap-3 px-4 py-1.5 text-[10px]">
             <span className="text-[#f7a600]">VOLUME: {turnover > 0 ? (turnover / 1e9).toFixed(3) : "0.000"}</span>
             <span className="text-[#e040fb]">MA5: {turnover > 0 ? (turnover * 0.85 / 1e9).toFixed(3) : "0.000"}</span>
             <span className="text-[#29b6f6]">MA10: {turnover > 0 ? (turnover * 0.75 / 1e9).toFixed(3) : "0.000"}</span>
           </div>
 
           {/* Indicator tabs */}
-          <div className="scrollbar-none flex items-center gap-3 overflow-x-auto border-t border-border px-4 py-2 text-[11px]">
+          <div className="scrollbar-none flex shrink-0 items-center gap-3 overflow-x-auto border-t border-border px-4 py-2 text-[11px]">
             {["MA", "EMA", "BOLL", "Mark", "SAR", "MAVOL", "MACD"].map((ind, i) => (
               <span key={ind} className={i === 0 ? "font-semibold text-foreground" : "text-muted-foreground"}>{ind}</span>
             ))}
@@ -232,7 +231,7 @@ function ChartContent() {
           </div>
 
           {/* Bottom action bar */}
-          <div className="sticky bottom-14 flex items-center gap-2 border-t border-border bg-background px-3 py-2.5">
+          <div className="flex shrink-0 items-center gap-2 border-t border-border bg-background px-3 py-2.5">
             <Link href={`/trade?pair=${rawPair}`} className="flex flex-col items-center gap-0.5 px-3">
               <BarChart3 className="h-5 w-5 text-muted-foreground" />
               <span className="text-[10px] text-muted-foreground">Tools</span>
