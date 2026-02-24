@@ -87,13 +87,17 @@ export default function WalletPage() {
       </div>
 
       {/* Mobile header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-3 lg:hidden">
+      <div className="relative z-50 flex items-center justify-between border-b border-border px-4 py-3 lg:hidden">
         <BybitLogo className="h-5" />
         <div className="flex items-center gap-2">
-          <Link href="/account/settings" className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+          <Link
+            href="/account/settings"
+            className="relative z-50 flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary"
+            aria-label="Go to profile settings"
+          >
             {userInitial}
           </Link>
-          <Link href="/dashboard" className="p-1 text-muted-foreground">
+          <Link href="/dashboard" className="relative z-50 p-1 text-muted-foreground" aria-label="Add">
             <X className="h-5 w-5 rotate-45" />
           </Link>
         </div>

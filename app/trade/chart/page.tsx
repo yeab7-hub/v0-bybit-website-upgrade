@@ -59,6 +59,16 @@ function ChartContent() {
   const [activeTab, setActiveTab] = useState<ChartTab>("chart")
   const [selectedInterval, setSelectedInterval] = useState<TimeInterval>("1m")
 
+  // If price data hasn't resolved yet, show a loading state
+  if (!coin && allPrices.length === 0) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <p className="mt-2 text-xs text-muted-foreground">Loading chart data...</p>
+      </div>
+    )
+  }
+
   const price = coin?.price ?? 0
   const change = coin?.change24h ?? 0
   const high24h = coin?.high24h || (price > 0 ? price * 1.015 : 0)

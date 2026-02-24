@@ -342,21 +342,31 @@ export const NON_CRYPTO_BASE: Record<string, { price: number; category: string; 
   "VIX": { price: 15.8, category: "cfd", name: "Volatility Index" },
 }
 
-/** Safely resolve a price for any pair symbol. If the pair is a known
- *  non-crypto asset, this function guarantees it will NEVER return a
- *  crypto price (e.g. BTC) by mistake. */
+/** Safely resolve a price for any pair symbol.
+ *
+ *  ISOLATION RULE: If the pair is a known non-crypto asset (forex,
+ *  commodity, stock, CFD) this function ONLY searches within
+ *  non-crypto entries. It will NEVER fall through to the Binance
+ *  WebSocket crypto data, even as a fallback. If no live non-crypto
+ *  match is found, it returns a synthetic PriceData from the
+ *  NON_CRYPTO_BASE table. */
 export function safeFindPrice(allPrices: PriceData[], pair: string): PriceData | null {
   const p = pair?.trim()
   if (!p) return null
+
   const nonCrypto = NON_CRYPTO_BASE[p]
-  const live = findPrice(allPrices, p)
 
   if (nonCrypto) {
-    // Only accept live data if it's NOT crypto (prevents XAU/USD -> BTC fallback)
-    if (live && live.category !== "crypto") return live
-    // Return a synthetic PriceData from base prices
+    // STRICT: only search non-crypto entries -- filter out ALL crypto first
+    const nonCryptoPool = allPrices.filter((a) => a.category !== "crypto")
+    const live = findPrice(nonCryptoPool, p)
+
+    // If found a real live price in non-crypto pool, use it
+    if (live && live.price > 0) return live
+
+    // Otherwise return the known base price (never falls back to crypto)
     return {
-      id: p.toLowerCase().replace("/", "-"),
+      id: p.toLowerCase().replace(/\//g, "-"),
       symbol: p,
       name: nonCrypto.name,
       price: nonCrypto.price,
@@ -366,7 +376,9 @@ export function safeFindPrice(allPrices: PriceData[], pair: string): PriceData |
       category: nonCrypto.category as PriceData["category"],
     }
   }
-  return live
+
+  // For crypto pairs, search everything normally
+  return findPrice(allPrices, p)
 }
 
 /* ================================================================

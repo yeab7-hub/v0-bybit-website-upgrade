@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useMemo, useState } from "react"
+import { memo, useMemo, useState, useEffect } from "react"
 import { Loader2, BarChart3 } from "lucide-react"
 
 interface TradingViewChartProps {
@@ -77,7 +77,14 @@ function TradingViewChartInner({
 }: TradingViewChartProps) {
   const [loaded, setLoaded] = useState(false)
   const [hasError, setHasError] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const tvSymbol = useMemo(() => getTradingViewSymbol(symbol), [symbol])
+
+  // Guard: only render the iframe after the component mounts on the client
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
 
   // Use TradingView's tv.js constructor inside srcdoc for maximum control
   // and isolation. This runs entirely in the iframe sandbox.
@@ -137,12 +144,21 @@ try {
 </body></html>`
   }, [tvSymbol, theme, interval, hideTopToolbar])
 
+  // Show spinner while waiting for client mount or if symbol is invalid
+  if (!mounted || !tvSymbol) {
+    return (
+      <div className={`flex h-full w-full items-center justify-center bg-background ${className || ""}`} style={{ minHeight: "300px" }}>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   if (hasError) {
     return (
       <div className={`flex h-full w-full flex-col items-center justify-center gap-3 bg-card ${className || ""}`} style={{ minHeight: "300px" }}>
         <BarChart3 className="h-8 w-8 text-muted-foreground/40" />
         <p className="text-xs text-muted-foreground">Chart temporarily unavailable</p>
-        <button onClick={() => setHasError(false)} className="rounded bg-secondary px-4 py-1.5 text-xs text-foreground">
+        <button onClick={() => { setHasError(false); setLoaded(false) }} className="rounded bg-secondary px-4 py-1.5 text-xs text-foreground">
           Retry
         </button>
       </div>
