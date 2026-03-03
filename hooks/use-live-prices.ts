@@ -49,6 +49,10 @@ const FALLBACK_FOREX: PriceData[] = [
   { id: "eur-usd", symbol: "EUR/USD", name: "EUR/USD", price: 1.0842, change24h: 0.12, volume: 5e9, marketCap: 0, category: "forex" },
   { id: "gbp-usd", symbol: "GBP/USD", name: "GBP/USD", price: 1.2634, change24h: -0.08, volume: 3.2e9, marketCap: 0, category: "forex" },
   { id: "usd-jpy", symbol: "USD/JPY", name: "USD/JPY", price: 149.85, change24h: 0.34, volume: 4.1e9, marketCap: 0, category: "forex" },
+  { id: "aud-usd", symbol: "AUD/USD", name: "AUD/USD", price: 0.6543, change24h: -0.15, volume: 2.8e9, marketCap: 0, category: "forex" },
+  { id: "usd-chf", symbol: "USD/CHF", name: "USD/CHF", price: 0.8821, change24h: 0.08, volume: 2.1e9, marketCap: 0, category: "forex" },
+  { id: "usd-cad", symbol: "USD/CAD", name: "USD/CAD", price: 1.3612, change24h: 0.21, volume: 1.9e9, marketCap: 0, category: "forex" },
+  { id: "nzd-usd", symbol: "NZD/USD", name: "NZD/USD", price: 0.6102, change24h: -0.11, volume: 1.5e9, marketCap: 0, category: "forex" },
 ]
 const FALLBACK_COMMODITIES: PriceData[] = [
   { id: "xau-usd", symbol: "XAU/USD", name: "Gold", price: 2924.5, change24h: 0.45, volume: 2e9, marketCap: 0, category: "commodity" },
@@ -128,7 +132,7 @@ function applyMicroDrift(items: PriceData[], driftMap: Map<string, number>): Pri
    - Secondary: REST /api/prices polling (all assets, every N seconds)
    - Client tick: 500ms micro-drift for non-crypto assets
    ================================================================ */
-export function useLivePrices(refreshInterval = 10000) {
+export function useLivePrices(refreshInterval = 8000) {
   const { data: restData } = useSWR<PricesResponse | null>(
     "/api/prices",
     restFetcher,
@@ -308,16 +312,19 @@ export function findPrice(allPrices: PriceData[], pair: string): PriceData | nul
 }
 
 /* ================================================================
-   Known non-crypto base prices -- used as a guard to prevent
-   XAU/USD, EUR/USD etc. from accidentally showing BTC price
+   Known non-crypto symbols -- used as a GUARD to prevent
+   XAU/USD, EUR/USD etc. from ever resolving to a crypto price.
+   Prices here are fallbacks only; real prices come from the API.
    ================================================================ */
 export const NON_CRYPTO_BASE: Record<string, { price: number; category: string; name: string }> = {
+  // Commodities (fallback -- real prices from metals.live API)
   "XAU/USD": { price: 2924.5, category: "commodity", name: "Gold" },
   "XAG/USD": { price: 32.78, category: "commodity", name: "Silver" },
   "WTI": { price: 71.24, category: "commodity", name: "Crude Oil WTI" },
   "BRENT": { price: 74.89, category: "commodity", name: "Brent Crude" },
   "NG": { price: 3.42, category: "commodity", name: "Natural Gas" },
   "HG": { price: 4.52, category: "commodity", name: "Copper" },
+  // Forex (fallback -- real prices from Frankfurter API)
   "EUR/USD": { price: 1.0842, category: "forex", name: "EUR/USD" },
   "GBP/USD": { price: 1.2634, category: "forex", name: "GBP/USD" },
   "USD/JPY": { price: 149.85, category: "forex", name: "USD/JPY" },
@@ -325,6 +332,7 @@ export const NON_CRYPTO_BASE: Record<string, { price: number; category: string; 
   "USD/CHF": { price: 0.8821, category: "forex", name: "USD/CHF" },
   "USD/CAD": { price: 1.3612, category: "forex", name: "USD/CAD" },
   "NZD/USD": { price: 0.6102, category: "forex", name: "NZD/USD" },
+  // Stocks (fallback -- real prices from Yahoo Finance)
   "AAPL": { price: 232.4, category: "stock", name: "Apple Inc." },
   "MSFT": { price: 412.65, category: "stock", name: "Microsoft" },
   "GOOGL": { price: 178.2, category: "stock", name: "Alphabet" },
@@ -332,6 +340,7 @@ export const NON_CRYPTO_BASE: Record<string, { price: number; category: string; 
   "TSLA": { price: 348.9, category: "stock", name: "Tesla" },
   "NVDA": { price: 138.5, category: "stock", name: "NVIDIA" },
   "META": { price: 582.3, category: "stock", name: "Meta Platforms" },
+  // CFDs / Indices (fallback -- real prices from Yahoo Finance)
   "US30": { price: 42850, category: "cfd", name: "US Wall St 30" },
   "US500": { price: 5920, category: "cfd", name: "US 500" },
   "US100": { price: 21150, category: "cfd", name: "US Tech 100" },

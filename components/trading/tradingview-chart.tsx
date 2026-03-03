@@ -38,21 +38,23 @@ function getTradingViewSymbol(pair: string): string {
   const forexPairs = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "USDCAD", "NZDUSD", "EURGBP", "EURJPY", "GBPJPY"]
   if (forexPairs.includes(clean)) return `FX:${clean}`
 
-  // Commodities
+  // Commodities -- use OANDA for reliable real-time data
   const commodityMap: Record<string, string> = {
-    XAUUSD: "TVC:GOLD", GOLD: "TVC:GOLD",
-    XAGUSD: "TVC:SILVER", SILVER: "TVC:SILVER",
-    WTIUSD: "TVC:USOIL", USOIL: "TVC:USOIL",
-    BRENTUSD: "TVC:UKOIL", UKOIL: "TVC:UKOIL",
-    NGUSD: "NYMEX:NG1!",
+    XAUUSD: "OANDA:XAUUSD", GOLD: "OANDA:XAUUSD",
+    XAGUSD: "OANDA:XAGUSD", SILVER: "OANDA:XAGUSD",
+    WTI: "TVC:USOIL", WTIUSD: "TVC:USOIL", USOIL: "TVC:USOIL",
+    BRENT: "TVC:UKOIL", BRENTUSD: "TVC:UKOIL", UKOIL: "TVC:UKOIL",
+    NG: "NYMEX:NG1!", NGUSD: "NYMEX:NG1!",
+    HG: "COMEX:HG1!", HGUSD: "COMEX:HG1!",
   }
   if (commodityMap[clean]) return commodityMap[clean]
 
   // CFDs / Indices
   const cfdMap: Record<string, string> = {
-    US30: "DJ:DJI", US500: "SP:SPX", US100: "NASDAQ:NDX",
-    UK100: "SPREADEX:FTSE", DE30: "XETR:DAX", JP225: "TVC:NI225",
-    SPX500: "SP:SPX", NAS100: "NASDAQ:NDX",
+    US30: "TVC:DJI", US500: "FOREXCOM:SPXUSD", US100: "NASDAQ:NDX",
+    UK100: "TVC:UKX", DE30: "XETR:DAX", DE40: "XETR:DAX",
+    JP225: "TVC:NI225", HK50: "TVC:HSI", VIX: "TVC:VIX",
+    SPX500: "FOREXCOM:SPXUSD", NAS100: "NASDAQ:NDX",
   }
   if (cfdMap[clean]) return cfdMap[clean]
 
@@ -95,7 +97,7 @@ function TradingViewChartInner({
 
     return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>*{margin:0;padding:0;box-sizing:border-box;}html,body,#tv_chart{width:100%;height:100%;overflow:hidden;background:${bgColor};}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{width:100%;height:100%;overflow:hidden;background:${bgColor};}#tv_chart{width:100%!important;height:100%!important;overflow:hidden;background:${bgColor};}#tv_chart iframe{width:100%!important;height:100%!important;}</style>
 </head><body>
 <div id="tv_chart"></div>
 <script src="https://s3.tradingview.com/tv.js"></script>
@@ -147,7 +149,7 @@ try {
   // Show spinner while waiting for client mount or if symbol is invalid
   if (!mounted || !tvSymbol) {
     return (
-      <div className={`flex h-full w-full items-center justify-center bg-background ${className || ""}`} style={{ minHeight: "300px" }}>
+      <div className={`flex h-full w-full items-center justify-center bg-background ${className || ""}`}>
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     )
@@ -155,7 +157,7 @@ try {
 
   if (hasError) {
     return (
-      <div className={`flex h-full w-full flex-col items-center justify-center gap-3 bg-card ${className || ""}`} style={{ minHeight: "300px" }}>
+      <div className={`flex h-full w-full flex-col items-center justify-center gap-3 bg-card ${className || ""}`}>
         <BarChart3 className="h-8 w-8 text-muted-foreground/40" />
         <p className="text-xs text-muted-foreground">Chart temporarily unavailable</p>
         <button onClick={() => { setHasError(false); setLoaded(false) }} className="rounded bg-secondary px-4 py-1.5 text-xs text-foreground">
@@ -168,7 +170,7 @@ try {
   return (
     <div
       className={`relative overflow-hidden ${className || ""}`}
-      style={{ width: "100%", height: "100%", minHeight: "300px" }}
+      style={{ width: "100%", height: "100%" }}
     >
       {!loaded && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
@@ -179,7 +181,7 @@ try {
         srcDoc={srcdoc}
         onLoad={() => setLoaded(true)}
         onError={() => setHasError(true)}
-        style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+        style={{ width: "100%", height: "100%", border: "none", display: "block", minHeight: 0 }}
         sandbox="allow-scripts allow-same-origin allow-popups"
         loading="eager"
         title="TradingView Chart"
