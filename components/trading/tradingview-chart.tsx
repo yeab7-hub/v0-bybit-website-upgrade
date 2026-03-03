@@ -38,23 +38,23 @@ function getTradingViewSymbol(pair: string): string {
   const forexPairs = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "USDCAD", "NZDUSD", "EURGBP", "EURJPY", "GBPJPY"]
   if (forexPairs.includes(clean)) return `FX:${clean}`
 
-  // Commodities -- use OANDA for reliable real-time data
+  // Commodities -- multiple exchange options for reliability
   const commodityMap: Record<string, string> = {
-    XAUUSD: "OANDA:XAUUSD", GOLD: "OANDA:XAUUSD",
-    XAGUSD: "OANDA:XAGUSD", SILVER: "OANDA:XAGUSD",
-    WTI: "TVC:USOIL", WTIUSD: "TVC:USOIL", USOIL: "TVC:USOIL",
-    BRENT: "TVC:UKOIL", BRENTUSD: "TVC:UKOIL", UKOIL: "TVC:UKOIL",
-    NG: "NYMEX:NG1!", NGUSD: "NYMEX:NG1!",
+    XAUUSD: "PEPPERSTONE:XAUUSD", GOLD: "PEPPERSTONE:XAUUSD",
+    XAGUSD: "PEPPERSTONE:XAGUSD", SILVER: "PEPPERSTONE:XAGUSD",
+    WTI: "PEPPERSTONE:USOUSD", WTIUSD: "PEPPERSTONE:USOUSD", USOIL: "PEPPERSTONE:USOUSD",
+    BRENT: "PEPPERSTONE:UKOUSD", BRENTUSD: "PEPPERSTONE:UKOUSD", UKOIL: "PEPPERSTONE:UKOUSD",
+    NG: "PEPPERSTONE:NATGAS", NGUSD: "PEPPERSTONE:NATGAS",
     HG: "COMEX:HG1!", HGUSD: "COMEX:HG1!",
   }
   if (commodityMap[clean]) return commodityMap[clean]
 
   // CFDs / Indices
   const cfdMap: Record<string, string> = {
-    US30: "TVC:DJI", US500: "FOREXCOM:SPXUSD", US100: "NASDAQ:NDX",
-    UK100: "TVC:UKX", DE30: "XETR:DAX", DE40: "XETR:DAX",
+    US30: "PEPPERSTONE:US30", US500: "PEPPERSTONE:US500", US100: "PEPPERSTONE:US100",
+    UK100: "PEPPERSTONE:UK100", DE30: "PEPPERSTONE:GER40", DE40: "PEPPERSTONE:GER40",
     JP225: "TVC:NI225", HK50: "TVC:HSI", VIX: "TVC:VIX",
-    SPX500: "FOREXCOM:SPXUSD", NAS100: "NASDAQ:NDX",
+    SPX500: "PEPPERSTONE:US500", NAS100: "PEPPERSTONE:US100",
   }
   if (cfdMap[clean]) return cfdMap[clean]
 
@@ -67,6 +67,7 @@ function getTradingViewSymbol(pair: string): string {
   }
   if (stockMap[clean]) return stockMap[clean]
 
+  // Default: try BINANCE for crypto
   return `BINANCE:${clean}`
 }
 
@@ -88,62 +89,31 @@ function TradingViewChartInner({
     return () => setMounted(false)
   }, [])
 
-  // Use TradingView's tv.js constructor inside srcdoc for maximum control
-  // and isolation. This runs entirely in the iframe sandbox.
-  const srcdoc = useMemo(() => {
-    const bgColor = theme === "dark" ? "#0b0e11" : "#ffffff"
-    const textColor = theme === "dark" ? "#d1d5db" : "#333333"
-    const gridColor = theme === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)"
-
-    return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{width:100%;height:100%;overflow:hidden;background:${bgColor};}#tv_chart{width:100%!important;height:100%!important;overflow:hidden;background:${bgColor};}#tv_chart iframe{width:100%!important;height:100%!important;}</style>
-</head><body>
-<div id="tv_chart"></div>
-<script src="https://s3.tradingview.com/tv.js"></script>
-<script>
-try {
-  new TradingView.widget({
-    container_id: "tv_chart",
-    autosize: true,
-    symbol: "${tvSymbol}",
-    interval: "${interval}",
-    timezone: "Etc/UTC",
-    theme: "${theme}",
-    style: "1",
-    locale: "en",
-    toolbar_bg: "${bgColor}",
-    enable_publishing: false,
-    allow_symbol_change: false,
-    hide_top_toolbar: ${hideTopToolbar},
-    hide_side_toolbar: true,
-    hide_legend: true,
-    save_image: false,
-    withdateranges: false,
-    details: false,
-    hotlist: false,
-    calendar: false,
-    backgroundColor: "${bgColor}",
-    gridColor: "${gridColor}",
-    studies: ["MASimple@tv-basicstudies"],
-    overrides: {
-      "paneProperties.background": "${bgColor}",
-      "paneProperties.backgroundType": "solid",
-      "mainSeriesProperties.candleStyle.upColor": "#0ecb81",
-      "mainSeriesProperties.candleStyle.downColor": "#f6465d",
-      "mainSeriesProperties.candleStyle.borderUpColor": "#0ecb81",
-      "mainSeriesProperties.candleStyle.borderDownColor": "#f6465d",
-      "mainSeriesProperties.candleStyle.wickUpColor": "#0ecb81",
-      "mainSeriesProperties.candleStyle.wickDownColor": "#f6465d",
-      "scalesProperties.textColor": "${textColor}",
-    },
-    loading_screen: { backgroundColor: "${bgColor}", foregroundColor: "#f7a600" },
-  });
-} catch(e) {
-  document.getElementById("tv_chart").innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:13px;">Chart loading...</div>';
-}
-</script>
-</body></html>`
+  // Build TradingView embed URL -- this is the most reliable approach
+  // that handles sizing correctly on all devices.
+  const widgetUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      symbol: tvSymbol,
+      interval: interval,
+      timezone: "Etc/UTC",
+      theme: theme,
+      style: "1",
+      locale: "en",
+      enable_publishing: "false",
+      allow_symbol_change: "false",
+      hide_top_toolbar: hideTopToolbar ? "true" : "false",
+      hide_side_toolbar: "true",
+      hide_legend: "false",
+      save_image: "false",
+      withdateranges: "false",
+      details: "false",
+      hotlist: "false",
+      calendar: "false",
+      backgroundColor: theme === "dark" ? "rgba(11,14,17,1)" : "rgba(255,255,255,1)",
+      gridColor: theme === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)",
+      studies: '["MASimple@tv-basicstudies"]',
+    })
+    return `https://s.tradingview.com/widgetembed/?${params.toString()}`
   }, [tvSymbol, theme, interval, hideTopToolbar])
 
   // Show spinner while waiting for client mount or if symbol is invalid
@@ -178,13 +148,14 @@ try {
         </div>
       )}
       <iframe
-        srcDoc={srcdoc}
+        src={widgetUrl}
         onLoad={() => setLoaded(true)}
         onError={() => setHasError(true)}
         style={{ width: "100%", height: "100%", border: "none", display: "block", minHeight: 0 }}
-        sandbox="allow-scripts allow-same-origin allow-popups"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         loading="eager"
         title="TradingView Chart"
+        allow="fullscreen"
       />
     </div>
   )

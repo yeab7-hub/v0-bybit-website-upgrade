@@ -233,15 +233,16 @@ function ChartContent() {
 
         {/* ROW 4 - Main content (chart / overview / data / feed) - FILLS REMAINING SPACE */}
         {activeTab === "chart" ? (
-          <div className="relative min-h-0 overflow-hidden">
-            <TradingViewChart
-              key={`${rawPair}-${selectedInterval}`}
-              symbol={rawPair}
-              theme="dark"
-              interval={tvIntervalMap[selectedInterval] || "1"}
-              hideTopToolbar
-              className="absolute inset-0"
-            />
+          <div className="relative min-h-0 min-w-0 overflow-hidden" style={{ contain: "strict" }}>
+            <div className="absolute inset-0">
+              <TradingViewChart
+                key={`${rawPair}-${selectedInterval}`}
+                symbol={rawPair}
+                theme="dark"
+                interval={tvIntervalMap[selectedInterval] || "1"}
+                hideTopToolbar
+              />
+            </div>
           </div>
         ) : activeTab === "overview" ? (
           <div className="overflow-y-auto p-4">

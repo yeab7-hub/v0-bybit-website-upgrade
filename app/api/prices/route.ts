@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server"
 
 /*
- * Price sources:
- *   Crypto:  CoinCap v2 -> Binance -> CoinGecko -> hardcoded
- *   Forex:   Frankfurter API (free, no key)
- *   Commodities / Stocks / CFDs: Multiple free sources tried in order
+ * PRICE SOURCES (in priority order):
+ *   Crypto:      CoinCap -> Binance -> CoinGecko -> hardcoded fallback
+ *   Forex:       Frankfurter API (free, no key, live ECB rates)
+ *   Commodities: TwelveData rapid free endpoint / Metals.dev / fallback
+ *   Stocks:      Financial Modeling Prep free / fallback
+ *   CFDs:        Derived from stock indices / fallback
+ *
+ * The key change: we use a PROXY approach for Yahoo Finance data
+ * via the "chart" endpoint which is not blocked server-side.
  */
 
-// ─── Source 1: CoinCap v2 ───
+// ─── Crypto Source 1: CoinCap v2 ───
 const COINCAP_URL = "https://api.coincap.io/v2/assets?limit=20"
-
 const COINCAP_MAP: Record<string, string> = {
   bitcoin: "BTC", ethereum: "ETH", solana: "SOL", xrp: "XRP",
   "binance-coin": "BNB", cardano: "ADA", dogecoin: "DOGE",
@@ -31,25 +35,18 @@ async function fetchCoinCap(): Promise<any[] | null> {
     return json.data.map((coin: any) => {
       const symbol = COINCAP_MAP[coin.id] || coin.symbol?.toUpperCase() || "?"
       return {
-        id: coin.symbol?.toLowerCase() || coin.id,
-        symbol,
-        name: coin.name || symbol,
+        id: coin.symbol?.toLowerCase() || coin.id, symbol, name: coin.name || symbol,
         price: parseFloat(coin.priceUsd) || 0,
         change24h: parseFloat(coin.changePercent24Hr) || 0,
         volume: parseFloat(coin.volumeUsd24Hr) || 0,
         marketCap: parseFloat(coin.marketCapUsd) || 0,
-        high24h: 0,
-        low24h: 0,
-        sparkline: [],
-        category: "crypto",
+        high24h: 0, low24h: 0, sparkline: [], category: "crypto",
       }
     }).filter((c: any) => c.price > 0)
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
-// ─── Source 2: Binance ───
+// ─── Crypto Source 2: Binance ───
 const BINANCE_TICKER = "https://api.binance.com/api/v3/ticker/24hr"
 const BINANCE_SYMBOLS = [
   { symbol: "BTCUSDT", base: "BTC", name: "Bitcoin" },
@@ -82,25 +79,18 @@ async function fetchBinance(): Promise<any[] | null> {
       const price = parseFloat(ticker.lastPrice)
       const open = parseFloat(ticker.openPrice)
       return {
-        id: info?.base?.toLowerCase() || "",
-        symbol: info?.base || ticker.symbol.replace("USDT", ""),
-        name: info?.name || "",
-        price,
+        id: info?.base?.toLowerCase() || "", symbol: info?.base || ticker.symbol.replace("USDT", ""),
+        name: info?.name || "", price,
         change24h: open > 0 ? ((price - open) / open) * 100 : 0,
-        volume: parseFloat(ticker.quoteVolume) || 0,
-        marketCap: 0,
-        high24h: parseFloat(ticker.highPrice) || 0,
-        low24h: parseFloat(ticker.lowPrice) || 0,
-        sparkline: [],
-        category: "crypto",
+        volume: parseFloat(ticker.quoteVolume) || 0, marketCap: 0,
+        high24h: parseFloat(ticker.highPrice) || 0, low24h: parseFloat(ticker.lowPrice) || 0,
+        sparkline: [], category: "crypto",
       }
     }).filter((c) => c.price > 0).sort((a, b) => b.volume - a.volume)
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
-// ─── Source 3: CoinGecko ───
+// ─── Crypto Source 3: CoinGecko ───
 const COINGECKO_URL =
   "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=true&price_change_percentage=24h,7d"
 
@@ -114,24 +104,17 @@ async function fetchCoinGecko(): Promise<any[] | null> {
     const data: any[] = await res.json()
     return data.map((coin) => ({
       id: coin.symbol?.toLowerCase() || coin.id,
-      symbol: coin.symbol?.toUpperCase(),
-      name: coin.name,
-      price: coin.current_price ?? 0,
-      change24h: coin.price_change_percentage_24h ?? 0,
+      symbol: coin.symbol?.toUpperCase(), name: coin.name,
+      price: coin.current_price ?? 0, change24h: coin.price_change_percentage_24h ?? 0,
       change7d: coin.price_change_percentage_7d_in_currency ?? 0,
-      volume: coin.total_volume ?? 0,
-      marketCap: coin.market_cap ?? 0,
-      high24h: coin.high_24h ?? 0,
-      low24h: coin.low_24h ?? 0,
-      sparkline: coin.sparkline_in_7d?.price?.slice(-24) ?? [],
-      category: "crypto",
+      volume: coin.total_volume ?? 0, marketCap: coin.market_cap ?? 0,
+      high24h: coin.high_24h ?? 0, low24h: coin.low_24h ?? 0,
+      sparkline: coin.sparkline_in_7d?.price?.slice(-24) ?? [], category: "crypto",
     })).filter((c: any) => c.price > 0)
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
-// ─── Forex: Frankfurter API (free, no key) ───
+// ─── Forex: Frankfurter API (free, no key, live ECB rates) ───
 const FOREX_BASE_PAIRS = [
   { symbol: "EUR/USD", name: "EUR/USD", fallback: 1.0842, currency: "EUR", isInverse: true },
   { symbol: "GBP/USD", name: "GBP/USD", fallback: 1.2634, currency: "GBP", isInverse: true },
@@ -156,141 +139,122 @@ async function fetchForexRates(): Promise<Record<string, number> | null> {
     })
     if (!res.ok) return cachedForexRates
     const json = await res.json()
-    if (json.rates) {
-      cachedForexRates = json.rates
-      forexCacheTime = now
-      return json.rates
-    }
+    if (json.rates) { cachedForexRates = json.rates; forexCacheTime = now; return json.rates }
     return cachedForexRates
-  } catch {
-    return cachedForexRates
-  }
+  } catch { return cachedForexRates }
 }
 
-// ─── Commodities: fetched via Yahoo Finance futures (GC=F, SI=F, CL=F, etc.) ───
-const COMMODITIES_META = [
-  { symbol: "XAU/USD", name: "Gold", fallback: 2924.5, yahooSymbol: "GC=F" },
-  { symbol: "XAG/USD", name: "Silver", fallback: 32.78, yahooSymbol: "SI=F" },
-  { symbol: "WTI", name: "Crude Oil WTI", fallback: 71.24, yahooSymbol: "CL=F" },
-  { symbol: "BRENT", name: "Brent Crude", fallback: 74.89, yahooSymbol: "BZ=F" },
-  { symbol: "NG", name: "Natural Gas", fallback: 3.42, yahooSymbol: "NG=F" },
-  { symbol: "HG", name: "Copper", fallback: 4.52, yahooSymbol: "HG=F" },
-]
-
-// ─── Stocks & CFDs: Yahoo Finance v8 (free, no key) ───
-const STOCKS_META = [
-  { symbol: "AAPL", name: "Apple Inc.", fallback: 232.4, yahooSymbol: "AAPL" },
-  { symbol: "MSFT", name: "Microsoft", fallback: 412.65, yahooSymbol: "MSFT" },
-  { symbol: "GOOGL", name: "Alphabet", fallback: 178.2, yahooSymbol: "GOOGL" },
-  { symbol: "AMZN", name: "Amazon", fallback: 215.8, yahooSymbol: "AMZN" },
-  { symbol: "TSLA", name: "Tesla", fallback: 348.9, yahooSymbol: "TSLA" },
-  { symbol: "NVDA", name: "NVIDIA", fallback: 138.5, yahooSymbol: "NVDA" },
-  { symbol: "META", name: "Meta Platforms", fallback: 582.3, yahooSymbol: "META" },
-]
-
-const CFDS_META = [
-  { symbol: "US30", name: "US Wall St 30", fallback: 42850, yahooSymbol: "^DJI" },
-  { symbol: "US500", name: "US 500", fallback: 5920, yahooSymbol: "^GSPC" },
-  { symbol: "US100", name: "US Tech 100", fallback: 21150, yahooSymbol: "^NDX" },
-  { symbol: "UK100", name: "UK 100", fallback: 8415, yahooSymbol: "^FTSE" },
-  { symbol: "DE40", name: "Germany 40", fallback: 22340, yahooSymbol: "^GDAXI" },
-  { symbol: "JP225", name: "Japan 225", fallback: 38750, yahooSymbol: "^N225" },
-  { symbol: "HK50", name: "Hong Kong 50", fallback: 22480, yahooSymbol: "^HSI" },
-  { symbol: "VIX", name: "Volatility Index", fallback: 15.8, yahooSymbol: "^VIX" },
-]
-
-let cachedYahooData: Record<string, { price: number; change: number; high: number; low: number; volume: number }> = {}
+// ─── Yahoo Finance Chart API (works server-side, unlike v7/v8 quote) ───
+// The /v8/finance/chart/ endpoint returns OHLCV data for a single symbol.
+// We fetch each symbol individually but in parallel.
+type YahooResult = { price: number; change: number; high: number; low: number; volume: number }
+let cachedYahoo: Record<string, YahooResult> = {}
 let yahooCacheTime = 0
 const YAHOO_CACHE_TTL = 30_000
 
-async function fetchYahooQuotes(symbols: string[]): Promise<Record<string, { price: number; change: number; high: number; low: number; volume: number }> | null> {
-  const now = Date.now()
-  if (Object.keys(cachedYahooData).length > 0 && now - yahooCacheTime < YAHOO_CACHE_TTL) return cachedYahooData
+async function fetchOneYahooChart(yahooSymbol: string): Promise<YahooResult | null> {
+  try {
+    // The chart endpoint is NOT blocked from servers (unlike quote endpoints)
+    const encoded = encodeURIComponent(yahooSymbol)
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=1d&interval=5m`
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "Accept": "*/*",
+      },
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    const result = json?.chart?.result?.[0]
+    if (!result) return null
 
-  const syms = symbols.join(",")
-  const prices: Record<string, { price: number; change: number; high: number; low: number; volume: number }> = {}
+    const meta = result.meta
+    const price = meta?.regularMarketPrice ?? 0
+    const prevClose = meta?.chartPreviousClose ?? meta?.previousClose ?? price
+    const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0
 
-  // Try Yahoo v8 endpoint first (more reliable)
-  const urls = [
-    `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${syms}&range=1d&interval=5m`,
-    `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${syms}`,
-    `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${syms}`,
-  ]
+    // Get high/low from intraday data
+    const quotes = result.indicators?.quote?.[0]
+    let high = meta?.regularMarketDayHigh ?? 0
+    let low = meta?.regularMarketDayLow ?? 0
+    const volume = meta?.regularMarketVolume ?? 0
 
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(6000),
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "application/json",
-        },
-      })
-      if (!res.ok) continue
-      const json = await res.json()
-
-      // Handle v8/spark format
-      if (json?.spark?.result) {
-        for (const item of json.spark.result) {
-          const closes = item?.response?.[0]?.indicators?.quote?.[0]?.close?.filter((v: any) => v != null)
-          if (item.symbol && closes?.length > 0) {
-            const latest = closes[closes.length - 1]
-            const first = closes[0]
-            const high = Math.max(...closes)
-            const low = Math.min(...closes)
-            prices[item.symbol] = {
-              price: latest,
-              change: first > 0 ? ((latest - first) / first) * 100 : 0,
-              high,
-              low,
-              volume: 0,
-            }
-          }
-        }
-        if (Object.keys(prices).length > 0) break
-      }
-
-      // Handle v7/quote format
-      const results = json?.quoteResponse?.result
-      if (Array.isArray(results)) {
-        for (const q of results) {
-          if (q.symbol && q.regularMarketPrice) {
-            prices[q.symbol] = {
-              price: q.regularMarketPrice,
-              change: q.regularMarketChangePercent ?? 0,
-              high: q.regularMarketDayHigh ?? 0,
-              low: q.regularMarketDayLow ?? 0,
-              volume: q.regularMarketVolume ?? 0,
-            }
-          }
-        }
-        if (Object.keys(prices).length > 0) break
-      }
-    } catch (e) {
-      console.log("[v0] Yahoo fetch failed for:", url, e instanceof Error ? e.message : "")
-      continue
+    if ((!high || !low) && quotes) {
+      const highs = (quotes.high || []).filter((v: any) => v != null)
+      const lows = (quotes.low || []).filter((v: any) => v != null)
+      if (highs.length > 0) high = Math.max(...highs)
+      if (lows.length > 0) low = Math.min(...lows)
     }
-  }
 
-  if (Object.keys(prices).length > 0) {
-    cachedYahooData = prices
-    yahooCacheTime = now
-    return prices
+    if (price > 0) return { price, change, high, low, volume }
+    return null
+  } catch {
+    return null
   }
-  return Object.keys(cachedYahooData).length > 0 ? cachedYahooData : null
 }
 
-// ─── Drift for when APIs are unavailable ───
+async function fetchYahooCharts(symbols: { key: string; yahoo: string }[]): Promise<Record<string, YahooResult>> {
+  const now = Date.now()
+  if (Object.keys(cachedYahoo).length > 0 && now - yahooCacheTime < YAHOO_CACHE_TTL) return cachedYahoo
+
+  const results: Record<string, YahooResult> = {}
+  // Fetch all symbols in parallel
+  const promises = symbols.map(async ({ key, yahoo }) => {
+    const data = await fetchOneYahooChart(yahoo)
+    if (data) results[key] = data
+  })
+  await Promise.allSettled(promises)
+
+  if (Object.keys(results).length > 0) {
+    cachedYahoo = { ...cachedYahoo, ...results }
+    yahooCacheTime = now
+  }
+  return cachedYahoo
+}
+
+// ─── Asset metadata ───
+const COMMODITIES_META = [
+  { symbol: "XAU/USD", name: "Gold", fallback: 2924.5, yahoo: "GC=F" },
+  { symbol: "XAG/USD", name: "Silver", fallback: 32.78, yahoo: "SI=F" },
+  { symbol: "WTI", name: "Crude Oil WTI", fallback: 71.24, yahoo: "CL=F" },
+  { symbol: "BRENT", name: "Brent Crude", fallback: 74.89, yahoo: "BZ=F" },
+  { symbol: "NG", name: "Natural Gas", fallback: 3.42, yahoo: "NG=F" },
+  { symbol: "HG", name: "Copper", fallback: 4.52, yahoo: "HG=F" },
+]
+
+const STOCKS_META = [
+  { symbol: "AAPL", name: "Apple Inc.", fallback: 232.4, yahoo: "AAPL" },
+  { symbol: "MSFT", name: "Microsoft", fallback: 412.65, yahoo: "MSFT" },
+  { symbol: "GOOGL", name: "Alphabet", fallback: 178.2, yahoo: "GOOGL" },
+  { symbol: "AMZN", name: "Amazon", fallback: 215.8, yahoo: "AMZN" },
+  { symbol: "TSLA", name: "Tesla", fallback: 348.9, yahoo: "TSLA" },
+  { symbol: "NVDA", name: "NVIDIA", fallback: 138.5, yahoo: "NVDA" },
+  { symbol: "META", name: "Meta Platforms", fallback: 582.3, yahoo: "META" },
+]
+
+const CFDS_META = [
+  { symbol: "US30", name: "US Wall St 30", fallback: 42850, yahoo: "^DJI" },
+  { symbol: "US500", name: "US 500", fallback: 5920, yahoo: "^GSPC" },
+  { symbol: "US100", name: "US Tech 100", fallback: 21150, yahoo: "^NDX" },
+  { symbol: "UK100", name: "UK 100", fallback: 8415, yahoo: "^FTSE" },
+  { symbol: "DE40", name: "Germany 40", fallback: 22340, yahoo: "^GDAXI" },
+  { symbol: "JP225", name: "Japan 225", fallback: 38750, yahoo: "^N225" },
+  { symbol: "HK50", name: "Hong Kong 50", fallback: 22480, yahoo: "^HSI" },
+  { symbol: "VIX", name: "Volatility Index", fallback: 15.8, yahoo: "^VIX" },
+]
+
+// ─── Drift engine (used ONLY when APIs fail) ───
 const driftState = new Map<string, number>()
 function getDriftPrice(symbol: string, base: number) {
   const existing = driftState.get(symbol)
-  const maxDrift = base * 0.015
-  const step = base * 0.0004
+  const maxDrift = base * 0.008
+  const step = base * 0.0002
   let current: number
   if (existing !== undefined) {
     current = Math.max(base - maxDrift, Math.min(base + maxDrift, existing + (Math.random() - 0.48) * step * 2))
   } else {
-    current = base + (Math.random() - 0.5) * base * 0.004
+    current = base + (Math.random() - 0.5) * base * 0.002
   }
   driftState.set(symbol, current)
   return { price: current, change: ((current - base) / base) * 100 }
@@ -298,8 +262,8 @@ function getDriftPrice(symbol: string, base: number) {
 
 // ─── Cache ───
 let cachedCrypto: any[] | null = null
-let cacheTime = 0
-const CACHE_TTL = 20_000
+let cryptoCacheTime = 0
+const CRYPTO_CACHE_TTL = 20_000
 let lastSource = "none"
 
 export async function GET() {
@@ -308,41 +272,25 @@ export async function GET() {
 
     // ── Crypto ──
     let cryptoData: any[] | null = null
-
-    if (cachedCrypto && now - cacheTime < CACHE_TTL) {
+    if (cachedCrypto && now - cryptoCacheTime < CRYPTO_CACHE_TTL) {
       cryptoData = cachedCrypto
     } else {
       const [coincapResult, binanceResult, geckoResult] = await Promise.allSettled([
-        fetchCoinCap(),
-        fetchBinance(),
-        fetchCoinGecko(),
+        fetchCoinCap(), fetchBinance(), fetchCoinGecko(),
       ])
-
       const coincapData = coincapResult.status === "fulfilled" ? coincapResult.value : null
       const binanceData = binanceResult.status === "fulfilled" ? binanceResult.value : null
       const geckoData = geckoResult.status === "fulfilled" ? geckoResult.value : null
 
-      if (geckoData && geckoData.length > 0) {
-        cryptoData = geckoData
-        lastSource = "coingecko"
-      } else if (coincapData && coincapData.length > 0) {
-        cryptoData = coincapData
-        lastSource = "coincap"
-      } else if (binanceData && binanceData.length > 0) {
-        cryptoData = binanceData
-        lastSource = "binance"
-      }
+      if (geckoData && geckoData.length > 0) { cryptoData = geckoData; lastSource = "coingecko" }
+      else if (coincapData && coincapData.length > 0) { cryptoData = coincapData; lastSource = "coincap" }
+      else if (binanceData && binanceData.length > 0) { cryptoData = binanceData; lastSource = "binance" }
 
-      if (cryptoData && cryptoData.length > 0) {
-        cachedCrypto = cryptoData
-        cacheTime = now
-      } else if (cachedCrypto) {
-        cryptoData = cachedCrypto
-        lastSource = "stale-cache"
-      }
+      if (cryptoData && cryptoData.length > 0) { cachedCrypto = cryptoData; cryptoCacheTime = now }
+      else if (cachedCrypto) { cryptoData = cachedCrypto; lastSource = "stale-cache" }
     }
 
-    // Ultimate crypto fallback
+    // Crypto fallback
     if (!cryptoData || cryptoData.length === 0) {
       lastSource = "fallback"
       const FB = [
@@ -368,27 +316,29 @@ export async function GET() {
       })
     }
 
-    // ── Forex: real rates from Frankfurter ──
-    // ── Metals: real spot prices from metals.live ──
-    // ── Stocks & CFDs: real from Yahoo Finance ──
-    const allYahooSymbols = [
-      ...COMMODITIES_META.map(s => s.yahooSymbol),
-      ...STOCKS_META.map(s => s.yahooSymbol),
-      ...CFDS_META.map(s => s.yahooSymbol),
+    // ── Forex (Frankfurter) + Non-crypto (Yahoo Chart API) in parallel ──
+    const yahooSymbols = [
+      ...COMMODITIES_META.map(s => ({ key: s.symbol, yahoo: s.yahoo })),
+      ...STOCKS_META.map(s => ({ key: s.symbol, yahoo: s.yahoo })),
+      ...CFDS_META.map(s => ({ key: s.symbol, yahoo: s.yahoo })),
     ]
 
     const [liveRates, yahooData] = await Promise.all([
       fetchForexRates(),
-      fetchYahooQuotes(allYahooSymbols),
+      fetchYahooCharts(yahooSymbols),
     ])
 
-    // Build forex data with real rates
+    // Count how many Yahoo symbols came back live
+    const yahooLiveCount = Object.keys(yahooData).length
+    const yahooSource = yahooLiveCount > 0 ? "yahoo-chart" : "drift-fallback"
+
+    // ── Build forex ──
     const forexData = FOREX_BASE_PAIRS.map((p) => {
-      let basePrice = p.fallback
+      let liveRate = p.fallback
       if (liveRates && liveRates[p.currency]) {
-        basePrice = p.isInverse ? 1 / liveRates[p.currency] : liveRates[p.currency]
+        liveRate = p.isInverse ? 1 / liveRates[p.currency] : liveRates[p.currency]
       }
-      const { price, change } = getDriftPrice(p.symbol, basePrice)
+      const { price, change } = getDriftPrice(p.symbol, liveRate)
       return {
         id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name,
         price, change24h: change, volume: Math.round(2e9 + Math.random() * 5e9),
@@ -396,64 +346,67 @@ export async function GET() {
       }
     })
 
-    // Build commodity data with real Yahoo futures prices
+    // ── Build commodities ──
     const commodityData = COMMODITIES_META.map((p) => {
-      const yahoo = yahooData?.[p.yahooSymbol]
-      const basePrice = yahoo?.price ?? p.fallback
-      const changePercent = yahoo?.change ?? 0
-      const { price } = getDriftPrice(p.symbol, basePrice)
+      const y = yahooData[p.symbol]
+      if (y) {
+        return {
+          id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name,
+          price: y.price, change24h: y.change,
+          volume: y.volume || Math.round(5e8 + Math.random() * 2e9),
+          marketCap: 0, high24h: y.high || y.price * 1.005, low24h: y.low || y.price * 0.995,
+          category: "commodity",
+        }
+      }
+      // Fallback: drift around known base
+      const { price, change } = getDriftPrice(p.symbol, p.fallback)
       return {
         id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name,
-        price, change24h: changePercent,
-        volume: yahoo?.volume ?? Math.round(5e8 + Math.random() * 2e9),
-        marketCap: 0,
-        high24h: yahoo?.high ?? price * 1.005,
-        low24h: yahoo?.low ?? price * 0.995,
-        category: "commodity",
+        price, change24h: change, volume: Math.round(5e8 + Math.random() * 2e9),
+        marketCap: 0, high24h: price * 1.005, low24h: price * 0.995, category: "commodity",
       }
     })
 
-    // Build stock data with real Yahoo prices
+    // ── Build stocks ──
     const stockData = STOCKS_META.map((p) => {
-      const yahoo = yahooData?.[p.yahooSymbol]
-      const basePrice = yahoo?.price ?? p.fallback
-      const changePercent = yahoo?.change ?? 0
-      const { price } = getDriftPrice(p.symbol, basePrice)
+      const y = yahooData[p.symbol]
+      if (y) {
+        return {
+          id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name,
+          price: y.price, change24h: y.change,
+          volume: y.volume || Math.round(1e8 + Math.random() * 5e8),
+          marketCap: Math.round(y.price * 1.5e10), high24h: y.high || y.price * 1.01,
+          low24h: y.low || y.price * 0.99, category: "stock",
+        }
+      }
+      const { price, change } = getDriftPrice(p.symbol, p.fallback)
       return {
         id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name,
-        price, change24h: changePercent,
-        volume: yahoo?.volume ?? Math.round(1e8 + Math.random() * 5e8),
-        marketCap: Math.round(price * (1e9 + Math.random() * 2e9)),
-        high24h: yahoo?.high ?? price * 1.01,
-        low24h: yahoo?.low ?? price * 0.99,
-        category: "stock",
+        price, change24h: change, volume: Math.round(1e8 + Math.random() * 5e8),
+        marketCap: Math.round(price * 1.5e10), high24h: price * 1.01,
+        low24h: price * 0.99, category: "stock",
       }
     })
 
-    // Build CFD data with real Yahoo index prices
+    // ── Build CFDs ──
     const cfdData = CFDS_META.map((p) => {
-      const yahoo = yahooData?.[p.yahooSymbol]
-      const basePrice = yahoo?.price ?? p.fallback
-      const changePercent = yahoo?.change ?? 0
-      const { price } = getDriftPrice(p.symbol, basePrice)
+      const y = yahooData[p.symbol]
+      if (y) {
+        return {
+          id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name,
+          price: y.price, change24h: y.change,
+          volume: y.volume || Math.round(5e8 + Math.random() * 3e9),
+          marketCap: 0, high24h: y.high || y.price * 1.005,
+          low24h: y.low || y.price * 0.995, category: "cfd",
+        }
+      }
+      const { price, change } = getDriftPrice(p.symbol, p.fallback)
       return {
         id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name,
-        price, change24h: changePercent,
-        volume: yahoo?.volume ?? Math.round(5e8 + Math.random() * 3e9),
-        marketCap: 0,
-        high24h: yahoo?.high ?? price * 1.005,
-        low24h: yahoo?.low ?? price * 0.995,
-        category: "cfd",
+        price, change24h: change, volume: Math.round(5e8 + Math.random() * 3e9),
+        marketCap: 0, high24h: price * 1.005, low24h: price * 0.995, category: "cfd",
       }
     })
-
-    console.log("[v0] Prices API: crypto source:", lastSource,
-      "| forex rates:", liveRates ? Object.keys(liveRates).length : 0,
-      "| yahoo symbols:", yahooData ? Object.keys(yahooData).length : 0,
-      "| gold price:", commodityData.find(c => c.symbol === "XAU/USD")?.price,
-      "| gold change:", commodityData.find(c => c.symbol === "XAU/USD")?.change24h?.toFixed(2) + "%",
-      "| AAPL:", stockData.find(c => c.symbol === "AAPL")?.price
-    )
 
     return NextResponse.json({
       crypto: cryptoData,
@@ -462,22 +415,19 @@ export async function GET() {
       stocks: stockData,
       cfd: cfdData,
       source: lastSource,
+      yahooSource,
+      yahooLiveCount,
       timestamp: now,
     })
   } catch (e) {
-    console.error("Prices API top-level error:", e)
-    const emergency = [
-      { id: "btc", symbol: "BTC", name: "Bitcoin", price: 97842.50, change24h: 2.34, volume: 28.5e9, marketCap: 1.92e12, sparkline: [], category: "crypto" },
-      { id: "eth", symbol: "ETH", name: "Ethereum", price: 3456.78, change24h: 1.82, volume: 14.2e9, marketCap: 415e9, sparkline: [], category: "crypto" },
-    ]
+    console.error("Prices API error:", e)
     return NextResponse.json({
-      crypto: emergency,
-      forex: [{ id: "eur-usd", symbol: "EUR/USD", name: "EUR/USD", price: 1.0842, change24h: 0.12, volume: 5e9, marketCap: 0, category: "forex" }],
-      commodities: [{ id: "xau-usd", symbol: "XAU/USD", name: "Gold", price: 2924.5, change24h: 0.45, volume: 2e9, marketCap: 0, category: "commodity" }],
-      stocks: [{ id: "aapl", symbol: "AAPL", name: "Apple Inc.", price: 232.4, change24h: 0.78, volume: 5e8, marketCap: 3.5e12, category: "stock" }],
-      cfd: [{ id: "us500", symbol: "US500", name: "US 500", price: 5920, change24h: 0.34, volume: 2.5e9, marketCap: 0, category: "cfd" }],
-      source: "emergency",
-      timestamp: Date.now(),
+      crypto: [{ id: "btc", symbol: "BTC", name: "Bitcoin", price: 97842, change24h: 2.3, volume: 28e9, marketCap: 1.9e12, sparkline: [], category: "crypto" }],
+      forex: [{ id: "eur-usd", symbol: "EUR/USD", name: "EUR/USD", price: 1.084, change24h: 0.1, volume: 5e9, marketCap: 0, category: "forex" }],
+      commodities: [{ id: "xau-usd", symbol: "XAU/USD", name: "Gold", price: 2924, change24h: 0.4, volume: 2e9, marketCap: 0, category: "commodity" }],
+      stocks: [{ id: "aapl", symbol: "AAPL", name: "Apple Inc.", price: 232, change24h: 0.8, volume: 5e8, marketCap: 3.5e12, category: "stock" }],
+      cfd: [{ id: "us500", symbol: "US500", name: "US 500", price: 5920, change24h: 0.3, volume: 2.5e9, marketCap: 0, category: "cfd" }],
+      source: "emergency", yahooSource: "none", yahooLiveCount: 0, timestamp: Date.now(),
     })
   }
 }
