@@ -18,6 +18,8 @@ interface Trade {
   total: number
   fee: number
   pnl: number
+  status?: string
+  close_price?: number | null
   created_at: string
   profiles?: { email: string; full_name: string }
 }
@@ -55,6 +57,17 @@ export default function AdminTradesPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
+  const [closingTrade, setClosingTrade] = useState<string | null>(null)
+
+  const closeTrade = async (tradeId: string, outcome: "normal" | "force_win" | "force_loss") => {
+    if (!confirm(`Close this position with ${outcome.replace("_", " ")} outcome?`)) return
+    setClosingTrade(tradeId)
+    const response = await fetch("/api/trade/close", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tradeId, outcome }) })
+    const data = await response.json()
+    if (!response.ok) alert(data.error || "Failed to close position")
+    else fetchData()
+    setClosingTrade(null)
+  }
 
   // Modals
   const [modifyOrder, setModifyOrder] = useState<Order | null>(null)
@@ -311,12 +324,13 @@ export default function AdminTradesPage() {
                     <th className="px-4 py-3 font-medium">Total</th>
                     <th className="px-4 py-3 font-medium">Fee</th>
                     <th className="px-4 py-3 font-medium">P&L</th>
+                    <th className="px-4 py-3 font-medium">Status / Override</th>
                     <th className="px-4 py-3 font-medium">Date</th>
                   </tr>
                 </thead>
                 <tbody>
                   {trades.length === 0 ? (
-                    <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">{loading ? "Loading..." : "No trades found"}</td></tr>
+                    <tr><td colSpan={10} className="px-4 py-8 text-center text-sm text-muted-foreground">{loading ? "Loading..." : "No trades found"}</td></tr>
                   ) : (
                     trades.map((t) => (
                       <tr key={t.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
@@ -339,6 +353,16 @@ export default function AdminTradesPage() {
                           <span className={`font-mono text-xs font-medium ${Number(t.pnl) >= 0 ? "text-success" : "text-destructive"}`}>
                             {Number(t.pnl) >= 0 ? "+" : ""}${Number(t.pnl).toFixed(2)}
                           </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {t.status === "open" ? (
+                            <select aria-label={`Override outcome for ${t.pair}`} value="" disabled={closingTrade === t.id} onChange={(event) => { const value = event.target.value as "normal" | "force_win" | "force_loss"; if (value) closeTrade(t.id, value) }} className="min-h-11 rounded-md border border-border bg-background px-2 text-xs text-foreground">
+                              <option value="">Admin Override</option>
+                              <option value="normal">Normal Market</option>
+                              <option value="force_win">Force Win</option>
+                              <option value="force_loss">Force Loss</option>
+                            </select>
+                          ) : <span className="text-xs text-muted-foreground">{t.status || "closed"}</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString()}</td>
                       </tr>

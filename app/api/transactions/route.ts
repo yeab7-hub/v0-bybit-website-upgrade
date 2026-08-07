@@ -33,18 +33,38 @@ export async function POST(request: NextRequest) {
   const { action } = body
 
   if (action === "deposit") {
-    const { asset, network, amount, tx_hash } = body
+    const assetName = String(body.asset || "").trim().toUpperCase()
+    const networkName = String(body.network || "").trim()
+    const amountNum = Number(body.amount)
+    const txHash = String(body.tx_hash || "").trim()
+    if (!assetName || !networkName || !Number.isFinite(amountNum) || amountNum <= 0) {
+      return NextResponse.json({ error: "Enter a valid asset, network, and positive amount" }, { status: 400 })
+    }
+    if (txHash.length > 256) return NextResponse.json({ error: "Transaction hash is too long" }, { status: 400 })
+
+    const { data: destination, error: destinationError } = await supabase
+      .from("deposit_addresses")
+      .select("symbol, network, active, min_deposit")
+      .eq("symbol", assetName)
+      .eq("network", networkName)
+      .eq("active", true)
+      .maybeSingle()
+    if (destinationError) return NextResponse.json({ error: "Deposit routing is unavailable. Please try again later." }, { status: 503 })
+    if (!destination) return NextResponse.json({ error: "This deposit asset/network is not currently available" }, { status: 400 })
+    if (Number(destination.min_deposit || 0) > amountNum) return NextResponse.json({ error: `Minimum deposit is ${destination.min_deposit} ${assetName}` }, { status: 400 })
+
+    if (txHash) {
+      const { data: existing, error: duplicateError } = await supabase.from("transactions").select("*").eq("user_id", user.id).eq("type", "deposit").eq("asset", assetName).eq("network", networkName).eq("tx_hash", txHash).maybeSingle()
+      if (duplicateError) return NextResponse.json({ error: "Could not verify transaction hash" }, { status: 503 })
+      if (existing) return NextResponse.json(existing)
+    }
+
     const { data, error } = await supabase.from("transactions").insert({
-      user_id: user.id,
-      type: "deposit",
-      asset,
-      network: network || null,
-      amount: parseFloat(amount),
-      tx_hash: tx_hash || null,
-      status: "pending",
+      user_id: user.id, type: "deposit", asset: assetName, network: networkName,
+      amount: amountNum, tx_hash: txHash || null, status: "pending",
     }).select().single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: "Could not queue deposit for review" }, { status: 500 })
 
     notifyAdmin({
       subject: `New Deposit Request - ${amount} ${asset}`,

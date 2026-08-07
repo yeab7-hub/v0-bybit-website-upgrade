@@ -388,8 +388,8 @@ export default function WalletPage() {
 
 /* ===== Deposit ===== */
 function DepositTab({ mutTx, mutBal }: any) {
-  const { data: addrData } = useSWR("/api/deposit-addresses", fetcher)
-  const DEPOSIT_ADDRESSES: CoinDepositConfig[] = addrData?.addresses ?? FALLBACK_ADDRESSES
+  const { data: addrData, error: addrError } = useSWR("/api/deposit-addresses", fetcher)
+  const DEPOSIT_ADDRESSES: CoinDepositConfig[] = addrData?.addresses ?? []
   const [coin, setCoin] = useState("USDT")
   const [netIdx, setNetIdx] = useState(0)
   const [copied, setCopied] = useState(false)
@@ -400,12 +400,22 @@ function DepositTab({ mutTx, mutBal }: any) {
 
   const cd = DEPOSIT_ADDRESSES.find(c => c.symbol === coin) || DEPOSIT_ADDRESSES[0]
   const net = cd?.networks?.[netIdx] || cd?.networks?.[0]
-  const copy = () => { navigator.clipboard.writeText(net.address); setCopied(true); setTimeout(() => setCopied(false), 2000) }
+  const [error, setError] = useState("")
+  if (addrError || !DEPOSIT_ADDRESSES.length || !cd || !net) return (
+    <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-10 text-center">
+      <AlertTriangle className="mx-auto mb-4 h-8 w-8 text-warning" />
+      <h3 className="mb-2 text-lg font-bold text-foreground">Deposits unavailable</h3>
+      <p className="text-sm text-muted-foreground">No active deposit wallet is configured. Please try again later or contact support.</p>
+    </div>
+  )
+  const copy = () => { if (!net) return; navigator.clipboard.writeText(net.address); setCopied(true); setTimeout(() => setCopied(false), 2000) }
 
   const submit = async () => {
-    if (!amount || parseFloat(amount) <= 0) return
-    setSubmitting(true)
-    await fetch("/api/transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deposit", asset: coin, network: net.network, amount, tx_hash: txHash }) })
+    if (!amount || parseFloat(amount) <= 0 || !net) return
+    setSubmitting(true); setError("")
+    const response = await fetch("/api/transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deposit", asset: coin, network: net.network, amount, tx_hash: txHash }) })
+    const result = await response.json()
+    if (!response.ok) { setError(result.error || "Could not submit deposit"); setSubmitting(false); return }
     mutTx(); mutBal(); setDone(true); setSubmitting(false)
   }
 
@@ -477,6 +487,7 @@ function DepositTab({ mutTx, mutBal }: any) {
           <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Transaction Hash (optional)</label>
           <input type="text" value={txHash} onChange={e => setTxHash(e.target.value)} placeholder="0x..." className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#f7a600] focus:outline-none" />
         </div>
+        {error && <p role="alert" className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
         <button onClick={submit} disabled={submitting || !amount || parseFloat(amount) <= 0}
           className="w-full rounded-lg bg-[#f7a600] py-3 text-sm font-bold text-[#0a0e17] transition hover:bg-[#e09800] disabled:opacity-50">
           {submitting ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : "Submit Deposit Request"}

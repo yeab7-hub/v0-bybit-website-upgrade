@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+export { POST, PUT } from "@/app/api/deposit-addresses/route"
 
 export async function GET() {
   const supabase = await createClient()

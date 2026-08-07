@@ -7,7 +7,38 @@ import { NextResponse } from "next/server"
  *   Commodities / Stocks / CFDs: Multiple free sources tried in order
  */
 
-// ─── Source 1: CoinCap v2 ───
+// ─── Primary source: Bybit public v5 market data ───
+const BYBIT_TICKER = "https://api.bybit.com/v5/market/tickers?category=spot"
+const BYBIT_SYMBOLS = [
+  { symbol: "BTCUSDT", base: "BTC", name: "Bitcoin" },
+  { symbol: "ETHUSDT", base: "ETH", name: "Ethereum" },
+  { symbol: "SOLUSDT", base: "SOL", name: "Solana" },
+  { symbol: "XRPUSDT", base: "XRP", name: "XRP" },
+  { symbol: "BNBUSDT", base: "BNB", name: "BNB" },
+  { symbol: "ADAUSDT", base: "ADA", name: "Cardano" },
+  { symbol: "DOGEUSDT", base: "DOGE", name: "Dogecoin" },
+  { symbol: "AVAXUSDT", base: "AVAX", name: "Avalanche" },
+  { symbol: "DOTUSDT", base: "DOT", name: "Polkadot" },
+  { symbol: "LINKUSDT", base: "LINK", name: "Chainlink" },
+]
+
+async function fetchBybit(): Promise<any[] | null> {
+  try {
+    const res = await fetch(BYBIT_TICKER, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(6000), cache: "no-store" })
+    if (!res.ok) return null
+    const json = await res.json()
+    const rows = json?.result?.list
+    if (!Array.isArray(rows)) return null
+    return rows.map((ticker: any) => {
+      const info = BYBIT_SYMBOLS.find((item) => item.symbol === ticker.symbol)
+      const price = Number(ticker.lastPrice)
+      const prev = Number(ticker.prevPrice24h)
+      return { id: info?.base?.toLowerCase() || ticker.symbol, symbol: info?.base || ticker.symbol.replace("USDT", ""), name: info?.name || ticker.symbol, price, change24h: Number(ticker.price24hPcnt || 0) * 100, volume: Number(ticker.turnover24h || 0), marketCap: 0, high24h: Number(ticker.highPrice24h || 0), low24h: Number(ticker.lowPrice24h || 0), sparkline: [], category: "crypto" }
+    }).filter((coin: any) => coin.price > 0)
+  } catch { return null }
+}
+
+// ─── Source 2: CoinCap v2 ───
 const COINCAP_URL = "https://api.coincap.io/v2/assets?limit=20"
 
 const COINCAP_MAP: Record<string, string> = {
@@ -312,25 +343,25 @@ export async function GET() {
     if (cachedCrypto && now - cacheTime < CACHE_TTL) {
       cryptoData = cachedCrypto
     } else {
-      const [coincapResult, binanceResult, geckoResult] = await Promise.allSettled([
-        fetchCoinCap(),
+      const [bybitResult, binanceResult, geckoResult] = await Promise.allSettled([
+        fetchBybit(),
         fetchBinance(),
         fetchCoinGecko(),
       ])
 
-      const coincapData = coincapResult.status === "fulfilled" ? coincapResult.value : null
+      const bybitData = bybitResult.status === "fulfilled" ? bybitResult.value : null
       const binanceData = binanceResult.status === "fulfilled" ? binanceResult.value : null
       const geckoData = geckoResult.status === "fulfilled" ? geckoResult.value : null
 
-      if (geckoData && geckoData.length > 0) {
-        cryptoData = geckoData
-        lastSource = "coingecko"
-      } else if (coincapData && coincapData.length > 0) {
-        cryptoData = coincapData
-        lastSource = "coincap"
+      if (bybitData && bybitData.length > 0) {
+        cryptoData = bybitData
+        lastSource = "bybit"
       } else if (binanceData && binanceData.length > 0) {
         cryptoData = binanceData
         lastSource = "binance"
+      } else if (geckoData && geckoData.length > 0) {
+        cryptoData = geckoData
+        lastSource = "coingecko"
       }
 
       if (cryptoData && cryptoData.length > 0) {
