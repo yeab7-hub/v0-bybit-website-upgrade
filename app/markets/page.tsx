@@ -134,7 +134,7 @@ export default function MarketsPage() {
                assetClass === "stocks" ? "Stock Markets" : "CFD Markets"}
             </h1>
             <p className="mt-2 text-muted-foreground">
-              {assetClass === "crypto" ? <>The tracked crypto market value is <span className="font-semibold text-foreground">{formatCompactValue(totalMarketValue)}</span> across {currentAssets.length} live assets, with an average <span className={marketChange >= 0 ? "text-success" : "text-destructive"}>{marketChange >= 0 ? "+" : ""}{marketChange.toFixed(2)}%</span> average change over the last day.</> :
+              {assetClass === "crypto" ? <>The tracked crypto market value is <span className="font-semibold text-foreground">{formatCompactValue(totalMarketValue)}</span> across {currentAssets.length} live assets, with an average <span className={marketChange >= 0 ? "text-success" : "text-destructive"}>{marketChange >= 0 ? "+" : ""}{marketChange.toFixed(2)}%</span> change over the last day.</> :
                assetClass === "forex" ? "Real-time foreign exchange rates for major, minor, and exotic currency pairs." :
                assetClass === "commodities" ? "Live prices for gold, silver, oil, natural gas, and other commodities." :
                assetClass === "stocks" ? "Track major US and global equity markets in real time." :
@@ -168,6 +168,7 @@ export default function MarketsPage() {
                   <span className="text-sm font-semibold text-foreground">Hot</span>
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </div>
+                {hotCoins.length === 0 && <p className="py-2 text-xs text-muted-foreground">Live market data unavailable.</p>}
                 {hotCoins.slice(0, 3).map((c) => (
                   <Link key={c.symbol} href={c.category === "crypto" ? `/trade?pair=${c.symbol}USDT` : `/trade?pair=${encodeURIComponent(c.symbol)}`} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
@@ -188,6 +189,7 @@ export default function MarketsPage() {
                   <span className="text-sm font-semibold text-foreground">Top Gainers</span>
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </div>
+                {topGainers.length === 0 && <p className="py-2 text-xs text-muted-foreground">Live market data unavailable.</p>}
                 {topGainers.slice(0, 3).map((c) => (
                   <Link key={c.symbol} href={c.category === "crypto" ? `/trade?pair=${c.symbol}USDT` : `/trade?pair=${encodeURIComponent(c.symbol)}`} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
@@ -206,6 +208,7 @@ export default function MarketsPage() {
                   <span className="text-sm font-semibold text-foreground">Top Losers</span>
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </div>
+                {topLosers.length === 0 && <p className="py-2 text-xs text-muted-foreground">Live market data unavailable.</p>}
                 {topLosers.slice(0, 3).map((c) => (
                   <Link key={c.symbol} href={c.category === "crypto" ? `/trade?pair=${c.symbol}USDT` : `/trade?pair=${encodeURIComponent(c.symbol)}`} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
@@ -224,6 +227,7 @@ export default function MarketsPage() {
                   <span className="text-sm font-semibold text-foreground">New Listings</span>
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </div>
+                {newListings.length === 0 && <p className="py-2 text-xs text-muted-foreground">Live market data unavailable.</p>}
                 {newListings.slice(0, 3).map((c) => (
                   <Link key={c.symbol} href={c.category === "crypto" ? `/trade?pair=${c.symbol}USDT` : `/trade?pair=${encodeURIComponent(c.symbol)}`} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
@@ -312,6 +316,8 @@ export default function MarketsPage() {
                           </td>
                         </tr>
                       ))
+                    : filtered.length === 0
+                      ? <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">{isLoading ? "Loading live market data…" : "No live market data matches this filter."}</td></tr>
                     : filtered.map((coin, idx) => (
                         <tr key={coin.symbol} className="group/row border-b border-border/50 transition-colors hover:bg-card/50">
                           <td className="px-4 py-3">
