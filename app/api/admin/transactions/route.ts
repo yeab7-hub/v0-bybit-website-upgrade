@@ -2,7 +2,10 @@ import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() {
+  const apiKey = process.env.RESEND_API_KEY
+  return apiKey ? new Resend(apiKey) : null
+}
 
 function buildWithdrawalRejectionEmail(amount: string, asset: string, reason: string) {
   return `<!DOCTYPE html>
@@ -308,7 +311,8 @@ export async function PATCH(request: NextRequest) {
       .eq("id", tx.user_id)
       .single()
 
-    if (userProfile?.email) {
+    const resend = getResend()
+    if (userProfile?.email && resend) {
       try {
         await resend.emails.send({
           from: "Bybit <onboarding@resend.dev>",

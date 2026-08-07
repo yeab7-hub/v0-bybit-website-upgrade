@@ -373,35 +373,16 @@ export async function GET() {
       }
     }
 
-    // Ultimate crypto fallback
+  // Do not synthesize market prices when all public sources are unavailable.
+  // The client renders an explicit empty/loading state instead of stale data.
     if (!cryptoData || cryptoData.length === 0) {
-      lastSource = "fallback"
-      const FB = [
-        { s: "BTC", n: "Bitcoin", p: 97842.50, v: 28.5e9, m: 1.92e12 },
-        { s: "ETH", n: "Ethereum", p: 3456.78, v: 14.2e9, m: 415e9 },
-        { s: "SOL", n: "Solana", p: 189.45, v: 3.8e9, m: 82e9 },
-        { s: "XRP", n: "XRP", p: 2.87, v: 5.1e9, m: 148e9 },
-        { s: "BNB", n: "BNB", p: 654.32, v: 1.9e9, m: 97e9 },
-        { s: "ADA", n: "Cardano", p: 0.9876, v: 1.2e9, m: 34e9 },
-        { s: "DOGE", n: "Dogecoin", p: 0.3245, v: 2.3e9, m: 47e9 },
-        { s: "AVAX", n: "Avalanche", p: 35.67, v: 890e6, m: 14e9 },
-        { s: "DOT", n: "Polkadot", p: 7.89, v: 560e6, m: 10.5e9 },
-        { s: "LINK", n: "Chainlink", p: 19.54, v: 780e6, m: 12.3e9 },
-      ]
-      cryptoData = FB.map((c) => {
-        const { price, change } = getDriftPrice(c.s, c.p)
-        return {
-          id: c.s.toLowerCase(), symbol: c.s, name: c.n, price, change24h: change,
-          volume: c.v, marketCap: c.m, high24h: price * 1.02, low24h: price * 0.98,
-          sparkline: Array.from({ length: 24 }, () => c.p * (0.99 + Math.random() * 0.02)),
-          category: "crypto",
-        }
-      })
+      cryptoData = []
+      lastSource = "unavailable"
     }
 
     // ── Forex: real rates from Frankfurter ──
     // ── Metals: real spot prices from metals.live ──
-    // ── Stocks & CFDs: real from Yahoo Finance ──
+    // ── Stocks & CFDs: real from Yahoo Finance ��─
     const allYahooSymbols = [
       ...COMMODITIES_META.map(s => s.yahooSymbol),
       ...STOCKS_META.map(s => s.yahooSymbol),

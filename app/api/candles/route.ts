@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 const BYBIT_KLINE = "https://api.bybit.com/v5/market/kline"
 const BINANCE_KLINE = "https://api.binance.com/api/v3/klines"
 const intervalMap: Record<string, { bybit: string; binance: string }> = {
-  "1m": { bybit: "1", binance: "1m" }, "3m": { bybit: "3", binance: "3m" }, "5m": { bybit: "5", binance: "5m" },
-  "15m": { bybit: "15", binance: "15m" }, "30m": { bybit: "30", binance: "30m" }, "1H": { bybit: "60", binance: "1h" },
+  "1": { bybit: "1", binance: "1m" }, "1m": { bybit: "1", binance: "1m" }, "3": { bybit: "3", binance: "3m" }, "3m": { bybit: "3", binance: "3m" }, "5": { bybit: "5", binance: "5m" }, "5m": { bybit: "5", binance: "5m" },
+  "15": { bybit: "15", binance: "15m" }, "15m": { bybit: "15", binance: "15m" }, "30": { bybit: "30", binance: "30m" }, "30m": { bybit: "30", binance: "30m" }, "1H": { bybit: "60", binance: "1h" },
   "2H": { bybit: "120", binance: "2h" }, "4H": { bybit: "240", binance: "4h" }, "6H": { bybit: "360", binance: "6h" },
   "12H": { bybit: "720", binance: "12h" }, "1D": { bybit: "D", binance: "1d" }, "3D": { bybit: "D", binance: "3d" },
   "1W": { bybit: "W", binance: "1w" }, "1M": { bybit: "M", binance: "1M" },

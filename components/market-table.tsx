@@ -100,12 +100,12 @@ export function MarketTable() {
     })
   }
 
-  // Get assets based on active category, always with fallbacks
-  const liveCrypto = crypto.length > 0 ? crypto : CRYPTO_FALLBACK
-  const liveForex = forex.length > 0 ? forex : FOREX_FALLBACK
-  const liveCommodities = commodities.length > 0 ? commodities : COMMODITIES_FALLBACK
-  const liveStocks = stocks.length > 0 ? stocks : STOCKS_FALLBACK
-  const liveCfd = cfd.length > 0 ? cfd : CFD_FALLBACK
+  // Render only server-sourced market data; do not present stale mock values as live.
+  const liveCrypto = crypto
+  const liveForex = forex
+  const liveCommodities = commodities
+  const liveStocks = stocks
+  const liveCfd = cfd
 
   let assets: PriceData[] = []
   if (activeCategory === "Crypto") {
