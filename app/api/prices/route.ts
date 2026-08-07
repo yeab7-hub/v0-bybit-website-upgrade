@@ -478,18 +478,14 @@ export async function GET() {
     })
   } catch (e) {
     console.error("Prices API top-level error:", e)
-    const emergency = [
-      { id: "btc", symbol: "BTC", name: "Bitcoin", price: 97842.50, change24h: 2.34, volume: 28.5e9, marketCap: 1.92e12, sparkline: [], category: "crypto" },
-      { id: "eth", symbol: "ETH", name: "Ethereum", price: 3456.78, change24h: 1.82, volume: 14.2e9, marketCap: 415e9, sparkline: [], category: "crypto" },
-    ]
     return NextResponse.json({
-      crypto: emergency,
-      forex: [{ id: "eur-usd", symbol: "EUR/USD", name: "EUR/USD", price: 1.0842, change24h: 0.12, volume: 5e9, marketCap: 0, category: "forex" }],
-      commodities: [{ id: "xau-usd", symbol: "XAU/USD", name: "Gold", price: 2924.5, change24h: 0.45, volume: 2e9, marketCap: 0, category: "commodity" }],
-      stocks: [{ id: "aapl", symbol: "AAPL", name: "Apple Inc.", price: 232.4, change24h: 0.78, volume: 5e8, marketCap: 3.5e12, category: "stock" }],
-      cfd: [{ id: "us500", symbol: "US500", name: "US 500", price: 5920, change24h: 0.34, volume: 2.5e9, marketCap: 0, category: "cfd" }],
-      source: "emergency",
+      crypto: [],
+      forex: [],
+      commodities: [],
+      stocks: [],
+      cfd: [],
+      source: "unavailable",
       timestamp: Date.now(),
-    })
+    }, { status: 503 })
   }
 }
