@@ -394,69 +394,30 @@ export async function GET() {
       fetchYahooQuotes(allYahooSymbols),
     ])
 
-    // Build forex data with real rates
-    const forexData = FOREX_BASE_PAIRS.map((p) => {
-      let basePrice = p.fallback
-      if (liveRates && liveRates[p.currency]) {
-        basePrice = p.isInverse ? 1 / liveRates[p.currency] : liveRates[p.currency]
-      }
-      const { price, change } = getDriftPrice(p.symbol, basePrice)
-      return {
-        id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name,
-        price, change24h: change, volume: Math.round(2e9 + Math.random() * 5e9),
-        marketCap: 0, high24h: price * 1.002, low24h: price * 0.998, category: "forex",
-      }
+    // Only expose values returned by the live providers. Never synthesize prices when a provider is unavailable.
+    const forexData = FOREX_BASE_PAIRS.flatMap((p) => {
+      const rate = liveRates?.[p.currency]
+      if (!rate || rate <= 0) return []
+      const price = p.isInverse ? 1 / rate : rate
+      return [{ id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name, price, change24h: 0, volume: 0, marketCap: 0, high24h: price, low24h: price, category: "forex" }]
     })
 
-    // Build commodity data with real Yahoo futures prices
-    const commodityData = COMMODITIES_META.map((p) => {
-      const yahoo = yahooData?.[p.yahooSymbol]
-      const basePrice = yahoo?.price ?? p.fallback
-      const changePercent = yahoo?.change ?? 0
-      const { price } = getDriftPrice(p.symbol, basePrice)
-      return {
-        id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name,
-        price, change24h: changePercent,
-        volume: yahoo?.volume ?? Math.round(5e8 + Math.random() * 2e9),
-        marketCap: 0,
-        high24h: yahoo?.high ?? price * 1.005,
-        low24h: yahoo?.low ?? price * 0.995,
-        category: "commodity",
-      }
+    const commodityData = COMMODITIES_META.flatMap((p) => {
+      const quote = yahooData?.[p.yahooSymbol]
+      if (!quote?.price || quote.price <= 0) return []
+      return [{ id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name, price: quote.price, change24h: quote.change ?? 0, volume: quote.volume ?? 0, marketCap: 0, high24h: quote.high ?? quote.price, low24h: quote.low ?? quote.price, category: "commodity" }]
     })
 
-    // Build stock data with real Yahoo prices
-    const stockData = STOCKS_META.map((p) => {
-      const yahoo = yahooData?.[p.yahooSymbol]
-      const basePrice = yahoo?.price ?? p.fallback
-      const changePercent = yahoo?.change ?? 0
-      const { price } = getDriftPrice(p.symbol, basePrice)
-      return {
-        id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name,
-        price, change24h: changePercent,
-        volume: yahoo?.volume ?? Math.round(1e8 + Math.random() * 5e8),
-        marketCap: Math.round(price * (1e9 + Math.random() * 2e9)),
-        high24h: yahoo?.high ?? price * 1.01,
-        low24h: yahoo?.low ?? price * 0.99,
-        category: "stock",
-      }
+    const stockData = STOCKS_META.flatMap((p) => {
+      const quote = yahooData?.[p.yahooSymbol]
+      if (!quote?.price || quote.price <= 0) return []
+      return [{ id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name, price: quote.price, change24h: quote.change ?? 0, volume: quote.volume ?? 0, marketCap: 0, high24h: quote.high ?? quote.price, low24h: quote.low ?? quote.price, category: "stock" }]
     })
 
-    // Build CFD data with real Yahoo index prices
-    const cfdData = CFDS_META.map((p) => {
-      const yahoo = yahooData?.[p.yahooSymbol]
-      const basePrice = yahoo?.price ?? p.fallback
-      const changePercent = yahoo?.change ?? 0
-      const { price } = getDriftPrice(p.symbol, basePrice)
-      return {
-        id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name,
-        price, change24h: changePercent,
-        volume: yahoo?.volume ?? Math.round(5e8 + Math.random() * 3e9),
-        marketCap: 0,
-        high24h: yahoo?.high ?? price * 1.005,
-        low24h: yahoo?.low ?? price * 0.995,
-        category: "cfd",
-      }
+    const cfdData = CFDS_META.flatMap((p) => {
+      const quote = yahooData?.[p.yahooSymbol]
+      if (!quote?.price || quote.price <= 0) return []
+      return [{ id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name, price: quote.price, change24h: quote.change ?? 0, volume: quote.volume ?? 0, marketCap: 0, high24h: quote.high ?? quote.price, low24h: quote.low ?? quote.price, category: "cfd" }]
     })
 
     console.log("[v0] Prices API: crypto source:", lastSource,

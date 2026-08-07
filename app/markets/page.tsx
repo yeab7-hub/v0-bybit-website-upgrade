@@ -67,6 +67,11 @@ export default function MarketsPage() {
   }
 
   const currentAssets = getAssetsForClass()
+  const totalMarketValue = currentAssets.reduce((sum, asset) => sum + (asset.marketCap || asset.volume * asset.price), 0)
+  const marketChange = currentAssets.length
+    ? currentAssets.reduce((sum, asset) => sum + asset.change24h, 0) / currentAssets.length
+    : 0
+  const formatCompactValue = (value: number) => value >= 1e12 ? `$${(value / 1e12).toFixed(2)}T` : value >= 1e9 ? `$${(value / 1e9).toFixed(2)}B` : value >= 1e6 ? `$${(value / 1e6).toFixed(2)}M` : "$0"
 
   const toggleFav = (symbol: string) => {
     setFavorites((prev) => {
@@ -129,7 +134,7 @@ export default function MarketsPage() {
                assetClass === "stocks" ? "Stock Markets" : "CFD Markets"}
             </h1>
             <p className="mt-2 text-muted-foreground">
-              {assetClass === "crypto" ? <>The global crypto market cap is <span className="font-semibold text-foreground">$2.84T</span>, a <span className="text-success">+2.34%</span> change over the last day.</> :
+              {assetClass === "crypto" ? <>The tracked crypto market value is <span className="font-semibold text-foreground">{formatCompactValue(totalMarketValue)}</span> across {currentAssets.length} live assets, with an average <span className={marketChange >= 0 ? "text-success" : "text-destructive"}>{marketChange >= 0 ? "+" : ""}{marketChange.toFixed(2)}%</span> average change over the last day.</> :
                assetClass === "forex" ? "Real-time foreign exchange rates for major, minor, and exotic currency pairs." :
                assetClass === "commodities" ? "Live prices for gold, silver, oil, natural gas, and other commodities." :
                assetClass === "stocks" ? "Track major US and global equity markets in real time." :
