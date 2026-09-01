@@ -134,7 +134,7 @@ export default function MarketsPage() {
                assetClass === "stocks" ? "Stock Markets" : "CFD Markets"}
             </h1>
             <p className="mt-2 text-muted-foreground">
-              {assetClass === "crypto" ? <>The tracked crypto market value is <span className="font-semibold text-foreground">{formatCompactValue(totalMarketValue)}</span> across {currentAssets.length} live assets, with an average <span className={marketChange >= 0 ? "text-success" : "text-destructive"}>{marketChange >= 0 ? "+" : ""}{marketChange.toFixed(2)}%</span> change over the last day.</> :
+              {assetClass === "crypto" ? <>The tracked crypto market value is <span className="font-semibold text-foreground">{formatCompactValue(totalMarketValue)}</span> across {currentAssets.length} live assets, with a <span className={marketChange >= 0 ? "text-success" : "text-destructive"}>{marketChange >= 0 ? "+" : ""}{marketChange.toFixed(2)}%</span> average change over the last day.</> :
                assetClass === "forex" ? "Real-time foreign exchange rates for major, minor, and exotic currency pairs." :
                assetClass === "commodities" ? "Live prices for gold, silver, oil, natural gas, and other commodities." :
                assetClass === "stocks" ? "Track major US and global equity markets in real time." :
