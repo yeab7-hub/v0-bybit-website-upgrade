@@ -196,13 +196,17 @@ export default function TradePage() {
     globalMutate("/api/trade?type=balances")
   }
 
-  const closePosition = async (tradeId: string) => {
+  const closePosition = async (tradeId: string, pair?: string) => {
     setClosingId(tradeId)
     try {
+      // Use the live price currently shown on screen for this asset as the exit
+      // price, so the trade settles at the value the user sees rather than a
+      // stale server re-fetch. The backend validates this against its own feed.
+      const closePrice = pair ? safeFindPrice(allPrices, pair)?.price : undefined
       const res = await fetch("/api/trade/close", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tradeId }),
+        body: JSON.stringify({ tradeId, closePrice }),
       })
       const data = await res.json()
       if (data.success) {
@@ -654,7 +658,7 @@ export default function TradePage() {
                           </div>
                         </div>
                         <button
-                          onClick={(e) => { e.stopPropagation(); closePosition(pos.id) }}
+                          onClick={(e) => { e.stopPropagation(); closePosition(pos.id, pos.pair) }}
                           disabled={isClosing}
                           className="rounded-md border border-destructive px-2 py-1 text-[10px] font-semibold text-destructive disabled:opacity-50"
                         >
@@ -950,7 +954,7 @@ export default function TradePage() {
                 <button onClick={() => { cancelOrder(selectedDetail.id); setSelectedDetail(null) }} className="flex-1 rounded-lg border border-destructive py-3 text-sm font-semibold text-destructive">Cancel Order</button>
               ) : selectedDetail.status === "open" ? (
                 <button
-                  onClick={() => { closePosition(selectedDetail.id); setSelectedDetail(null) }}
+                  onClick={() => { closePosition(selectedDetail.id, selectedDetail.pair); setSelectedDetail(null) }}
                   className="flex-1 rounded-lg bg-destructive py-3 text-sm font-semibold text-white"
                 >
                   Close Position at Market
