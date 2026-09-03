@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 
 // GET: return all active deposit addresses grouped by coin
@@ -7,7 +7,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("deposit_addresses")
     .select("*")
-    .eq("active", true)
+    .eq("is_active", true)
     .order("symbol")
     .order("network")
 
@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest) {
   if (profile?.role !== "admin" && profile?.role !== "super_admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const body = await request.json()
-  const { id, address, memo, network, min_deposit, confirmations, active } = body
+  const { id, address, memo, network, min_deposit, confirmations, is_active } = body
 
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 })
 
@@ -55,10 +55,13 @@ export async function PUT(request: NextRequest) {
   if (network !== undefined) updates.network = network
   if (min_deposit !== undefined) updates.min_deposit = min_deposit
   if (confirmations !== undefined) updates.confirmations = confirmations
-  if (active !== undefined) updates.active = active
+  if (is_active !== undefined) updates.is_active = is_active
   updates.updated_at = new Date().toISOString()
 
-  const { error } = await supabase.from("deposit_addresses").update(updates).eq("id", id)
+  // Use the service-role client for the write so both admin and super_admin
+  // roles succeed regardless of the row-level security policy configuration.
+  const adminSupabase = await createAdminClient()
+  const { error } = await adminSupabase.from("deposit_addresses").update(updates).eq("id", id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ success: true })
@@ -78,9 +81,10 @@ export async function POST(request: NextRequest) {
 
   if (!symbol || !network || !address) return NextResponse.json({ error: "Symbol, network, and address required" }, { status: 400 })
 
-  const { data, error } = await supabase.from("deposit_addresses").insert({
+  const adminSupabase = await createAdminClient()
+  const { data, error } = await adminSupabase.from("deposit_addresses").insert({
     symbol, name: name || symbol, network, address, memo: memo || null,
-    min_deposit: min_deposit || 0.01, confirmations: confirmations || 12, active: true,
+    min_deposit: min_deposit || 0.01, confirmations: confirmations || 12, is_active: true,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

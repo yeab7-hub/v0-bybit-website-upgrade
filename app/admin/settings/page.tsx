@@ -14,7 +14,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 interface DepositAddr {
   id: string; symbol: string; name: string; network: string
   address: string; memo: string | null; min_deposit: number
-  confirmations: number; active: boolean
+  confirmations: number; is_active: boolean
 }
 
 export default function AdminSettingsPage() {
@@ -240,10 +240,10 @@ function WalletAddressManager() {
     setEditing(null); mutate(); setSaving(false)
   }
 
-  const toggleActive = async (id: string, active: boolean) => {
+  const toggleActive = async (id: string, isActive: boolean) => {
     await fetch("/api/admin/deposit-addresses", {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, active: !active }),
+      body: JSON.stringify({ id, is_active: !isActive }),
     })
     mutate()
   }
@@ -330,7 +330,7 @@ function WalletAddressManager() {
             </thead>
             <tbody>
               {addrs.map((a) => (
-                <tr key={a.id} className={`border-b border-border/50 transition hover:bg-secondary/20 ${!a.active ? "opacity-50" : ""}`}>
+                <tr key={a.id} className={`border-b border-border/50 transition hover:bg-secondary/20 ${!a.is_active ? "opacity-50" : ""}`}>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
                       <MarketAsset symbol={a.symbol} size={28} />
@@ -358,9 +358,9 @@ function WalletAddressManager() {
                     )}
                   </td>
                   <td className="px-3 py-3 text-center">
-                    <button onClick={() => toggleActive(a.id, a.active)}
-                      className={`rounded-full px-2.5 py-0.5 text-[9px] font-semibold transition ${a.active ? "bg-green-500/10 text-green-400 hover:bg-green-500/20" : "bg-red-500/10 text-red-400 hover:bg-red-500/20"}`}>
-                      {a.active ? "Active" : "Disabled"}
+                    <button onClick={() => toggleActive(a.id, a.is_active)}
+                      className={`rounded-full px-2.5 py-0.5 text-[9px] font-semibold transition ${a.is_active ? "bg-green-500/10 text-green-400 hover:bg-green-500/20" : "bg-red-500/10 text-red-400 hover:bg-red-500/20"}`}>
+                      {a.is_active ? "Active" : "Disabled"}
                     </button>
                   </td>
                   <td className="px-3 py-3 text-right">

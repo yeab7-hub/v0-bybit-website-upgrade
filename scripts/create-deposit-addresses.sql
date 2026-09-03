@@ -42,5 +42,5 @@ CREATE POLICY "Anyone can read active deposit addresses" ON deposit_addresses
 DROP POLICY IF EXISTS "Admins can manage deposit addresses" ON deposit_addresses;
 CREATE POLICY "Admins can manage deposit addresses" ON deposit_addresses
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role IN ('admin', 'super_admin'))
   );
