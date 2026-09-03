@@ -41,18 +41,21 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const adminSupabase = await createAdminClient()
-  const { tradeId } = await request.json()
-
+  const body = await request.json()
+  const { tradeId, outcome } = body
   if (!tradeId) return NextResponse.json({ error: "Trade ID required" }, { status: 400 })
 
-  // Get the open position
-  const { data: position } = await adminSupabase
-    .from("trades")
-    .select("*")
-    .eq("id", tradeId)
-    .eq("user_id", user.id)
-    .eq("status", "open")
-    .single()
+  let isAdmin = false
+  if (outcome && ["normal", "force_win", "force_loss"].includes(outcome)) {
+    const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
+    isAdmin = profile?.role === "admin" || profile?.role === "super_admin"
+    if (!isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  // Get the open position. Admins can close any user's position; users can only close their own.
+  let positionQuery = adminSupabase.from("trades").select("*").eq("id", tradeId).eq("status", "open")
+  if (!isAdmin) positionQuery = positionQuery.eq("user_id", user.id)
+  const { data: position } = await positionQuery.single()
 
   if (!position) return NextResponse.json({ error: "Open position not found" }, { status: 404 })
 
@@ -77,32 +80,23 @@ export async function POST(request: NextRequest) {
   const { data: overrides } = await adminSupabase
     .from("trade_overrides")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", position.user_id)
     .eq("active", true)
     .order("created_at", { ascending: false })
 
   const override = overrides?.find((o: any) => o.pair === position.pair) ||
                    overrides?.find((o: any) => !o.pair) || null
+  const forcedResult = outcome === "force_win" ? "win" : outcome === "force_loss" ? "loss" : override?.forced_result
 
-  if (override) {
-    const mult = Number(override.multiplier) || 1
+  if (forcedResult === "win" || forcedResult === "loss") {
+    const mult = Number(override?.multiplier) || 1
     const entryTotal = entryPrice * qty
-    const forcedAmount = entryTotal * 0.05 * mult // 5% of position value * multiplier
-
-    if (override.forced_result === "win") {
-      pnl = Math.abs(forcedAmount)
-      pnlPercent = Math.abs(5 * mult)
-    } else if (override.forced_result === "loss") {
-      pnl = -Math.abs(forcedAmount)
-      pnlPercent = -Math.abs(5 * mult)
-    }
-
-    // Mark override as used
-    await adminSupabase.from("trade_overrides").update({
-      active: false,
-      used_at: new Date().toISOString(),
-    }).eq("id", override.id)
+    const forcedAmount = entryTotal * 0.05 * mult
+    pnl = forcedResult === "win" ? Math.abs(forcedAmount) : -Math.abs(forcedAmount)
+    pnlPercent = forcedResult === "win" ? Math.abs(5 * mult) : -Math.abs(5 * mult)
+    if (override?.id) await adminSupabase.from("trade_overrides").update({ active: false, used_at: new Date().toISOString() }).eq("id", override.id).eq("active", true)
   }
+
 
   // Update the position to closed
   await adminSupabase.from("trades").update({
@@ -117,7 +111,7 @@ export async function POST(request: NextRequest) {
   const { data: bBal } = await adminSupabase
     .from("balances")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", position.user_id)
     .eq("asset", baseAsset)
     .single()
 
@@ -125,14 +119,14 @@ export async function POST(request: NextRequest) {
     await adminSupabase.from("balances").update({
       available: Math.max(0, bBal.available - qty),
       updated_at: new Date().toISOString(),
-    }).eq("user_id", user.id).eq("asset", baseAsset)
+    }).eq("user_id", position.user_id).eq("asset", baseAsset)
   }
 
   // Credit quote asset (sale proceeds minus fee)
   const { data: qBal } = await adminSupabase
     .from("balances")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", position.user_id)
     .eq("asset", quoteAsset)
     .single()
 
@@ -142,7 +136,7 @@ export async function POST(request: NextRequest) {
     await adminSupabase.from("balances").update({
       available: Math.max(0, qBal.available + creditAmount),
       updated_at: new Date().toISOString(),
-    }).eq("user_id", user.id).eq("asset", quoteAsset)
+    }).eq("user_id", position.user_id).eq("asset", quoteAsset)
   } else {
     await adminSupabase.from("balances").insert({
       user_id: user.id,

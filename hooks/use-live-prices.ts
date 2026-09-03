@@ -68,11 +68,11 @@ const FALLBACK_CFD: PriceData[] = [
 ]
 
 const INITIAL_DATA: PricesResponse = {
-  crypto: FALLBACK_CRYPTO,
-  forex: FALLBACK_FOREX,
-  commodities: FALLBACK_COMMODITIES,
-  stocks: FALLBACK_STOCKS,
-  cfd: FALLBACK_CFD,
+  crypto: [],
+  forex: [],
+  commodities: [],
+  stocks: [],
+  cfd: [],
   timestamp: Date.now(),
 }
 
@@ -219,7 +219,7 @@ export function useLivePrices(refreshInterval = 8000) {
   const baseData = restData || INITIAL_DATA
 
   // Crypto: overlay WebSocket real-time prices
-  const crypto = (baseData.crypto?.length ? baseData.crypto : FALLBACK_CRYPTO).map((coin) => {
+  const crypto = (baseData.crypto ?? []).map((coin) => {
     const override = wsOverrides[coin.symbol]
     if (override) {
       return {
@@ -233,13 +233,12 @@ export function useLivePrices(refreshInterval = 8000) {
     return coin
   })
 
-  // Non-crypto: apply client-side micro-drift so prices tick every 500ms
-  // The tickCount dependency forces re-computation
-  void tickCount // eslint -- force dependency
-  const forex = applyMicroDrift(baseData.forex?.length ? baseData.forex : FALLBACK_FOREX, driftMapRef.current)
-  const commodities = applyMicroDrift(baseData.commodities?.length ? baseData.commodities : FALLBACK_COMMODITIES, driftMapRef.current)
-  const stocks = applyMicroDrift(baseData.stocks?.length ? baseData.stocks : FALLBACK_STOCKS, driftMapRef.current)
-  const cfdArr = applyMicroDrift(baseData.cfd?.length ? baseData.cfd : FALLBACK_CFD, driftMapRef.current)
+  // Non-crypto values are server-sourced only; never simulate prices in the browser.
+  void tickCount
+  const forex = baseData.forex ?? []
+  const commodities = baseData.commodities ?? []
+  const stocks = baseData.stocks ?? []
+  const cfdArr = baseData.cfd ?? []
 
   return {
     data: { ...baseData, crypto, forex, commodities, stocks, cfd: cfdArr },

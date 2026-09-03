@@ -233,7 +233,7 @@ function WalletAddressManager() {
 
   const saveAddress = async (id: string) => {
     setSaving(true)
-    await fetch("/api/deposit-addresses", {
+    await fetch("/api/admin/deposit-addresses", {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, address: editVal, memo: editMemo || null }),
     })
@@ -241,7 +241,7 @@ function WalletAddressManager() {
   }
 
   const toggleActive = async (id: string, active: boolean) => {
-    await fetch("/api/deposit-addresses", {
+    await fetch("/api/admin/deposit-addresses", {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, active: !active }),
     })
@@ -251,7 +251,7 @@ function WalletAddressManager() {
   const addNew = async () => {
     if (!newForm.symbol || !newForm.network || !newForm.address) return
     setAddLoading(true)
-    await fetch("/api/deposit-addresses", {
+    await fetch("/api/admin/deposit-addresses", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...newForm,

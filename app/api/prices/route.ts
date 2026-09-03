@@ -7,7 +7,38 @@ import { NextResponse } from "next/server"
  *   Commodities / Stocks / CFDs: Multiple free sources tried in order
  */
 
-// ─── Source 1: CoinCap v2 ───
+// ─── Primary source: Bybit public v5 market data ───
+const BYBIT_TICKER = "https://api.bybit.com/v5/market/tickers?category=spot"
+const BYBIT_SYMBOLS = [
+  { symbol: "BTCUSDT", base: "BTC", name: "Bitcoin" },
+  { symbol: "ETHUSDT", base: "ETH", name: "Ethereum" },
+  { symbol: "SOLUSDT", base: "SOL", name: "Solana" },
+  { symbol: "XRPUSDT", base: "XRP", name: "XRP" },
+  { symbol: "BNBUSDT", base: "BNB", name: "BNB" },
+  { symbol: "ADAUSDT", base: "ADA", name: "Cardano" },
+  { symbol: "DOGEUSDT", base: "DOGE", name: "Dogecoin" },
+  { symbol: "AVAXUSDT", base: "AVAX", name: "Avalanche" },
+  { symbol: "DOTUSDT", base: "DOT", name: "Polkadot" },
+  { symbol: "LINKUSDT", base: "LINK", name: "Chainlink" },
+]
+
+async function fetchBybit(): Promise<any[] | null> {
+  try {
+    const res = await fetch(BYBIT_TICKER, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(6000), cache: "no-store" })
+    if (!res.ok) return null
+    const json = await res.json()
+    const rows = json?.result?.list
+    if (!Array.isArray(rows)) return null
+    return rows.map((ticker: any) => {
+      const info = BYBIT_SYMBOLS.find((item) => item.symbol === ticker.symbol)
+      const price = Number(ticker.lastPrice)
+      const prev = Number(ticker.prevPrice24h)
+      return { id: info?.base?.toLowerCase() || ticker.symbol, symbol: info?.base || ticker.symbol.replace("USDT", ""), name: info?.name || ticker.symbol, price, change24h: Number(ticker.price24hPcnt || 0) * 100, volume: Number(ticker.turnover24h || 0), marketCap: 0, high24h: Number(ticker.highPrice24h || 0), low24h: Number(ticker.lowPrice24h || 0), sparkline: [], category: "crypto" }
+    }).filter((coin: any) => coin.price > 0)
+  } catch { return null }
+}
+
+// ─── Source 2: CoinCap v2 ───
 const COINCAP_URL = "https://api.coincap.io/v2/assets?limit=20"
 
 const COINCAP_MAP: Record<string, string> = {
@@ -312,25 +343,25 @@ export async function GET() {
     if (cachedCrypto && now - cacheTime < CACHE_TTL) {
       cryptoData = cachedCrypto
     } else {
-      const [coincapResult, binanceResult, geckoResult] = await Promise.allSettled([
-        fetchCoinCap(),
+      const [bybitResult, binanceResult, geckoResult] = await Promise.allSettled([
+        fetchBybit(),
         fetchBinance(),
         fetchCoinGecko(),
       ])
 
-      const coincapData = coincapResult.status === "fulfilled" ? coincapResult.value : null
+      const bybitData = bybitResult.status === "fulfilled" ? bybitResult.value : null
       const binanceData = binanceResult.status === "fulfilled" ? binanceResult.value : null
       const geckoData = geckoResult.status === "fulfilled" ? geckoResult.value : null
 
-      if (geckoData && geckoData.length > 0) {
-        cryptoData = geckoData
-        lastSource = "coingecko"
-      } else if (coincapData && coincapData.length > 0) {
-        cryptoData = coincapData
-        lastSource = "coincap"
+      if (bybitData && bybitData.length > 0) {
+        cryptoData = bybitData
+        lastSource = "bybit"
       } else if (binanceData && binanceData.length > 0) {
         cryptoData = binanceData
         lastSource = "binance"
+      } else if (geckoData && geckoData.length > 0) {
+        cryptoData = geckoData
+        lastSource = "coingecko"
       }
 
       if (cryptoData && cryptoData.length > 0) {
@@ -342,35 +373,16 @@ export async function GET() {
       }
     }
 
-    // Ultimate crypto fallback
+  // Do not synthesize market prices when all public sources are unavailable.
+  // The client renders an explicit empty/loading state instead of stale data.
     if (!cryptoData || cryptoData.length === 0) {
-      lastSource = "fallback"
-      const FB = [
-        { s: "BTC", n: "Bitcoin", p: 97842.50, v: 28.5e9, m: 1.92e12 },
-        { s: "ETH", n: "Ethereum", p: 3456.78, v: 14.2e9, m: 415e9 },
-        { s: "SOL", n: "Solana", p: 189.45, v: 3.8e9, m: 82e9 },
-        { s: "XRP", n: "XRP", p: 2.87, v: 5.1e9, m: 148e9 },
-        { s: "BNB", n: "BNB", p: 654.32, v: 1.9e9, m: 97e9 },
-        { s: "ADA", n: "Cardano", p: 0.9876, v: 1.2e9, m: 34e9 },
-        { s: "DOGE", n: "Dogecoin", p: 0.3245, v: 2.3e9, m: 47e9 },
-        { s: "AVAX", n: "Avalanche", p: 35.67, v: 890e6, m: 14e9 },
-        { s: "DOT", n: "Polkadot", p: 7.89, v: 560e6, m: 10.5e9 },
-        { s: "LINK", n: "Chainlink", p: 19.54, v: 780e6, m: 12.3e9 },
-      ]
-      cryptoData = FB.map((c) => {
-        const { price, change } = getDriftPrice(c.s, c.p)
-        return {
-          id: c.s.toLowerCase(), symbol: c.s, name: c.n, price, change24h: change,
-          volume: c.v, marketCap: c.m, high24h: price * 1.02, low24h: price * 0.98,
-          sparkline: Array.from({ length: 24 }, () => c.p * (0.99 + Math.random() * 0.02)),
-          category: "crypto",
-        }
-      })
+      cryptoData = []
+      lastSource = "unavailable"
     }
 
     // ── Forex: real rates from Frankfurter ──
     // ── Metals: real spot prices from metals.live ──
-    // ── Stocks & CFDs: real from Yahoo Finance ──
+    // ── Stocks & CFDs: real from Yahoo Finance ��─
     const allYahooSymbols = [
       ...COMMODITIES_META.map(s => s.yahooSymbol),
       ...STOCKS_META.map(s => s.yahooSymbol),
@@ -382,69 +394,30 @@ export async function GET() {
       fetchYahooQuotes(allYahooSymbols),
     ])
 
-    // Build forex data with real rates
-    const forexData = FOREX_BASE_PAIRS.map((p) => {
-      let basePrice = p.fallback
-      if (liveRates && liveRates[p.currency]) {
-        basePrice = p.isInverse ? 1 / liveRates[p.currency] : liveRates[p.currency]
-      }
-      const { price, change } = getDriftPrice(p.symbol, basePrice)
-      return {
-        id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name,
-        price, change24h: change, volume: Math.round(2e9 + Math.random() * 5e9),
-        marketCap: 0, high24h: price * 1.002, low24h: price * 0.998, category: "forex",
-      }
+    // Only expose values returned by the live providers. Never synthesize prices when a provider is unavailable.
+    const forexData = FOREX_BASE_PAIRS.flatMap((p) => {
+      const rate = liveRates?.[p.currency]
+      if (!rate || rate <= 0) return []
+      const price = p.isInverse ? 1 / rate : rate
+      return [{ id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name, price, change24h: 0, volume: 0, marketCap: 0, high24h: price, low24h: price, category: "forex" }]
     })
 
-    // Build commodity data with real Yahoo futures prices
-    const commodityData = COMMODITIES_META.map((p) => {
-      const yahoo = yahooData?.[p.yahooSymbol]
-      const basePrice = yahoo?.price ?? p.fallback
-      const changePercent = yahoo?.change ?? 0
-      const { price } = getDriftPrice(p.symbol, basePrice)
-      return {
-        id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name,
-        price, change24h: changePercent,
-        volume: yahoo?.volume ?? Math.round(5e8 + Math.random() * 2e9),
-        marketCap: 0,
-        high24h: yahoo?.high ?? price * 1.005,
-        low24h: yahoo?.low ?? price * 0.995,
-        category: "commodity",
-      }
+    const commodityData = COMMODITIES_META.flatMap((p) => {
+      const quote = yahooData?.[p.yahooSymbol]
+      if (!quote?.price || quote.price <= 0) return []
+      return [{ id: p.symbol.toLowerCase().replace("/", "-"), symbol: p.symbol, name: p.name, price: quote.price, change24h: quote.change ?? 0, volume: quote.volume ?? 0, marketCap: 0, high24h: quote.high ?? quote.price, low24h: quote.low ?? quote.price, category: "commodity" }]
     })
 
-    // Build stock data with real Yahoo prices
-    const stockData = STOCKS_META.map((p) => {
-      const yahoo = yahooData?.[p.yahooSymbol]
-      const basePrice = yahoo?.price ?? p.fallback
-      const changePercent = yahoo?.change ?? 0
-      const { price } = getDriftPrice(p.symbol, basePrice)
-      return {
-        id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name,
-        price, change24h: changePercent,
-        volume: yahoo?.volume ?? Math.round(1e8 + Math.random() * 5e8),
-        marketCap: Math.round(price * (1e9 + Math.random() * 2e9)),
-        high24h: yahoo?.high ?? price * 1.01,
-        low24h: yahoo?.low ?? price * 0.99,
-        category: "stock",
-      }
+    const stockData = STOCKS_META.flatMap((p) => {
+      const quote = yahooData?.[p.yahooSymbol]
+      if (!quote?.price || quote.price <= 0) return []
+      return [{ id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name, price: quote.price, change24h: quote.change ?? 0, volume: quote.volume ?? 0, marketCap: 0, high24h: quote.high ?? quote.price, low24h: quote.low ?? quote.price, category: "stock" }]
     })
 
-    // Build CFD data with real Yahoo index prices
-    const cfdData = CFDS_META.map((p) => {
-      const yahoo = yahooData?.[p.yahooSymbol]
-      const basePrice = yahoo?.price ?? p.fallback
-      const changePercent = yahoo?.change ?? 0
-      const { price } = getDriftPrice(p.symbol, basePrice)
-      return {
-        id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name,
-        price, change24h: changePercent,
-        volume: yahoo?.volume ?? Math.round(5e8 + Math.random() * 3e9),
-        marketCap: 0,
-        high24h: yahoo?.high ?? price * 1.005,
-        low24h: yahoo?.low ?? price * 0.995,
-        category: "cfd",
-      }
+    const cfdData = CFDS_META.flatMap((p) => {
+      const quote = yahooData?.[p.yahooSymbol]
+      if (!quote?.price || quote.price <= 0) return []
+      return [{ id: p.symbol.toLowerCase(), symbol: p.symbol, name: p.name, price: quote.price, change24h: quote.change ?? 0, volume: quote.volume ?? 0, marketCap: 0, high24h: quote.high ?? quote.price, low24h: quote.low ?? quote.price, category: "cfd" }]
     })
 
     console.log("[v0] Prices API: crypto source:", lastSource,
@@ -466,18 +439,14 @@ export async function GET() {
     })
   } catch (e) {
     console.error("Prices API top-level error:", e)
-    const emergency = [
-      { id: "btc", symbol: "BTC", name: "Bitcoin", price: 97842.50, change24h: 2.34, volume: 28.5e9, marketCap: 1.92e12, sparkline: [], category: "crypto" },
-      { id: "eth", symbol: "ETH", name: "Ethereum", price: 3456.78, change24h: 1.82, volume: 14.2e9, marketCap: 415e9, sparkline: [], category: "crypto" },
-    ]
     return NextResponse.json({
-      crypto: emergency,
-      forex: [{ id: "eur-usd", symbol: "EUR/USD", name: "EUR/USD", price: 1.0842, change24h: 0.12, volume: 5e9, marketCap: 0, category: "forex" }],
-      commodities: [{ id: "xau-usd", symbol: "XAU/USD", name: "Gold", price: 2924.5, change24h: 0.45, volume: 2e9, marketCap: 0, category: "commodity" }],
-      stocks: [{ id: "aapl", symbol: "AAPL", name: "Apple Inc.", price: 232.4, change24h: 0.78, volume: 5e8, marketCap: 3.5e12, category: "stock" }],
-      cfd: [{ id: "us500", symbol: "US500", name: "US 500", price: 5920, change24h: 0.34, volume: 2.5e9, marketCap: 0, category: "cfd" }],
-      source: "emergency",
+      crypto: [],
+      forex: [],
+      commodities: [],
+      stocks: [],
+      cfd: [],
+      source: "unavailable",
       timestamp: Date.now(),
-    })
+    }, { status: 503 })
   }
 }
