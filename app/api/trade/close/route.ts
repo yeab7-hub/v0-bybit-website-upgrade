@@ -72,9 +72,14 @@ export async function POST(request: NextRequest) {
   const closeTotal = currentPrice * qty
   const fee = closeTotal * 0.001
 
+  // Direction of the open position leg. A "buy" leg is LONG (profit when price rises),
+  // a "sell" leg is SHORT (profit when price falls).
+  const isShort = position.side === "sell"
+  const priceDelta = isShort ? entryPrice - currentPrice : currentPrice - entryPrice
+
   // Check for admin trade overrides (forced win/loss)
-  let pnl = (currentPrice - entryPrice) * qty - fee - Number(position.fee || 0)
-  let pnlPercent = entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0
+  let pnl = priceDelta * qty - fee - Number(position.fee || 0)
+  let pnlPercent = entryPrice > 0 ? (priceDelta / entryPrice) * 100 : 0
 
   // Look for active override for this user (pair-specific first, then global)
   const { data: overrides } = await adminSupabase
@@ -98,31 +103,37 @@ export async function POST(request: NextRequest) {
   }
 
 
-  // Update the position to closed
+  // Close the SINGLE existing position leg. We do NOT insert a second trade row —
+  // that caused double logging in Trade History. The original leg keeps its
+  // opening side and is stamped with the exit price and realized PnL.
   await adminSupabase.from("trades").update({
     status: "closed",
     close_price: currentPrice,
     closed_at: new Date().toISOString(),
+    fee: Number(position.fee || 0) + fee,
     pnl,
   }).eq("id", tradeId)
 
-  // Update balances: sell the base asset back, credit the quote asset
-  // Deduct base asset
-  const { data: bBal } = await adminSupabase
-    .from("balances")
-    .select("*")
-    .eq("user_id", position.user_id)
-    .eq("asset", baseAsset)
-    .single()
+  // Settle balances against the quote asset. For a LONG (buy) leg the base asset
+  // was credited on open, so release it back; for a SHORT (sell) leg no base was held.
+  if (!isShort) {
+    const { data: bBal } = await adminSupabase
+      .from("balances")
+      .select("*")
+      .eq("user_id", position.user_id)
+      .eq("asset", baseAsset)
+      .single()
 
-  if (bBal) {
-    await adminSupabase.from("balances").update({
-      available: Math.max(0, bBal.available - qty),
-      updated_at: new Date().toISOString(),
-    }).eq("user_id", position.user_id).eq("asset", baseAsset)
+    if (bBal) {
+      await adminSupabase.from("balances").update({
+        available: Math.max(0, bBal.available - qty),
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", position.user_id).eq("asset", baseAsset)
+    }
   }
 
-  // Credit quote asset (sale proceeds minus fee)
+  // Credit the quote asset with the returned margin plus realized PnL
+  // (entry notional + pnl; pnl is already direction-aware and net of fees).
   const { data: qBal } = await adminSupabase
     .from("balances")
     .select("*")
@@ -130,7 +141,6 @@ export async function POST(request: NextRequest) {
     .eq("asset", quoteAsset)
     .single()
 
-  // Credit quote asset: entry total + pnl (pnl can be negative for losses)
   const creditAmount = (entryPrice * qty) + pnl
   if (qBal) {
     await adminSupabase.from("balances").update({
@@ -139,27 +149,12 @@ export async function POST(request: NextRequest) {
     }).eq("user_id", position.user_id).eq("asset", quoteAsset)
   } else {
     await adminSupabase.from("balances").insert({
-      user_id: user.id,
+      user_id: position.user_id,
       asset: quoteAsset,
       available: Math.max(0, creditAmount),
       in_order: 0,
     })
   }
-
-  // Create a closing trade record
-  await adminSupabase.from("trades").insert({
-    user_id: user.id,
-    pair: position.pair,
-    side: "sell",
-    price: currentPrice,
-    amount: qty,
-    total: closeTotal,
-    fee,
-    pnl,
-    status: "closed",
-    close_price: currentPrice,
-    closed_at: new Date().toISOString(),
-  })
 
   return NextResponse.json({
     success: true,
