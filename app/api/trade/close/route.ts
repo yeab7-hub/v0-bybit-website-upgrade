@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
+import { TRADING_FEE_RATE } from "@/lib/trading-fees"
 
 async function getLivePrice(baseAsset: string): Promise<number> {
   // Try Binance
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
   const entryPrice = Number(position.price)
   const qty = Number(position.amount)
   const closeTotal = currentPrice * qty
-  const fee = closeTotal * 0.001
+  const fee = closeTotal * TRADING_FEE_RATE
 
   // Direction of the open position leg. A "buy" leg is LONG (profit when price rises),
   // a "sell" leg is SHORT (profit when price falls).

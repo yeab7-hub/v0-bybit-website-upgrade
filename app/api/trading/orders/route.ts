@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
+import { TRADING_FEE_RATE } from "@/lib/trading-fees"
 
 export async function GET() {
   const supabase = await createClient()
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     if (orderError) return NextResponse.json({ error: orderError.message }, { status: 500 })
 
-    const fee = total * 0.001
+    const fee = total * TRADING_FEE_RATE
 
     await adminSupabase.from("trades").insert({
       user_id: user.id,

@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { TRADING_FEE_RATE } from "@/lib/trading-fees"
 
 /**
  * GET /api/trade/fill
@@ -98,7 +99,7 @@ export async function GET() {
     if (!shouldFill) continue
 
     const total = fillPrice * remaining
-    const fee = total * 0.001
+    const fee = total * TRADING_FEE_RATE
 
     let pnl = 0
     if (order.side === "sell") {
@@ -145,7 +146,7 @@ export async function GET() {
     if (order.side === "buy") {
       const { data: qBal } = await adminSupabase.from("balances").select("*").eq("user_id", user.id).eq("asset", quoteAsset).single()
       if (qBal) {
-        const lockedAmount = order.price * remaining + (order.price * remaining * 0.001)
+        const lockedAmount = order.price * remaining + (order.price * remaining * TRADING_FEE_RATE)
         await adminSupabase.from("balances").update({
           in_order: Math.max(0, (qBal.in_order || 0) - lockedAmount),
           available: qBal.available + Math.max(0, (order.price - fillPrice) * remaining),
