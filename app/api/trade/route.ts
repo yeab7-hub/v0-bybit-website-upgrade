@@ -176,11 +176,14 @@ export async function POST(request: NextRequest) {
   const adminSupabase = await createAdminClient()
 
   const body = await request.json()
-  const { pair, side, order_type, price, stop_price, amount } = body
+  const { pair, side, order_type, price, stop_price, amount, take_profit, stop_loss } = body
 
   if (!pair || !side || !order_type || !amount || amount <= 0) {
     return NextResponse.json({ error: "Invalid order parameters" }, { status: 400 })
   }
+
+  const takeProfit = Number(take_profit) > 0 ? Number(take_profit) : null
+  const stopLoss = Number(stop_loss) > 0 ? Number(stop_loss) : null
 
   const baseAsset = pair.split("/")[0]
   const quoteAsset = pair.split("/")[1] || "USDT"
@@ -301,13 +304,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert trade record -- buy = open position, sell = closed position
-    await adminSupabase.from("trades").insert({
+    const { data: insertedTrade } = await adminSupabase.from("trades").insert({
       user_id: user.id, order_id: order.id, pair, side,
       price: execPrice, amount, total, fee, pnl,
       status: side === "buy" ? "open" : "closed",
       close_price: side === "sell" ? execPrice : null,
       closed_at: side === "sell" ? new Date().toISOString() : null,
-    })
+    }).select("id").single()
+
+    // Attach TP/SL to the freshly opened long position. Done as a best-effort
+    // separate update so that, if the take_profit/stop_loss columns have not
+    // been migrated yet, the core trade still succeeds instead of erroring out.
+    if (side === "buy" && insertedTrade?.id && (takeProfit || stopLoss)) {
+      try {
+        await adminSupabase.from("trades").update({
+          take_profit: takeProfit,
+          stop_loss: stopLoss,
+        }).eq("id", insertedTrade.id)
+      } catch { /* columns not migrated yet -- ignore */ }
+    }
 
     // Update balances
     if (side === "buy") {

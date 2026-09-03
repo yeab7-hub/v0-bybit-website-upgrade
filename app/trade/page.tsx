@@ -45,7 +45,9 @@ export default function TradePage() {
   const [marginEnabled, setMarginEnabled] = useState(false)
   const [postOnly, setPostOnly] = useState(false)
   const [reduceOnly, setReduceOnly] = useState(false)
-  const [tpsl, setTpsl] = useState("")
+  const [tpslEnabled, setTpslEnabled] = useState(false)
+  const [takeProfit, setTakeProfit] = useState("")
+  const [stopLoss, setStopLoss] = useState("")
   const [leverage, setLeverage] = useState("10x")
   const [marginType, setMarginType] = useState("Cross")
 
@@ -126,6 +128,25 @@ export default function TradePage() {
     return () => clearInterval(iv)
   }, [orders.length])
 
+  // Watch open positions against their TP/SL thresholds; auto-close on cross.
+  useEffect(() => {
+    if (positions.length === 0) return
+    const checkTpSl = async () => {
+      try {
+        const res = await fetch("/api/trade/monitor")
+        const data = await res.json()
+        if (data.closed > 0) {
+          globalMutate("/api/trade?type=positions")
+          globalMutate("/api/trade?type=history")
+          globalMutate("/api/trade?type=balances")
+        }
+      } catch { /* ignore */ }
+    }
+    checkTpSl()
+    const iv = setInterval(checkTpSl, 5000)
+    return () => clearInterval(iv)
+  }, [positions.length])
+
   const handleSubmit = async () => {
     if (!user) { setFeedback({ type: "error", msg: "Please log in to trade" }); return }
     if (parsedAmount <= 0) { setFeedback({ type: "error", msg: "Enter a valid amount" }); return }
@@ -140,12 +161,14 @@ export default function TradePage() {
           order_type: orderType === "Market" ? "market" : "limit",
           price: orderType !== "Market" ? parseFloat(price.replace(/,/g, "")) : undefined,
           amount: parsedAmount,
+          take_profit: tpslEnabled ? parseFloat(takeProfit.replace(/,/g, "")) || undefined : undefined,
+          stop_loss: tpslEnabled ? parseFloat(stopLoss.replace(/,/g, "")) || undefined : undefined,
         }),
       })
       const data = await res.json()
       if (data.success) {
         setFeedback({ type: "success", msg: data.message })
-        setAmount(""); setSliderPct(0)
+        setAmount(""); setSliderPct(0); setTakeProfit(""); setStopLoss("")
         globalMutate("/api/trade?type=balances")
         globalMutate("/api/trade?type=orders")
         globalMutate("/api/trade?type=positions")
@@ -416,10 +439,46 @@ export default function TradePage() {
       </div>
 
       {/* TP/SL */}
-      <label className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-        <input type="checkbox" className="h-3.5 w-3.5 rounded border-border accent-foreground" />
+      <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={tpslEnabled}
+          onChange={(e) => setTpslEnabled(e.target.checked)}
+          className="h-3.5 w-3.5 rounded border-border accent-foreground"
+        />
         TP/SL
       </label>
+      {tpslEnabled && (
+        <div className="mb-3 flex flex-col gap-2">
+          <div className="flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2">
+            <span className="text-xs text-success">Take Profit</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={takeProfit}
+              onChange={(e) => setTakeProfit(e.target.value)}
+              placeholder="0.00"
+              className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
+            />
+            <span className="ml-2 text-xs text-muted-foreground">{quoteAsset}</span>
+          </div>
+          <div className="flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2">
+            <span className="text-xs text-destructive">Stop Loss</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={stopLoss}
+              onChange={(e) => setStopLoss(e.target.value)}
+              placeholder="0.00"
+              className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
+            />
+            <span className="ml-2 text-xs text-muted-foreground">{quoteAsset}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Applies to positions opened by a Market buy. Closes automatically when the mark price crosses your level.
+          </p>
+        </div>
+      )}
 
       {/* Post-Only + Reduce-Only + GTC */}
       <div className="mb-3 flex flex-col gap-1.5">
@@ -604,9 +663,14 @@ export default function TradePage() {
                       </div>
                     </div>
                     {/* Live price bar */}
-                    <div className="mt-1.5 flex items-center gap-3 text-[9px] text-muted-foreground">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[9px] text-muted-foreground">
                       <span>Mark: ${curPrice.toLocaleString()}</span>
-                      <span>Liq: --</span>
+                      {Number(pos.take_profit) > 0 && (
+                        <span className="text-success">TP: ${Number(pos.take_profit).toLocaleString()}</span>
+                      )}
+                      {Number(pos.stop_loss) > 0 && (
+                        <span className="text-destructive">SL: ${Number(pos.stop_loss).toLocaleString()}</span>
+                      )}
                       <span>{new Date(pos.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
