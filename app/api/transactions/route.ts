@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 import { notifyAdmin } from "@/lib/notify-admin"
+import { renderDepositEmail, renderWithdrawalEmail, sendBrandedEmail } from "@/lib/email/templates"
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -67,11 +68,19 @@ export async function POST(request: NextRequest) {
     if (error) return NextResponse.json({ error: "Could not queue deposit for review" }, { status: 500 })
 
     notifyAdmin({
-      subject: `New Deposit Request - ${amount} ${asset}`,
+      subject: `New Deposit Request - ${amountNum} ${assetName}`,
       event: "Deposit Request",
       userEmail: user.email || "unknown",
-      details: { Asset: asset, Amount: amount, Network: network || "N/A", TX_Hash: tx_hash || "N/A", Status: "Pending Approval" },
+      details: { Asset: assetName, Amount: amountNum, Network: networkName || "N/A", TX_Hash: txHash || "N/A", Status: "Pending Approval" },
     }).catch(() => {})
+
+    if (user.email) {
+      sendBrandedEmail({
+        to: user.email,
+        subject: `Deposit Received - ${amountNum} ${assetName} - Bybit`,
+        html: renderDepositEmail({ status: "pending", amount: String(amountNum), asset: assetName, network: networkName }),
+      }).catch(() => {})
+    }
 
     return NextResponse.json(data)
   }
@@ -124,6 +133,14 @@ export async function POST(request: NextRequest) {
       userEmail: user.email || "unknown",
       details: { Asset: asset, Amount: amountNum, Network: network || "N/A", Address: address || "N/A", Status: "Pending Approval" },
     }).catch(() => {})
+
+    if (user.email) {
+      sendBrandedEmail({
+        to: user.email,
+        subject: `Withdrawal Request Received - ${amountNum} ${asset} - Bybit`,
+        html: renderWithdrawalEmail({ status: "pending", amount: String(amountNum), asset, address }),
+      }).catch(() => {})
+    }
 
     return NextResponse.json(data)
   }
