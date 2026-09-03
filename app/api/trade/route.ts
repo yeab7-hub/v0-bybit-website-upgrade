@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
 import { notifyAdmin } from "@/lib/notify-admin"
+import { TRADING_FEE_RATE } from "@/lib/trading-fees"
 
 /* ---------- helpers ---------- */
 // Non-crypto assets that use our internal prices API
@@ -231,7 +232,7 @@ export async function POST(request: NextRequest) {
   }
 
   const total = execPrice * amount
-  const fee = total * 0.001
+  const fee = total * TRADING_FEE_RATE
 
   /* Check balance */
   if (side === "buy") {
@@ -381,8 +382,8 @@ export async function POST(request: NextRequest) {
   if (side === "buy") {
     const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
     await adminSupabase.from("balances").update({
-      available: Math.max(0, qBal.available - lockTotal - (lockTotal * 0.001)),
-      in_order: (qBal.in_order || 0) + lockTotal + (lockTotal * 0.001),
+      available: Math.max(0, qBal.available - lockTotal - (lockTotal * TRADING_FEE_RATE)),
+      in_order: (qBal.in_order || 0) + lockTotal + (lockTotal * TRADING_FEE_RATE),
       updated_at: new Date().toISOString()
     }).eq("user_id", user.id).eq("asset", quoteAsset)
   } else {
@@ -426,7 +427,7 @@ export async function DELETE(request: NextRequest) {
 
   // Unlock balance
   if (order.side === "buy") {
-    const locked = order.price * remaining + (order.price * remaining * 0.001)
+    const locked = order.price * remaining + (order.price * remaining * TRADING_FEE_RATE)
     const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
     await adminSupabase.from("balances").update({
       available: qBal.available + locked,

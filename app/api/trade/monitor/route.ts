@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { TRADING_FEE_RATE } from "@/lib/trading-fees"
 
 /**
  * GET /api/trade/monitor
@@ -119,7 +120,7 @@ export async function GET() {
     const entryPrice = Number(position.price)
     const qty = Number(position.amount)
     const closeTotal = triggerPrice * qty
-    const fee = closeTotal * 0.001
+    const fee = closeTotal * TRADING_FEE_RATE
 
     // Direction-aware realized PnL at the TP/SL target, net of both legs' fees.
     const priceDelta = isShort ? entryPrice - triggerPrice : triggerPrice - entryPrice
