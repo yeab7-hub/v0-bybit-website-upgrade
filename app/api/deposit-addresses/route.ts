@@ -7,7 +7,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("deposit_addresses")
     .select("*")
-    .eq("active", true)
+    .eq("is_active", true)
     .order("symbol")
     .order("network")
 
@@ -55,7 +55,7 @@ export async function PUT(request: NextRequest) {
   if (network !== undefined) updates.network = network
   if (min_deposit !== undefined) updates.min_deposit = min_deposit
   if (confirmations !== undefined) updates.confirmations = confirmations
-  if (active !== undefined) updates.active = active
+  if (active !== undefined) updates.is_active = active
   updates.updated_at = new Date().toISOString()
 
   const { error } = await supabase.from("deposit_addresses").update(updates).eq("id", id)
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase.from("deposit_addresses").insert({
     symbol, name: name || symbol, network, address, memo: memo || null,
-    min_deposit: min_deposit || 0.01, confirmations: confirmations || 12, active: true,
+    min_deposit: min_deposit || 0.01, confirmations: confirmations || 12, is_active: true,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
