@@ -1,79 +1,83 @@
-import { createClient } from "@/lib/supabase/server"
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
-const STABLE = new Set(["USDT", "USDC"])
+export async function POST(request: Request) {
+  try {
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value;
+          },
+        },
+      }
+    );
 
-// GET: return the user's recent conversion history
-export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const { data, error } = await supabase
-    .from("conversions")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(10)
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ conversions: data ?? [] })
-}
-
-// POST: execute a conversion from one asset to another
-export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const body = await request.json()
-  const { from_asset, to_asset, amount } = body
-
-  if (!from_asset || !to_asset || !amount || amount <= 0) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 })
-  }
-  if (from_asset === to_asset) {
-    return NextResponse.json({ error: "Cannot convert an asset to itself" }, { status: 400 })
-  }
-
-  // Fetch authoritative live prices server-side -- never trust a rate
-  // sent from the client, since it could be tampered with.
-  const origin = request.nextUrl.origin
-  let fromPrice = STABLE.has(from_asset) ? 1 : null
-  let toPrice = STABLE.has(to_asset) ? 1 : null
-
-  if (fromPrice === null || toPrice === null) {
-    try {
-      const priceRes = await fetch(`${origin}/api/prices`, { cache: "no-store" })
-      const priceData = await priceRes.json()
-      const all = [...(priceData.crypto ?? [])]
-      if (fromPrice === null) fromPrice = all.find((c: any) => c.symbol === from_asset)?.price ?? null
-      if (toPrice === null) toPrice = all.find((c: any) => c.symbol === to_asset)?.price ?? null
-    } catch {
-      return NextResponse.json({ error: "Could not fetch live prices, try again" }, { status: 502 })
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { fromCoin, toCoin, fromAmount, toAmount, rate } = await request.json();
+
+    if (!fromCoin || !toCoin || !fromAmount || !toAmount) {
+      return NextResponse.json({ error: 'Missing required conversion parameters' }, { status: 400 });
+    }
+
+    // 1. Fetch user's current balances
+    const { data: balances, error: balanceError } = await supabase
+      .from('user_balances')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (balanceError) {
+      return NextResponse.json({ error: 'Failed to fetch balances' }, { status: 500 });
+    }
+
+    const fromBalance = balances?.find((b) => b.coin === fromCoin)?.balance || 0;
+
+    if (fromBalance < fromAmount) {
+      return NextResponse.json({ error: `Insufficient ${fromCoin} balance` }, { status: 400 });
+    }
+
+    // 2. Perform balance deduction and addition (Transaction logic)
+    // Deduct fromCoin
+    const newFromBalance = fromBalance - fromAmount;
+    await supabase
+      .from('user_balances')
+      .upsert({ user_id: user.id, coin: fromCoin, balance: newFromBalance }, { onConflict: 'user_id,coin' });
+
+    // Add toCoin
+    const existingToBalance = balances?.find((b) => b.coin === toCoin)?.balance || 0;
+    const newToBalance = existingToBalance + toAmount;
+    await supabase
+      .from('user_balances')
+      .upsert({ user_id: user.id, coin: toCoin, balance: newToBalance }, { onConflict: 'user_id,coin' });
+
+    // 3. Record the transaction history
+    await supabase.from('transactions').insert({
+      user_id: user.id,
+      type: 'CONVERT',
+      details: `Converted ${fromAmount} ${fromCoin} to ${toAmount} ${toCoin} at rate ${rate}`,
+      amount: fromAmount,
+      currency: fromCoin,
+      status: 'COMPLETED',
+    });
+
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Conversion successful',
+      newBalances: {
+        [fromCoin]: newFromBalance,
+        [toCoin]: newToBalance
+      }
+    });
+
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
-
-  if (!fromPrice || !toPrice) {
-    return NextResponse.json({ error: "Price unavailable for one of the selected assets" }, { status: 400 })
-  }
-
-  const rate = fromPrice / toPrice
-  const toAmount = Number(amount) * rate
-
-  const { error } = await supabase.rpc("perform_conversion", {
-    p_user_id: user.id,
-    p_from_asset: from_asset,
-    p_to_asset: to_asset,
-    p_from_amount: Number(amount),
-    p_to_amount: toAmount,
-    p_rate: rate,
-  })
-
-  if (error) {
-    const msg = error.message.includes("Insufficient balance") ? "Insufficient balance" : error.message
-    return NextResponse.json({ error: msg }, { status: 400 })
-  }
-
-  return NextResponse.json({ success: true, to_amount: toAmount, rate })
 }
