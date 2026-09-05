@@ -45,10 +45,10 @@ export async function POST(request: NextRequest) {
 
     const { data: destination, error: destinationError } = await supabase
       .from("deposit_addresses")
-      .select("symbol, network, active, min_deposit")
+      .select("symbol, network, is_active, min_deposit")
       .eq("symbol", assetName)
       .eq("network", networkName)
-      .eq("active", true)
+      .eq("is_active", true)
       .maybeSingle()
     if (destinationError) return NextResponse.json({ error: "Deposit routing is unavailable. Please try again later." }, { status: 503 })
     if (!destination) return NextResponse.json({ error: "This deposit asset/network is not currently available" }, { status: 400 })

@@ -55,7 +55,7 @@ export async function PUT(request: NextRequest) {
   if (network !== undefined) updates.network = network
   if (min_deposit !== undefined) updates.min_deposit = min_deposit
   if (confirmations !== undefined) updates.confirmations = confirmations
-  if (is_active !== undefined) updates.is_active = is_active
+  if (active !== undefined) updates.is_active = active
   updates.updated_at = new Date().toISOString()
 
   // Use the service-role client for the write so both admin and super_admin
