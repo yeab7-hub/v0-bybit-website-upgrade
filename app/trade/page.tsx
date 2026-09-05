@@ -34,6 +34,7 @@ export default function TradePage() {
   const [orderType, setOrderType] = useState<OrderType>("Limit")
   const [price, setPrice] = useState("")
   const [amount, setAmount] = useState("")
+  const [qtyMode, setQtyMode] = useState<"base" | "quote">("base")
   const [sliderPct, setSliderPct] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null)
@@ -96,11 +97,42 @@ export default function TradePage() {
 
   const effectivePrice = orderType === "Market" ? livePrice : parseFloat(price.replace(/,/g, "")) || 0
   const parsedAmount = parseFloat(amount) || 0
-  const total = effectivePrice * parsedAmount
+  // The amount field can be entered in the base asset (BTC) or the quote
+  // asset (USDT). baseQty is always the true order quantity in the base
+  // asset -- everything downstream (total, submission, max-sell) uses this.
+  const baseQty = qtyMode === "quote" ? (effectivePrice > 0 ? parsedAmount / effectivePrice : 0) : parsedAmount
+  const total = effectivePrice * baseQty
   const maxSell = side === "sell" ? baseBalance : (effectivePrice > 0 ? quoteBalance / effectivePrice : 0)
+
+  // Only digits and a single decimal point are ever allowed into a
+  // quantity/price field -- strips anything else as the user types.
+  const sanitizeNumeric = (raw: string) => {
+    let cleaned = raw.replace(/[^0-9.]/g, "")
+    const firstDot = cleaned.indexOf(".")
+    if (firstDot !== -1) {
+      cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "")
+    }
+    return cleaned
+  }
+
+  const handleAmountChange = (raw: string) => {
+    setAmount(sanitizeNumeric(raw))
+    setSliderPct(0)
+  }
+
+  const toggleQtyMode = () => {
+    // Convert whatever is currently in the box to the other unit so the
+    // number shown stays a meaningful, equivalent amount after switching.
+    if (effectivePrice > 0 && parsedAmount > 0) {
+      const converted = qtyMode === "base" ? parsedAmount * effectivePrice : parsedAmount / effectivePrice
+      setAmount(converted.toFixed(qtyMode === "base" ? 2 : 6))
+    }
+    setQtyMode((m) => (m === "base" ? "quote" : "base"))
+  }
 
   const handleSlider = useCallback((pct: number) => {
     setSliderPct(pct)
+    setQtyMode("base")
     if (pct === 0) { setAmount(""); return }
     if (side === "buy" && effectivePrice > 0) {
       setAmount(((quoteBalance * pct / 100) / effectivePrice).toFixed(6))
@@ -149,7 +181,7 @@ export default function TradePage() {
 
   const handleSubmit = async () => {
     if (!user) { setFeedback({ type: "error", msg: "Please log in to trade" }); return }
-    if (parsedAmount <= 0) { setFeedback({ type: "error", msg: "Enter a valid amount" }); return }
+    if (baseQty <= 0) { setFeedback({ type: "error", msg: "Enter a valid amount" }); return }
     setSubmitting(true)
     setFeedback(null)
     try {
@@ -160,7 +192,7 @@ export default function TradePage() {
           pair: pairDisplay, side,
           order_type: orderType === "Market" ? "market" : "limit",
           price: orderType !== "Market" ? parseFloat(price.replace(/,/g, "")) : undefined,
-          amount: parsedAmount,
+          amount: baseQty,
           take_profit: tpslEnabled ? parseFloat(takeProfit.replace(/,/g, "")) || undefined : undefined,
           stop_loss: tpslEnabled ? parseFloat(stopLoss.replace(/,/g, "")) || undefined : undefined,
         }),
@@ -288,7 +320,7 @@ export default function TradePage() {
       )}
       <div className="flex items-center justify-between px-2 py-1">
         <span className="text-[10px] text-muted-foreground">Price ({quoteAsset})</span>
-        <span className="text-[10px] text-muted-foreground">Quantity ({baseAsset})</span>
+        <span className="text-[10px] text-muted-foreground">Quantity ({qtyMode === "base" ? baseAsset : quoteAsset})</span>
       </div>
       {/* Asks (sells) - reversed so lowest ask is at bottom */}
       <div className="flex flex-col-reverse">
@@ -388,8 +420,9 @@ export default function TradePage() {
         <span className="text-xs text-muted-foreground">Price</span>
         <input
           type="text"
+          inputMode="decimal"
           value={orderType === "Market" ? "Market" : price}
-          onChange={(e) => setPrice(e.target.value)}
+          onChange={(e) => setPrice(sanitizeNumeric(e.target.value))}
           readOnly={orderType === "Market"}
           className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none"
         />
@@ -400,16 +433,28 @@ export default function TradePage() {
       <div className="mb-3 flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
         <span className="text-xs text-muted-foreground">Quantity</span>
         <input
-          type="text" value={amount}
-          onChange={(e) => { setAmount(e.target.value); setSliderPct(0) }}
+          type="text"
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => handleAmountChange(e.target.value)}
           placeholder="0.000"
           className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
         />
-        <span className="ml-2 flex items-center gap-1 text-xs text-muted-foreground">
-          {baseAsset}
+        <button
+          type="button"
+          onClick={toggleQtyMode}
+          className="ml-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          title="Switch quantity unit"
+        >
+          {qtyMode === "base" ? baseAsset : quoteAsset}
           <ArrowUpDown className="h-3 w-3" />
-        </span>
+        </button>
       </div>
+      {qtyMode === "quote" && effectivePrice > 0 && parsedAmount > 0 && (
+        <p className="-mt-2 mb-3 text-right text-[10px] text-muted-foreground">
+          ≈ {(parsedAmount / effectivePrice).toFixed(6)} {baseAsset}
+        </p>
+      )}
 
       {/* Percentage slider */}
       <div className="mb-3 flex items-center gap-0">
@@ -460,7 +505,7 @@ export default function TradePage() {
               type="text"
               inputMode="decimal"
               value={takeProfit}
-              onChange={(e) => setTakeProfit(e.target.value)}
+              onChange={(e) => setTakeProfit(sanitizeNumeric(e.target.value))}
               placeholder="0.00"
               className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
             />
@@ -472,7 +517,7 @@ export default function TradePage() {
               type="text"
               inputMode="decimal"
               value={stopLoss}
-              onChange={(e) => setStopLoss(e.target.value)}
+              onChange={(e) => setStopLoss(sanitizeNumeric(e.target.value))}
               placeholder="0.00"
               className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
             />
@@ -517,14 +562,14 @@ export default function TradePage() {
         <div className="flex flex-col gap-2">
           <button
             onClick={() => { setSide("buy"); handleSubmit() }}
-            disabled={submitting || !parsedAmount}
+            disabled={submitting || !baseQty}
             className="w-full rounded-lg bg-success py-3.5 text-sm font-bold text-[#0a0e17] transition-colors disabled:opacity-40"
           >
             {submitting && side === "buy" ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Long"}
           </button>
           <button
             onClick={() => { setSide("sell"); handleSubmit() }}
-            disabled={submitting || !parsedAmount}
+            disabled={submitting || !baseQty}
             className="w-full rounded-lg bg-destructive py-3.5 text-sm font-bold text-white transition-colors disabled:opacity-40"
           >
             {submitting && side === "sell" ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Short"}
@@ -533,7 +578,7 @@ export default function TradePage() {
       ) : (
         <button
           onClick={handleSubmit}
-          disabled={submitting || !parsedAmount}
+          disabled={submitting || !baseQty}
           className={`w-full rounded-lg py-3.5 text-sm font-semibold transition-colors disabled:opacity-40 ${isBuy ? "bg-success text-[#0a0e17]" : "bg-destructive text-white"}`}
         >
           {submitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : (isBuy ? `Buy ${baseAsset}` : `Sell ${baseAsset}`)}
