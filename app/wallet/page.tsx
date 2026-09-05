@@ -178,18 +178,27 @@ export default function WalletPage() {
               {/* Action Buttons - circular icons like Bybit */}
               <div className="mb-6 flex items-center justify-around">
                 {[
-                  { label: "Deposit", icon: ArrowDownLeft, tab: "deposit" as Tab, active: true },
-                  { label: "Withdraw", icon: ArrowUpRight, tab: "withdraw" as Tab, active: false },
-                  { label: "Transfer", icon: ArrowLeftRight, tab: "transfer" as Tab, active: false },
-                  { label: "Convert", icon: RefreshCw, tab: "overview" as Tab, active: false },
-                ].map((a) => (
-                  <button key={a.label} onClick={() => setTab(a.tab)} className="flex flex-col items-center gap-1.5">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-full ${a.active ? "bg-[#f7a600]" : "bg-secondary"}`}>
-                      <a.icon className={`h-5 w-5 ${a.active ? "text-[#0a0e17]" : "text-foreground"}`} />
-                    </div>
-                    <span className="text-xs text-muted-foreground">{a.label}</span>
-                  </button>
-                ))}
+                  { label: "Deposit", icon: ArrowDownLeft, tab: "deposit" as Tab, active: true, href: null },
+                  { label: "Withdraw", icon: ArrowUpRight, tab: "withdraw" as Tab, active: false, href: null },
+                  { label: "Transfer", icon: ArrowLeftRight, tab: "transfer" as Tab, active: false, href: null },
+                  { label: "Convert", icon: RefreshCw, tab: null, active: false, href: "/convert" },
+                ].map((a) =>
+                  a.href ? (
+                    <Link key={a.label} href={a.href} className="flex flex-col items-center gap-1.5">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
+                        <a.icon className="h-5 w-5 text-foreground" />
+                      </div>
+                      <span className="text-[11px] font-medium text-muted-foreground">{a.label}</span>
+                    </Link>
+                  ) : (
+                    <button key={a.label} onClick={() => setTab(a.tab as Tab)} className="flex flex-col items-center gap-1.5">
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-full ${a.active ? "bg-[#f7a600]" : "bg-secondary"}`}>
+                        <a.icon className={`h-5 w-5 ${a.active ? "text-[#0a0e17]" : "text-foreground"}`} />
+                      </div>
+                      <span className="text-xs text-muted-foreground">{a.label}</span>
+                    </button>
+                  )
+                )}
               </div>
 
               {/* Referral Banner */}
