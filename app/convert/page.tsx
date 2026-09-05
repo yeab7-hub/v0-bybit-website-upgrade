@@ -10,7 +10,6 @@ import { toast } from 'sonner';
 
 const COINS = ['USDT', 'BTC', 'ETH', 'SOL', 'XRP'];
 
-// Mock exchange rates relative to USDT
 const MOCK_RATES: Record<string, number> = {
   USDT: 1,
   BTC: 65000,
@@ -26,14 +25,12 @@ export default function ConvertPage() {
   const [loading, setLoading] = useState(false);
   const [balances, setBalances] = useState<Record<string, number>>({});
 
-  // Fetch balances on load
   useEffect(() => {
     async function fetchBalances() {
       try {
         const res = await fetch('/api/trading/balances');
         if (res.ok) {
           const data = await res.json();
-          // Map balances array/object depending on your backend response format
           const map: Record<string, number> = {};
           data.balances?.forEach((b: any) => {
             map[b.coin] = b.balance;
@@ -47,14 +44,11 @@ export default function ConvertPage() {
     fetchBalances();
   }, []);
 
-  // Calculate output amount based on mock/live rates
   const calculateReceiveAmount = () => {
     const amt = parseFloat(fromAmount) || 0;
     if (amt === 0) return '0.00';
     const fromRate = MOCK_RATES[fromCoin] || 1;
     const toRate = MOCK_RATES[toCoin] || 1;
-    
-    // (Amount * USD value of source) / USD value of target
     const result = (amt * fromRate) / toRate;
     return result.toFixed(6);
   };
@@ -103,28 +97,29 @@ export default function ConvertPage() {
   };
 
   return (
-    <div className="container max-w-lg mx-auto py-12 px-4">
-      <Card className="border-border bg-card shadow-xl">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold">Convert Assets</CardTitle>
+    <div className="container max-w-lg mx-auto py-6 px-3 sm:px-4 w-full">
+      <Card className="border-border bg-card shadow-xl w-full">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg sm:text-xl font-bold">Convert Assets</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 sm:space-y-6">
           {/* From Section */}
-          <div className="space-y-2 p-4 rounded-xl bg-background border border-border">
-            <div className="flex justify-between text-sm text-muted-foreground">
+          <div className="space-y-2 p-3 sm:p-4 rounded-xl bg-background border border-border">
+            <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
               <span>You Pay</span>
-              <span>Balance: {balances[fromCoin] ?? '0.00'} {fromCoin}</span>
+              <span className="truncate max-w-[150px] sm:max-w-none">Balance: {balances[fromCoin] ?? '0.00'} {fromCoin}</span>
             </div>
-            <div className="flex gap-4 items-center">
+            <div className="flex gap-2 sm:gap-4 items-center">
               <Input
                 type="number"
+                inputMode="decimal"
                 placeholder="0.00"
                 value={fromAmount}
                 onChange={(e) => setFromAmount(e.target.value)}
-                className="text-2xl font-semibold border-none bg-transparent focus-visible:ring-0 p-0 shadow-none"
+                className="text-xl sm:text-2xl font-semibold border-none bg-transparent focus-visible:ring-0 p-0 shadow-none w-full"
               />
               <Select value={fromCoin} onValueChange={setFromCoin}>
-                <SelectTrigger className="w-[110px]">
+                <SelectTrigger className="w-[100px] sm:w-[110px] shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -139,29 +134,29 @@ export default function ConvertPage() {
           </div>
 
           {/* Swap Button */}
-          <div className="flex justify-center -my-3 relative z-10">
+          <div className="flex justify-center -my-2 sm:-my-3 relative z-10">
             <Button
               variant="outline"
               size="icon"
               onClick={handleSwapCoins}
-              className="rounded-full shadow-md bg-background hover:bg-muted"
+              className="rounded-full shadow-md bg-background hover:bg-muted h-10 w-10"
             >
               <DownUpIcon />
             </Button>
           </div>
 
           {/* To Section */}
-          <div className="space-y-2 p-4 rounded-xl bg-background border border-border">
-            <div className="flex justify-between text-sm text-muted-foreground">
+          <div className="space-y-2 p-3 sm:p-4 rounded-xl bg-background border border-border">
+            <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
               <span>You Receive (Estimated)</span>
-              <span>Balance: {balances[toCoin] ?? '0.00'} {toCoin}</span>
+              <span className="truncate max-w-[150px] sm:max-w-none">Balance: {balances[toCoin] ?? '0.00'} {toCoin}</span>
             </div>
-            <div className="flex gap-4 items-center">
-              <div className="text-2xl font-semibold text-primary w-full overflow-hidden text-ellipsis">
+            <div className="flex gap-2 sm:gap-4 items-center">
+              <div className="text-xl sm:text-2xl font-semibold text-primary w-full overflow-hidden text-ellipsis">
                 {calculateReceiveAmount()}
               </div>
               <Select value={toCoin} onValueChange={setToCoin}>
-                <SelectTrigger className="w-[110px]">
+                <SelectTrigger className="w-[100px] sm:w-[110px] shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -177,7 +172,7 @@ export default function ConvertPage() {
 
           {/* Action Button */}
           <Button 
-            className="w-full py-6 text-lg font-medium" 
+            className="w-full py-5 sm:py-6 text-base sm:text-lg font-medium" 
             onClick={handleConvert}
             disabled={loading}
           >
