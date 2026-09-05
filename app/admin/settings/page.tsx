@@ -240,10 +240,10 @@ function WalletAddressManager() {
     setEditing(null); mutate(); setSaving(false)
   }
 
-  const toggleActive = async (id: string, active: boolean) => {
+  const toggleActive = async (id: string, isActive: boolean) => {
     await fetch("/api/admin/deposit-addresses", {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, active: !active }),
+      body: JSON.stringify({ id, is_active: !isActive }),
     })
     mutate()
   }

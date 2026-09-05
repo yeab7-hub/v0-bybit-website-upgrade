@@ -55,6 +55,21 @@ async function getLivePrice(baseAsset: string): Promise<number> {
   return 0
 }
 
+// Attach profile info manually. The trades/orders tables reference auth.users,
+// not public.profiles, so PostgREST cannot embed a profiles(...) join -- doing
+// so throws and returns no rows. We look profiles up by id and merge in code.
+async function enrichProfiles(supabase: any, rows: any[]) {
+  if (!rows || rows.length === 0) return rows ?? []
+  const ids = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean)))
+  if (ids.length === 0) return rows
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, email, full_name")
+    .in("id", ids)
+  const map = new Map((profiles ?? []).map((p: any) => [p.id, { email: p.email, full_name: p.full_name }]))
+  return rows.map((r) => ({ ...r, profiles: map.get(r.user_id) ?? null }))
+}
+
 async function ensureBalance(supabase: any, userId: string, asset: string) {
   const { data } = await supabase.from("balances").select("*").eq("user_id", userId).eq("asset", asset).single()
   if (data) return data
@@ -82,7 +97,7 @@ export async function GET(request: NextRequest) {
   if (type === "orders") {
     let query = adminSupabase
       .from("orders")
-      .select("*, profiles(email, full_name)")
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(200)
 
@@ -90,7 +105,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    let results = data ?? []
+    let results = await enrichProfiles(adminSupabase, data ?? [])
     if (search) {
       const s = search.toLowerCase()
       results = results.filter((o: any) =>
@@ -105,7 +120,7 @@ export async function GET(request: NextRequest) {
   // Default: trades
   let query = adminSupabase
     .from("trades")
-    .select("*, profiles(email, full_name)")
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(200)
 
@@ -113,7 +128,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  let results = data ?? []
+  let results = await enrichProfiles(adminSupabase, data ?? [])
   if (search) {
     const s = search.toLowerCase()
     results = results.filter((t: any) =>
