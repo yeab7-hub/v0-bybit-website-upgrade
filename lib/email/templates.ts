@@ -1,14 +1,16 @@
 import { Resend } from "resend"
 
 /**
- * Centralized, reusable Bybit-branded transactional email system.
+ * Centralized, reusable Trader Management-branded transactional email system.
  *
- * All emails share one branded layout (logo header, dark/yellow theme, footer)
+ * All emails share one branded layout (header, dark/yellow theme, footer)
  * so registration OTP, login OTP, deposit, and withdrawal notifications stay
  * visually consistent. Server-side only — never import into client components.
  */
 
 // ---- Brand tokens ---------------------------------------------------------
+
+const BRAND_NAME = "Trader Management"
 
 const BRAND = {
   bg: "#0b0e11",
@@ -32,7 +34,7 @@ function appUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || "https://v0-bybit-website-upgrade.vercel.app"
 }
 
-const FROM_ADDRESS = "Bybit <onboarding@resend.dev>"
+const FROM_ADDRESS = `${BRAND_NAME} <onboarding@resend.dev>`
 
 // ---- Shared layout --------------------------------------------------------
 
@@ -48,7 +50,7 @@ function brandedLayout({ title, body }: LayoutOptions): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(title)} - Bybit</title>
+  <title>${escapeHtml(title)} - ${BRAND_NAME}</title>
 </head>
 <body style="margin:0;padding:0;background-color:${BRAND.bg};font-family:${FONT};">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:${BRAND.bg};padding:40px 20px;">
@@ -56,11 +58,11 @@ function brandedLayout({ title, body }: LayoutOptions): string {
       <td align="center">
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:${BRAND.card};border-radius:16px;overflow:hidden;">
 
-          <!-- Header with Bybit logo -->
+          <!-- Header -->
           <tr>
             <td style="padding:32px 40px 24px;text-align:center;border-bottom:1px solid ${BRAND.border};">
-              <img src="${appUrl()}/images/bybit-email-logo.jpg" alt="Bybit" width="180" height="45" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
-              <p style="margin:8px 0 0;font-size:12px;color:${BRAND.faint};letter-spacing:0.5px;">CRYPTO EXCHANGE</p>
+              <p style="margin:0;font-size:20px;font-weight:800;color:${BRAND.text};letter-spacing:0.5px;">${BRAND_NAME}</p>
+              <p style="margin:8px 0 0;font-size:12px;color:${BRAND.faint};letter-spacing:0.5px;">TRADING PLATFORM</p>
             </td>
           </tr>
 
@@ -70,13 +72,13 @@ function brandedLayout({ title, body }: LayoutOptions): string {
           <tr>
             <td style="padding:24px 40px;background-color:${BRAND.footer};border-top:1px solid ${BRAND.border};text-align:center;">
               <p style="margin:0 0 8px;font-size:11px;color:${BRAND.faint};">
-                This is an automated email from Bybit. Please do not reply directly.
+                This is an automated email from ${BRAND_NAME}. Please do not reply directly.
               </p>
               <p style="margin:0 0 8px;font-size:11px;color:${BRAND.faint};">
-                If you have questions, please contact our <a href="${appUrl()}/support" style="color:${BRAND.yellow};text-decoration:none;">24/7 Support Team</a>.
+                If you have questions, please contact our <a href="${appUrl()}/support" style="color:${BRAND.yellow};text-decoration:none;">Support Team</a>.
               </p>
               <p style="margin:0;font-size:11px;color:${BRAND.faintest};">
-                &copy; 2018-2026 Bybit. All rights reserved.
+                &copy; 2026 ${BRAND_NAME}. All rights reserved.
               </p>
             </td>
           </tr>
@@ -159,8 +161,8 @@ export function renderOtpEmail(code: string, purpose: "login" | "signup"): strin
   const title = purpose === "signup" ? "Verify Your Email" : "Login Verification"
   const subtitle =
     purpose === "signup"
-      ? "Thank you for signing up with Bybit. Please use the verification code below to complete your registration."
-      : "We detected a login attempt to your Bybit account. Please use the verification code below to confirm it&#39;s you."
+      ? `Thank you for signing up with ${BRAND_NAME}. Please use the verification code below to complete your registration.`
+      : `We detected a login attempt to your ${BRAND_NAME} account. Please use the verification code below to confirm it&#39;s you.`
 
   const body = `
     ${titleRow(title)}
@@ -187,7 +189,7 @@ export function renderOtpEmail(code: string, purpose: "login" | "signup"): strin
           <tr>
             <td style="padding:12px 16px;">
               <p style="margin:0;font-size:13px;color:${BRAND.yellow};font-weight:500;">This code expires in 10 minutes</p>
-              <p style="margin:4px 0 0;font-size:12px;color:${BRAND.muted};">Do not share this code with anyone. Bybit support will never ask for your verification code.</p>
+              <p style="margin:4px 0 0;font-size:12px;color:${BRAND.muted};">Do not share this code with anyone. ${BRAND_NAME} support will never ask for your verification code.</p>
             </td>
           </tr>
         </table>
@@ -200,7 +202,7 @@ export function renderOtpEmail(code: string, purpose: "login" | "signup"): strin
         <p style="margin:0 0 12px;font-size:13px;font-weight:600;color:${BRAND.text};">Security Tips:</p>
         <table cellpadding="0" cellspacing="0">
           <tr><td style="padding:0 0 6px;font-size:12px;color:${BRAND.faint};line-height:18px;"><span style="color:${BRAND.yellow};margin-right:6px;">&#x2022;</span> Never share your verification code with anyone</td></tr>
-          <tr><td style="padding:0 0 6px;font-size:12px;color:${BRAND.faint};line-height:18px;"><span style="color:${BRAND.yellow};margin-right:6px;">&#x2022;</span> Bybit will never ask for your password or 2FA codes</td></tr>
+          <tr><td style="padding:0 0 6px;font-size:12px;color:${BRAND.faint};line-height:18px;"><span style="color:${BRAND.yellow};margin-right:6px;">&#x2022;</span> ${BRAND_NAME} will never ask for your password or 2FA codes</td></tr>
           <tr><td style="padding:0 0 6px;font-size:12px;color:${BRAND.faint};line-height:18px;"><span style="color:${BRAND.yellow};margin-right:6px;">&#x2022;</span> Enable 2FA for additional account security</td></tr>
         </table>
       </td>
@@ -259,7 +261,7 @@ function reasonBox(reason: string): string {
         <table width="100%" cellpadding="0" cellspacing="0" style="background-color:rgba(240,72,102,0.08);border-radius:8px;border-left:3px solid ${BRAND.red};">
           <tr>
             <td style="padding:16px 20px;">
-              <p style="margin:0 0 6px;font-size:12px;color:${BRAND.red};font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Reason for Rejection</p>
+              <p style="margin:0 0 6px;font-size:12px;color:${BRAND.red};font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Reason</p>
               <p style="margin:0;font-size:14px;line-height:22px;color:#e0e0e0;">${escapeHtml(reason)}</p>
             </td>
           </tr>
@@ -289,9 +291,11 @@ export interface DepositEmailParams {
   amount: string
   asset: string
   network?: string
+  /** Only rendered for rejected deposits. */
+  reason?: string
 }
 
-export function renderDepositEmail({ status, amount, asset }: DepositEmailParams): string {
+export function renderDepositEmail({ status, amount, asset, reason }: DepositEmailParams): string {
   const copy: Record<TxStatus, { title: string; subtitle: string }> = {
     pending: {
       title: "Deposit Received",
@@ -301,7 +305,7 @@ export function renderDepositEmail({ status, amount, asset }: DepositEmailParams
     approved: {
       title: "Deposit Approved",
       subtitle:
-        "Good news — your deposit has been approved and the funds are now available in your Bybit account.",
+        `Good news — your deposit has been approved and the funds are now available in your ${BRAND_NAME} account.`,
     },
     rejected: {
       title: "Deposit Rejected",
@@ -310,10 +314,12 @@ export function renderDepositEmail({ status, amount, asset }: DepositEmailParams
     },
   }
   const { title, subtitle } = copy[status]
+  const rejected = status === "rejected"
   const body = `
     ${titleRow(title)}
     ${paragraphRow(subtitle)}
     ${amountDetailBox("Deposit", status, amount, asset)}
+    ${rejected && reason ? reasonBox(reason) : ""}
     ${ctaRow("View My Wallet", `${appUrl()}/wallet`)}`
   return brandedLayout({ title, body })
 }
