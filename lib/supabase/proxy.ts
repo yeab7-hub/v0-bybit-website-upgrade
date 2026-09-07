@@ -90,6 +90,29 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
+    // Banned users are signed out and blocked from protected pages entirely.
+    // (Frozen users are allowed through here -- they can still view their
+    // account; the block for them happens at the specific financial actions.)
+    if (isProtected && user) {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_banned')
+          .eq('id', user.id)
+          .single()
+
+        if (profile?.is_banned) {
+          await supabase.auth.signOut()
+          const url = request.nextUrl.clone()
+          url.pathname = '/login'
+          url.searchParams.set('banned', '1')
+          return NextResponse.redirect(url)
+        }
+      } catch {
+        // If the check fails, allow through -- the page/API will handle it
+      }
+    }
+
     return supabaseResponse
   } catch {
     // If Supabase connection fails, allow the request through
