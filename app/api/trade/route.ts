@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
 import { notifyAdmin } from "@/lib/notify-admin"
 import { TRADING_FEE_RATE } from "@/lib/trading-fees"
+import { checkAccountStatus } from "@/lib/account-status"
 
 /* ---------- helpers ---------- */
 // Non-crypto assets that use our internal prices API
@@ -172,6 +173,9 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const status = await checkAccountStatus(supabase, user.id)
+  if (status.blocked) return NextResponse.json({ error: status.reason }, { status: 403 })
 
   // Use admin client for DB operations to bypass RLS constraints
   const adminSupabase = await createAdminClient()
