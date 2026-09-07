@@ -85,6 +85,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true })
   }
 
+  // Toggle freeze -- unlike a ban, a frozen user can still log in and view
+  // their account, but cannot trade, convert, deposit, or withdraw.
+  if (action === "toggle_freeze") {
+    const { user_id, is_frozen } = body
+    if (!user_id) return NextResponse.json({ error: "Missing user_id" }, { status: 400 })
+    const { data: target } = await adminSupabase.from("profiles").select("role").eq("id", user_id).single()
+    if (target?.role === "super_admin") return NextResponse.json({ error: "Cannot freeze master admin" }, { status: 403 })
+
+    const { error } = await adminSupabase.from("profiles").update({ is_frozen }).eq("id", user_id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
   // Adjust balance
   if (action === "adjust_balance") {
     const { user_id, asset, amount, adjust_action } = body
