@@ -50,9 +50,44 @@ export async function POST(request: NextRequest) {
   const user = auth.user!
 
   const body = await request.json()
-  const { action, ticket_id, message, status } = body
+  const { action, ticket_id, message, status, user_email, subject } = body
 
   const admin = await createAdminClient()
+
+  if (action === "start_conversation" && user_email && message) {
+    const { data: recipient, error: lookupErr } = await admin
+      .from("profiles")
+      .select("id, email")
+      .eq("email", user_email.trim())
+      .single()
+
+    if (lookupErr || !recipient) {
+      return NextResponse.json({ error: "No user found with that email" }, { status: 404 })
+    }
+
+    const { data: ticket, error: ticketErr } = await admin
+      .from("support_tickets")
+      .insert({
+        user_id: recipient.id,
+        subject: subject?.trim() || "Message from support",
+        category: "admin_initiated",
+        status: "in_progress",
+      })
+      .select()
+      .single()
+
+    if (ticketErr) return NextResponse.json({ error: ticketErr.message }, { status: 500 })
+
+    const { error: msgErr } = await admin.from("support_messages").insert({
+      ticket_id: ticket.id,
+      sender_id: user.id,
+      sender_role: "admin",
+      message,
+    })
+    if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 })
+
+    return NextResponse.json({ success: true, ticket_id: ticket.id })
+  }
 
   if (action === "reply" && ticket_id && message) {
     const { error: msgErr } = await admin.from("support_messages").insert({
