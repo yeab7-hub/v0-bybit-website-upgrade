@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import useSWR, { mutate as globalMutate } from "swr"
 import {
   MessageCircle, Send, Clock, CheckCircle2, AlertTriangle,
-  ArrowRight, Loader2, XCircle, RotateCcw, User,
+  ArrowRight, Loader2, XCircle, RotateCcw, User, Plus, X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -32,6 +32,14 @@ export default function AdminSupportPage() {
   const [filter, setFilter] = useState<string>("all")
   const [user, setUser] = useState<{ id: string } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // New conversation modal
+  const [showNewMsg, setShowNewMsg] = useState(false)
+  const [newEmail, setNewEmail] = useState("")
+  const [newSubject, setNewSubject] = useState("")
+  const [newMessage, setNewMessage] = useState("")
+  const [startingConvo, setStartingConvo] = useState(false)
+  const [newMsgError, setNewMsgError] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -81,6 +89,39 @@ export default function AdminSupportPage() {
   const openCount = allTickets.filter((t: { status: string }) => t.status === "open").length
   const inProgressCount = allTickets.filter((t: { status: string }) => t.status === "in_progress").length
 
+  const startConversation = async () => {
+    if (!newEmail.trim() || !newMessage.trim()) return
+    setStartingConvo(true)
+    setNewMsgError(null)
+    try {
+      const res = await fetch("/api/admin/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "start_conversation",
+          user_email: newEmail.trim(),
+          subject: newSubject.trim(),
+          message: newMessage.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setNewMsgError(data.error || "Failed to send message")
+        setStartingConvo(false)
+        return
+      }
+      setShowNewMsg(false)
+      setNewEmail("")
+      setNewSubject("")
+      setNewMessage("")
+      globalMutate("/api/support?admin=true")
+      setSelectedTicket(data.ticket_id)
+    } catch {
+      setNewMsgError("Network error, please try again")
+    }
+    setStartingConvo(false)
+  }
+
   return (
     <div className="flex h-full flex-col">
       {/* Header bar */}
@@ -91,6 +132,12 @@ export default function AdminSupportPage() {
             <p className="text-xs text-muted-foreground">Manage user support requests</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowNewMsg(true)}
+              className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus className="h-3 w-3" /> New Message
+            </button>
             <div className="flex items-center gap-1 rounded-full bg-destructive/10 px-3 py-1">
               <AlertTriangle className="h-3 w-3 text-destructive" />
               <span className="text-xs font-medium text-destructive">{openCount} open</span>
@@ -204,7 +251,7 @@ export default function AdminSupportPage() {
                 {/* Admin reply */}
                 <div className="border-t border-border p-4">
                   <div className="flex items-end gap-3">
-                    <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Reply as Bybit Support admin..."
+                    <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={3} placeholder="Reply as Support admin..."
                       className="flex-1 rounded-lg border border-border bg-secondary/30 px-4 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply() } }} />
                     <Button onClick={sendReply} disabled={submitting || !replyText.trim()} className="bg-primary text-primary-foreground">
@@ -216,6 +263,57 @@ export default function AdminSupportPage() {
             )}
           </div>
       </div>
+
+      {/* New conversation modal */}
+      {showNewMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-foreground">Message a User</h3>
+              <button onClick={() => setShowNewMsg(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="mb-1 block text-[10px] font-medium text-muted-foreground">User's Email</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Subject (optional)</label>
+                <input
+                  type="text"
+                  value={newSubject}
+                  onChange={(e) => setNewSubject(e.target.value)}
+                  placeholder="e.g. Regarding your account"
+                  className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Message</label>
+                <textarea
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  rows={4}
+                  placeholder="Type your message..."
+                  className="w-full resize-none rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
+                />
+              </div>
+              {newMsgError && <p className="text-xs text-red-400">{newMsgError}</p>}
+              <Button onClick={startConversation} disabled={startingConvo || !newEmail.trim() || !newMessage.trim()} className="mt-1 bg-primary text-primary-foreground">
+                {startingConvo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Send Message
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
