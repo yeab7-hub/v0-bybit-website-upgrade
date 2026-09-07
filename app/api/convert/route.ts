@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
+import { checkAccountStatus } from "@/lib/account-status"
 
 const STABLE = new Set(["USDT", "USDC"])
 
@@ -25,6 +26,9 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const status = await checkAccountStatus(supabase, user.id)
+  if (status.blocked) return NextResponse.json({ error: status.reason }, { status: 403 })
 
   const body = await request.json()
   const { from_asset, to_asset, amount } = body
