@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import useSWR, { mutate as globalMutate } from "swr"
-import { Send, Loader2, MessageCircle, User, Clock, CheckCircle2, XCircle } from "lucide-react"
+import { Send, Loader2, MessageCircle, User, Clock, CheckCircle2, XCircle, Plus, X } from "lucide-react"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -11,6 +11,14 @@ export default function AdminChatPage() {
   const [reply, setReply] = useState("")
   const [sending, setSending] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
+
+  // New conversation modal
+  const [showNewMsg, setShowNewMsg] = useState(false)
+  const [newEmail, setNewEmail] = useState("")
+  const [newSubject, setNewSubject] = useState("")
+  const [newMessage, setNewMessage] = useState("")
+  const [startingConvo, setStartingConvo] = useState(false)
+  const [newMsgError, setNewMsgError] = useState<string | null>(null)
 
   // Fetch all support tickets
   const { data: allTickets } = useSWR(
@@ -53,13 +61,54 @@ export default function AdminChatPage() {
     globalMutate(`/api/support?ticket_id=${ticketId}`)
   }
 
+  const startConversation = async () => {
+    if (!newEmail.trim() || !newMessage.trim()) return
+    setStartingConvo(true)
+    setNewMsgError(null)
+    try {
+      const res = await fetch("/api/admin/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "start_conversation",
+          user_email: newEmail.trim(),
+          subject: newSubject.trim(),
+          message: newMessage.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setNewMsgError(data.error || "Failed to send message")
+        setStartingConvo(false)
+        return
+      }
+      setShowNewMsg(false)
+      setNewEmail("")
+      setNewSubject("")
+      setNewMessage("")
+      globalMutate("/api/admin/chat")
+      setSelectedTicket(data.ticket_id)
+    } catch {
+      setNewMsgError("Network error, please try again")
+    }
+    setStartingConvo(false)
+  }
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* Ticket list */}
       <div className="w-[320px] shrink-0 border-r border-border">
-          <div className="border-b border-border px-4 py-3">
-            <h2 className="text-sm font-bold text-foreground">Live Chats & Tickets</h2>
-            <p className="text-[10px] text-muted-foreground">{tickets.length} total</p>
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Live Chats & Tickets</h2>
+              <p className="text-[10px] text-muted-foreground">{tickets.length} total</p>
+            </div>
+            <button
+              onClick={() => setShowNewMsg(true)}
+              className="flex items-center gap-1 rounded-md bg-[#f7a600] px-2.5 py-1.5 text-[10px] font-semibold text-[#0a0e17] hover:bg-[#f7a600]/80"
+            >
+              <Plus className="h-3 w-3" /> New Message
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto">
             {tickets.length === 0 ? (
@@ -191,6 +240,61 @@ export default function AdminChatPage() {
             </>
           )}
         </div>
+
+        {/* New conversation modal */}
+        {showNewMsg && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-foreground">Message a User</h3>
+                <button onClick={() => setShowNewMsg(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="mb-1 block text-[10px] font-medium text-muted-foreground">User's Email</label>
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="user@example.com"
+                    className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-[#f7a600]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Subject (optional)</label>
+                  <input
+                    type="text"
+                    value={newSubject}
+                    onChange={(e) => setNewSubject(e.target.value)}
+                    placeholder="e.g. Regarding your account"
+                    className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-[#f7a600]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Message</label>
+                  <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    rows={4}
+                    placeholder="Type your message..."
+                    className="w-full resize-none rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-[#f7a600]"
+                  />
+                </div>
+                {newMsgError && <p className="text-xs text-red-400">{newMsgError}</p>}
+                <button
+                  onClick={startConversation}
+                  disabled={startingConvo || !newEmail.trim() || !newMessage.trim()}
+                  className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-[#f7a600] py-2.5 text-sm font-semibold text-[#0a0e17] hover:bg-[#f7a600]/80 disabled:opacity-40"
+                >
+                  {startingConvo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Send Message
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   )
 }
