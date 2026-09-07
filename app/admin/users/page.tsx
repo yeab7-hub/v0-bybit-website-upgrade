@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import {
-  Search, UserCheck, UserX, Shield, Ban, MoreVertical,
+  Search, UserCheck, UserX, Shield, Ban, MoreVertical, Snowflake,
   ChevronLeft, ChevronRight, Wallet, Plus, Minus, X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ interface UserProfile {
   role: string
   kyc_status: string
   is_banned: boolean
+  is_frozen: boolean
   created_at: string
 }
 
@@ -79,6 +80,16 @@ export default function AdminUsersPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "toggle_ban", user_id: userId, is_banned: !isBanned }),
+    })
+    setActiveMenu(null)
+    fetchUsers()
+  }
+
+  const toggleFreeze = async (userId: string, isFrozen: boolean) => {
+    await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "toggle_freeze", user_id: userId, is_frozen: !isFrozen }),
     })
     setActiveMenu(null)
     fetchUsers()
@@ -228,6 +239,8 @@ export default function AdminUsersPage() {
                       <td className="px-5 py-3">
                         {u.is_banned
                           ? <span className="flex items-center gap-1 text-xs text-destructive"><Ban className="h-3 w-3" /> Banned</span>
+                          : u.is_frozen
+                          ? <span className="flex items-center gap-1 text-xs text-[#3ba7f7]"><Snowflake className="h-3 w-3" /> Frozen</span>
                           : <span className="text-xs text-success">Active</span>}
                       </td>
                       <td className="px-5 py-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
@@ -269,6 +282,12 @@ export default function AdminUsersPage() {
                                       </button>
                                     )
                                   )}
+                                  <button
+                                    onClick={() => toggleFreeze(u.id, u.is_frozen)}
+                                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-[#3ba7f7] hover:bg-[#3ba7f7]/10"
+                                  >
+                                    <Snowflake className="h-3.5 w-3.5" /> {u.is_frozen ? "Unfreeze User" : "Freeze User"}
+                                  </button>
                                   <button
                                     onClick={() => toggleBan(u.id, u.is_banned)}
                                     className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
