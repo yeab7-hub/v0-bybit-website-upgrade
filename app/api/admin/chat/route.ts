@@ -86,10 +86,21 @@ export async function POST(request: NextRequest) {
     })
     if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 })
 
+    await admin.from("notifications").insert({
+      user_id: recipient.id,
+      type: "support_reply",
+      category: "support",
+      title: "New message from Support",
+      message: message.length > 120 ? message.slice(0, 120) + "…" : message,
+      data: { ticket_id: ticket.id },
+    })
+
     return NextResponse.json({ success: true, ticket_id: ticket.id })
   }
 
   if (action === "reply" && ticket_id && message) {
+    const { data: ticket } = await admin.from("support_tickets").select("user_id").eq("id", ticket_id).single()
+
     const { error: msgErr } = await admin.from("support_messages").insert({
       ticket_id,
       sender_id: user.id,
@@ -102,6 +113,17 @@ export async function POST(request: NextRequest) {
       status: "in_progress",
       updated_at: new Date().toISOString(),
     }).eq("id", ticket_id)
+
+    if (ticket?.user_id) {
+      await admin.from("notifications").insert({
+        user_id: ticket.user_id,
+        type: "support_reply",
+        category: "support",
+        title: "New reply from Support",
+        message: message.length > 120 ? message.slice(0, 120) + "…" : message,
+        data: { ticket_id },
+      })
+    }
 
     return NextResponse.json({ success: true })
   }
