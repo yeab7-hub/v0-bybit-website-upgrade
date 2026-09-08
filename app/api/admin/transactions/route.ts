@@ -166,7 +166,7 @@ export async function PATCH(request: NextRequest) {
       type: "withdrawal_rejected",
       title: "Withdrawal Request Rejected",
       message: `Your withdrawal of ${tx.amount} ${tx.asset} has been rejected. Reason: ${rejectionReason}. Funds have been returned to your available balance.`,
-      metadata: { transaction_id: id, amount: tx.amount, asset: tx.asset, reason: rejectionReason },
+      data: { transaction_id: id, amount: tx.amount, asset: tx.asset, reason: rejectionReason },
       read: false,
     })
 
