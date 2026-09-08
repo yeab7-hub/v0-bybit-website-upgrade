@@ -112,11 +112,23 @@ export async function POST(request: NextRequest) {
     if (isAdmin) {
       // Admin writes bypass RLS via the service-role client.
       const admin = await createAdminClient()
+      const { data: ticket } = await admin.from("support_tickets").select("user_id, subject").eq("id", ticket_id).single()
       const { error: msgErr } = await admin.from("support_messages").insert({
         ticket_id, sender_id: user.id, sender_role: "admin", message
       })
       if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 })
       await admin.from("support_tickets").update({ status: "in_progress", updated_at: new Date().toISOString() }).eq("id", ticket_id)
+
+      if (ticket?.user_id) {
+        await admin.from("notifications").insert({
+          user_id: ticket.user_id,
+          type: "support_reply",
+          category: "support",
+          title: "New reply from Support",
+          message: message.length > 120 ? message.slice(0, 120) + "…" : message,
+          data: { ticket_id },
+        })
+      }
       return NextResponse.json({ success: true })
     }
 
