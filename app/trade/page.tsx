@@ -33,6 +33,7 @@ export default function TradePage() {
   const [side, setSide] = useState<OrderSide>("buy")
   const [orderType, setOrderType] = useState<OrderType>("Limit")
   const [price, setPrice] = useState("")
+  const [stopPrice, setStopPrice] = useState("")
   const [amount, setAmount] = useState("")
   const [qtyMode, setQtyMode] = useState<"base" | "quote">("base")
   const [sliderPct, setSliderPct] = useState(0)
@@ -179,9 +180,13 @@ export default function TradePage() {
     return () => clearInterval(iv)
   }, [positions.length])
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (sideOverride?: OrderSide) => {
+    const effectiveSide = sideOverride ?? side
     if (!user) { setFeedback({ type: "error", msg: "Please log in to trade" }); return }
     if (baseQty <= 0) { setFeedback({ type: "error", msg: "Enter a valid amount" }); return }
+    if (orderType === "Stop-Limit" && (!stopPrice || parseFloat(stopPrice) <= 0)) {
+      setFeedback({ type: "error", msg: "Enter a trigger price" }); return
+    }
     setSubmitting(true)
     setFeedback(null)
     try {
@@ -189,9 +194,10 @@ export default function TradePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          pair: pairDisplay, side,
-          order_type: orderType === "Market" ? "market" : "limit",
+          pair: pairDisplay, side: effectiveSide,
+          order_type: orderType === "Market" ? "market" : orderType === "Stop-Limit" ? "stop_limit" : "limit",
           price: orderType !== "Market" ? parseFloat(price.replace(/,/g, "")) : undefined,
+          stop_price: orderType === "Stop-Limit" ? parseFloat(stopPrice.replace(/,/g, "")) : undefined,
           amount: baseQty,
           take_profit: tpslEnabled ? parseFloat(takeProfit.replace(/,/g, "")) || undefined : undefined,
           stop_loss: tpslEnabled ? parseFloat(stopLoss.replace(/,/g, "")) || undefined : undefined,
@@ -200,14 +206,14 @@ export default function TradePage() {
       const data = await res.json()
       if (data.success) {
         setFeedback({ type: "success", msg: data.message })
-        setAmount(""); setSliderPct(0); setTakeProfit(""); setStopLoss("")
+        setAmount(""); setSliderPct(0); setTakeProfit(""); setStopLoss(""); setStopPrice("")
         globalMutate("/api/trade?type=balances")
         globalMutate("/api/trade?type=orders")
         globalMutate("/api/trade?type=positions")
         globalMutate("/api/trade?type=history")
         // Auto-switch to the right tab: buy fills create positions, sell fills go to history
         if (data.executed) {
-          setBottomTab(side === "buy" ? "positions" : "history")
+          setBottomTab(effectiveSide === "buy" ? "positions" : "history")
         } else {
           setBottomTab("orders") // Limit order placed, show in open orders
         }
@@ -415,6 +421,22 @@ export default function TradePage() {
         </select>
       </div>
 
+      {/* Trigger price (Stop-Limit only) */}
+      {orderType === "Stop-Limit" && (
+        <div className="mb-3 flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
+          <span className="text-xs text-muted-foreground">Trigger</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={stopPrice}
+            onChange={(e) => setStopPrice(sanitizeNumeric(e.target.value))}
+            placeholder="0.00"
+            className="flex-1 bg-transparent text-right font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
+          />
+          <span className="ml-2 text-xs text-muted-foreground">USDT</span>
+        </div>
+      )}
+
       {/* Price input */}
       <div className="mb-3 flex items-center rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
         <span className="text-xs text-muted-foreground">Price</span>
@@ -561,14 +583,14 @@ export default function TradePage() {
       {isFutures ? (
         <div className="flex flex-col gap-2">
           <button
-            onClick={() => { setSide("buy"); handleSubmit() }}
+            onClick={() => { setSide("buy"); handleSubmit("buy") }}
             disabled={submitting || !baseQty}
             className="w-full rounded-lg bg-success py-3.5 text-sm font-bold text-[#0a0e17] transition-colors disabled:opacity-40"
           >
             {submitting && side === "buy" ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Long"}
           </button>
           <button
-            onClick={() => { setSide("sell"); handleSubmit() }}
+            onClick={() => { setSide("sell"); handleSubmit("sell") }}
             disabled={submitting || !baseQty}
             className="w-full rounded-lg bg-destructive py-3.5 text-sm font-bold text-white transition-colors disabled:opacity-40"
           >
@@ -577,7 +599,7 @@ export default function TradePage() {
         </div>
       ) : (
         <button
-          onClick={handleSubmit}
+          onClick={() => handleSubmit(side)}
           disabled={submitting || !baseQty}
           className={`w-full rounded-lg py-3.5 text-sm font-semibold transition-colors disabled:opacity-40 ${isBuy ? "bg-success text-[#0a0e17]" : "bg-destructive text-white"}`}
         >
