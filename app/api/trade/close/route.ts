@@ -1,40 +1,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
 import { TRADING_FEE_RATE } from "@/lib/trading-fees"
-
-async function getLivePrice(baseAsset: string): Promise<number> {
-  // Try Binance
-  try {
-    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${baseAsset}USDT`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(5000),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      const price = parseFloat(data.price)
-      if (price > 0) return price
-    }
-  } catch { /* fallback */ }
-
-  // Try our own API
-  try {
-    const { headers } = await import("next/headers")
-    const headersList = await headers()
-    const host = headersList.get("host") || "localhost:3000"
-    const protocol = host.includes("localhost") ? "http" : "https"
-    const res = await fetch(`${protocol}://${host}/api/prices`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(5000),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      const coin = data.crypto?.find((c: { symbol: string }) => c.symbol === baseAsset)
-      if (coin?.price > 0) return coin.price
-    }
-  } catch { /* all failed */ }
-
-  return 0
-}
+import { getLivePrice } from "@/lib/live-price"
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -62,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   const baseAsset = position.pair.split("/")[0]
   const quoteAsset = position.pair.split("/")[1] || "USDT"
-  const serverPrice = await getLivePrice(baseAsset)
+  const serverPrice = await getLivePrice(baseAsset, position.pair)
 
   // Prefer the live price the user actually saw on screen (passed as closePrice)
   // so a winning trade closed on an uptrend settles at the on-screen value rather
@@ -133,46 +100,71 @@ export async function POST(request: NextRequest) {
     pnl,
   }).eq("id", tradeId)
 
-  // Settle balances against the quote asset. For a LONG (buy) leg the base asset
-  // was credited on open, so release it back; for a SHORT (sell) leg no base was held.
-  if (!isShort) {
-    const { data: bBal } = await adminSupabase
+  const isFuturesPosition = position.position_mode === "futures"
+
+  // Settle balances against the quote asset.
+  if (isFuturesPosition) {
+    // Futures: no base asset was ever held -- only margin (in quote asset)
+    // was locked. Credit back margin + pnl. pnl can exceed -margin only in
+    // theory; clamp at 0 as a safety net (liquidation should catch this first).
+    const margin = Number(position.margin) || 0
+    const creditAmount = margin + pnl
+    const { data: qBal } = await adminSupabase
+      .from("balances").select("*")
+      .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
+    if (qBal) {
+      await adminSupabase.from("balances").update({
+        available: Math.max(0, qBal.available + creditAmount),
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", position.user_id).eq("asset", quoteAsset)
+    } else {
+      await adminSupabase.from("balances").insert({
+        user_id: position.user_id, asset: quoteAsset,
+        available: Math.max(0, creditAmount), in_order: 0,
+      })
+    }
+  } else {
+    // Spot: a LONG (buy) leg held the base asset, so release it back; a
+    // SHORT (sell) leg never applies here since spot sells settle instantly.
+    if (!isShort) {
+      const { data: bBal } = await adminSupabase
+        .from("balances")
+        .select("*")
+        .eq("user_id", position.user_id)
+        .eq("asset", baseAsset)
+        .single()
+
+      if (bBal) {
+        await adminSupabase.from("balances").update({
+          available: Math.max(0, bBal.available - qty),
+          updated_at: new Date().toISOString(),
+        }).eq("user_id", position.user_id).eq("asset", baseAsset)
+      }
+    }
+
+    // Credit the quote asset with the returned margin plus realized PnL
+    // (entry notional + pnl; pnl is already direction-aware and net of fees).
+    const { data: qBal } = await adminSupabase
       .from("balances")
       .select("*")
       .eq("user_id", position.user_id)
-      .eq("asset", baseAsset)
+      .eq("asset", quoteAsset)
       .single()
 
-    if (bBal) {
+    const creditAmount = (entryPrice * qty) + pnl
+    if (qBal) {
       await adminSupabase.from("balances").update({
-        available: Math.max(0, bBal.available - qty),
+        available: Math.max(0, qBal.available + creditAmount),
         updated_at: new Date().toISOString(),
-      }).eq("user_id", position.user_id).eq("asset", baseAsset)
+      }).eq("user_id", position.user_id).eq("asset", quoteAsset)
+    } else {
+      await adminSupabase.from("balances").insert({
+        user_id: position.user_id,
+        asset: quoteAsset,
+        available: Math.max(0, creditAmount),
+        in_order: 0,
+      })
     }
-  }
-
-  // Credit the quote asset with the returned margin plus realized PnL
-  // (entry notional + pnl; pnl is already direction-aware and net of fees).
-  const { data: qBal } = await adminSupabase
-    .from("balances")
-    .select("*")
-    .eq("user_id", position.user_id)
-    .eq("asset", quoteAsset)
-    .single()
-
-  const creditAmount = (entryPrice * qty) + pnl
-  if (qBal) {
-    await adminSupabase.from("balances").update({
-      available: Math.max(0, qBal.available + creditAmount),
-      updated_at: new Date().toISOString(),
-    }).eq("user_id", position.user_id).eq("asset", quoteAsset)
-  } else {
-    await adminSupabase.from("balances").insert({
-      user_id: position.user_id,
-      asset: quoteAsset,
-      available: Math.max(0, creditAmount),
-      in_order: 0,
-    })
   }
 
   return NextResponse.json({
