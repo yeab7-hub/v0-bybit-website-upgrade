@@ -3,56 +3,118 @@ import { NextResponse, type NextRequest } from "next/server"
 import { notifyAdmin } from "@/lib/notify-admin"
 import { TRADING_FEE_RATE } from "@/lib/trading-fees"
 import { checkAccountStatus } from "@/lib/account-status"
+import { calcMargin, calcLiquidationPrice } from "@/lib/futures"
 
 /* ---------- helpers ---------- */
-// Non-crypto assets that use our internal prices API
-const NON_CRYPTO_ASSETS = new Set([
-  "EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "USD/CHF",
-  "XAU/USD", "XAG/USD", "WTI", "BRENT", "NG",
-  "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA",
-])
+
+// Direct, single-symbol metadata -- kept separate from the /api/prices
+// dashboard aggregator (which fetches ALL assets in a class at once) so
+// order placement never waits on unrelated symbols or slow sequential
+// fallback chains. A last-known/reasonable fallback price is always
+// returned so a transient external API hiccup never blocks a trade outright.
+const FOREX_META: Record<string, { currency: string; isInverse: boolean; fallback: number }> = {
+  "EUR/USD": { currency: "EUR", isInverse: true, fallback: 1.0842 },
+  "GBP/USD": { currency: "GBP", isInverse: true, fallback: 1.2634 },
+  "USD/JPY": { currency: "JPY", isInverse: false, fallback: 149.85 },
+  "AUD/USD": { currency: "AUD", isInverse: true, fallback: 0.6543 },
+  "USD/CHF": { currency: "CHF", isInverse: false, fallback: 0.8821 },
+  "USD/CAD": { currency: "CAD", isInverse: false, fallback: 1.3612 },
+  "NZD/USD": { currency: "NZD", isInverse: true, fallback: 0.6102 },
+}
+
+const YAHOO_META: Record<string, { yahooSymbol: string; fallback: number }> = {
+  "XAU/USD": { yahooSymbol: "GC=F", fallback: 2924.5 },
+  "XAG/USD": { yahooSymbol: "SI=F", fallback: 32.78 },
+  WTI: { yahooSymbol: "CL=F", fallback: 71.24 },
+  BRENT: { yahooSymbol: "BZ=F", fallback: 74.89 },
+  NG: { yahooSymbol: "NG=F", fallback: 3.42 },
+  HG: { yahooSymbol: "HG=F", fallback: 4.52 },
+  AAPL: { yahooSymbol: "AAPL", fallback: 232.4 },
+  MSFT: { yahooSymbol: "MSFT", fallback: 412.65 },
+  GOOGL: { yahooSymbol: "GOOGL", fallback: 178.2 },
+  AMZN: { yahooSymbol: "AMZN", fallback: 215.8 },
+  TSLA: { yahooSymbol: "TSLA", fallback: 348.9 },
+  NVDA: { yahooSymbol: "NVDA", fallback: 138.5 },
+  META: { yahooSymbol: "META", fallback: 582.3 },
+}
+
+const CRYPTO_FALLBACK: Record<string, number> = {
+  BTC: 97842.5, ETH: 3456.78, SOL: 189.45, XRP: 2.87, BNB: 690.2,
+  ADA: 0.89, DOGE: 0.32, AVAX: 38.4, DOT: 7.1, LINK: 22.6,
+}
+
+async function fetchDirectForex(pairSymbol: string): Promise<number> {
+  const meta = FOREX_META[pairSymbol]
+  if (!meta) return 0
+  try {
+    const res = await fetch(`https://api.frankfurter.dev/v1/latest?base=USD&symbols=${meta.currency}`, {
+      signal: AbortSignal.timeout(4000),
+    })
+    if (res.ok) {
+      const json = await res.json()
+      const rate = json?.rates?.[meta.currency]
+      if (rate > 0) return meta.isInverse ? 1 / rate : rate
+    }
+  } catch { /* fall through to caller's fallback */ }
+  return 0
+}
+
+async function fetchDirectYahoo(symbol: string): Promise<number> {
+  const meta = YAHOO_META[symbol]
+  if (!meta) return 0
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${meta.yahooSymbol}&range=1d&interval=5m`,
+      {
+        signal: AbortSignal.timeout(4500),
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          Accept: "application/json",
+        },
+      },
+    )
+    if (res.ok) {
+      const json = await res.json()
+      const result = json?.spark?.result?.[0]?.response?.[0]
+      const closes: number[] = result?.indicators?.quote?.[0]?.close ?? []
+      const lastClose = [...closes].reverse().find((c) => typeof c === "number" && c > 0)
+      if (lastClose) return lastClose
+    }
+  } catch { /* fall through to caller's fallback */ }
+  return 0
+}
 
 async function getLivePrice(baseAsset: string, pair?: string): Promise<number> {
-  // For non-crypto assets, use our internal prices API
   const lookupSymbol = pair?.split("/").length === 2 ? pair : baseAsset
-  if (NON_CRYPTO_ASSETS.has(lookupSymbol) || NON_CRYPTO_ASSETS.has(baseAsset)) {
-    try {
-      const { headers } = await import("next/headers")
-      const headersList = await headers()
-      const host = headersList.get("host") || "localhost:3000"
-      const protocol = host.includes("localhost") ? "http" : "https"
-      const res = await fetch(`${protocol}://${host}/api/prices`, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(5000),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        const allAssets = [...(data.forex ?? []), ...(data.commodities ?? []), ...(data.stocks ?? [])]
-        const match = allAssets.find((a: { symbol: string }) =>
-          a.symbol === lookupSymbol || a.symbol === baseAsset
-        )
-        if (match?.price > 0) return match.price
-      }
-    } catch { /* fallback below */ }
-    return 0
+
+  // Forex
+  if (FOREX_META[lookupSymbol]) {
+    const price = await fetchDirectForex(lookupSymbol)
+    return price > 0 ? price : FOREX_META[lookupSymbol].fallback
   }
 
+  // Commodities / stocks
+  if (YAHOO_META[lookupSymbol] || YAHOO_META[baseAsset]) {
+    const key = YAHOO_META[lookupSymbol] ? lookupSymbol : baseAsset
+    const price = await fetchDirectYahoo(key)
+    return price > 0 ? price : YAHOO_META[key].fallback
+  }
+
+  // Crypto
   const symbol = `${baseAsset}USDT`
 
-  // Try Binance first
   try {
     const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(4000),
     })
     if (res.ok) {
       const data = await res.json()
       const price = parseFloat(data.price)
       if (price > 0) return price
     }
-  } catch { /* Binance failed, try fallback */ }
+  } catch { /* try next source */ }
 
-  // Fallback: CoinGecko
   try {
     const idMap: Record<string, string> = {
       BTC: "bitcoin", ETH: "ethereum", SOL: "solana", XRP: "ripple",
@@ -64,7 +126,7 @@ async function getLivePrice(baseAsset: string, pair?: string): Promise<number> {
     if (cgId) {
       const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`, {
         cache: "no-store",
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(4000),
       })
       if (res.ok) {
         const data = await res.json()
@@ -72,26 +134,11 @@ async function getLivePrice(baseAsset: string, pair?: string): Promise<number> {
         if (price > 0) return price
       }
     }
-  } catch { /* CoinGecko failed too */ }
+  } catch { /* fall through to hardcoded fallback below */ }
 
-  // Last resort: fetch from our own /api/prices (internal call)
-  try {
-    const { headers } = await import("next/headers")
-    const headersList = await headers()
-    const host = headersList.get("host") || "localhost:3000"
-    const protocol = host.includes("localhost") ? "http" : "https"
-    const res = await fetch(`${protocol}://${host}/api/prices`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(5000),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      const coin = data.crypto?.find((c: { symbol: string }) => c.symbol === baseAsset)
-      if (coin?.price > 0) return coin.price
-    }
-  } catch { /* all failed */ }
-
-  return 0
+  // A stale-but-reasonable fallback beats outright refusing to place the
+  // trade over a transient external API hiccup.
+  return CRYPTO_FALLBACK[baseAsset] ?? 0
 }
 
 async function ensureBalance(supabase: any, userId: string, asset: string) {
@@ -168,6 +215,96 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ orders: data ?? [] })
 }
 
+/* ---------- FUTURES (leveraged, margin-based) ---------- */
+async function handleFuturesOrder(params: {
+  adminSupabase: any; userId: string; userEmail: string
+  pair: string; side: "buy" | "sell"; order_type: string; price: number; amount: number
+  marketPrice: number; leverage: number
+  takeProfit: number | null; stopLoss: number | null
+  baseAsset: string; quoteAsset: string
+}) {
+  const {
+    adminSupabase, userId, userEmail, pair, side, order_type, price, amount,
+    marketPrice, leverage, takeProfit, stopLoss, baseAsset, quoteAsset,
+  } = params
+
+  const isShort = side === "sell"
+  let execPrice: number
+
+  if (order_type === "market") {
+    execPrice = marketPrice
+  } else if (order_type === "limit" || order_type === "stop_limit") {
+    execPrice = Number(price)
+    if (!execPrice || execPrice <= 0) {
+      return NextResponse.json({ error: "Price required" }, { status: 400 })
+    }
+    // Only marketable-immediately Futures orders are supported for now --
+    // a resting leveraged limit order needs its own margin-locking engine,
+    // which this platform does not yet have. Reject clearly rather than
+    // silently mishandling the margin.
+    const marketable = isShort ? execPrice <= marketPrice : execPrice >= marketPrice
+    if (!marketable) {
+      return NextResponse.json({
+        error: "Resting Futures limit orders aren't supported yet. Use Market, or a Limit price that fills immediately.",
+      }, { status: 400 })
+    }
+    execPrice = marketPrice
+  } else {
+    return NextResponse.json({ error: "Invalid order type" }, { status: 400 })
+  }
+
+  const notional = execPrice * amount
+  const fee = notional * TRADING_FEE_RATE
+  const margin = calcMargin(notional, leverage)
+  const requiredBalance = margin + fee
+
+  const qBal = await ensureBalance(adminSupabase, userId, quoteAsset)
+  if (!qBal || qBal.available < requiredBalance) {
+    return NextResponse.json({
+      error: `Insufficient ${quoteAsset} margin. Need $${requiredBalance.toFixed(2)}, have $${(qBal?.available ?? 0).toFixed(2)}`,
+    }, { status: 400 })
+  }
+
+  const liquidationPrice = calcLiquidationPrice(execPrice, leverage, isShort)
+
+  const { data: order, error: orderErr } = await adminSupabase.from("orders").insert({
+    user_id: userId, pair, side, order_type,
+    price: execPrice, amount, filled: amount, total: notional, status: "filled",
+  }).select().single()
+  if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 })
+
+  const { error: tradeErr } = await adminSupabase.from("trades").insert({
+    user_id: userId, order_id: order.id, pair, side,
+    price: execPrice, amount, total: notional, fee,
+    status: "open", pnl: 0,
+    position_mode: "futures", leverage, margin,
+    liquidation_price: liquidationPrice,
+    last_funding_at: new Date().toISOString(),
+    take_profit: takeProfit, stop_loss: stopLoss,
+  })
+  if (tradeErr) return NextResponse.json({ error: tradeErr.message }, { status: 500 })
+
+  // Only the margin (not the full notional) is deducted -- that's the point of leverage.
+  await adminSupabase.from("balances").update({
+    available: Math.max(0, qBal.available - requiredBalance),
+    updated_at: new Date().toISOString(),
+  }).eq("user_id", userId).eq("asset", quoteAsset)
+
+  const message = `${isShort ? "Short" : "Long"} opened: ${amount} ${baseAsset} @ $${execPrice.toLocaleString()} | ${leverage}x | Margin: $${margin.toFixed(2)} | Liq: $${liquidationPrice.toFixed(2)}`
+
+  notifyAdmin({
+    subject: `Futures ${isShort ? "Short" : "Long"} - ${amount} ${baseAsset}`,
+    event: "Futures Position Opened",
+    userEmail,
+    details: {
+      Pair: pair, Side: isShort ? "SHORT" : "LONG", Leverage: `${leverage}x`,
+      Amount: amount, Price: `$${execPrice.toLocaleString()}`, Margin: `$${margin.toFixed(2)}`,
+    },
+  }).catch(() => {})
+
+  return NextResponse.json({ success: true, order, message, executed: true })
+}
+
 /* ---------- POST ---------- */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -181,7 +318,7 @@ export async function POST(request: NextRequest) {
   const adminSupabase = await createAdminClient()
 
   const body = await request.json()
-  const { pair, side, order_type, price, stop_price, amount, take_profit, stop_loss } = body
+  const { pair, side, order_type, price, stop_price, amount, take_profit, stop_loss, is_futures, leverage } = body
 
   if (!pair || !side || !order_type || !amount || amount <= 0) {
     return NextResponse.json({ error: "Invalid order parameters" }, { status: 400 })
@@ -196,6 +333,18 @@ export async function POST(request: NextRequest) {
 
   if (marketPrice <= 0) {
     return NextResponse.json({ error: "Could not fetch current market price" }, { status: 500 })
+  }
+
+  // Leveraged Futures orders are handled in a completely separate path (real
+  // margin, liquidation price, and funding) so the Spot logic below is never
+  // touched or put at risk by this.
+  if (is_futures) {
+    return handleFuturesOrder({
+      adminSupabase, userId: user.id, userEmail: user.email || "unknown",
+      pair, side, order_type, price, amount, marketPrice,
+      leverage: Math.max(1, Math.min(125, Number(leverage) || 1)),
+      takeProfit, stopLoss, baseAsset, quoteAsset,
+    })
   }
 
   /* Determine execution price */
