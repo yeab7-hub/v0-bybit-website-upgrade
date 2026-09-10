@@ -41,6 +41,7 @@ const YAHOO_META: Record<string, { yahooSymbol: string; fallback: number }> = {
 const CRYPTO_FALLBACK: Record<string, number> = {
   BTC: 97842.5, ETH: 3456.78, SOL: 189.45, XRP: 2.87, BNB: 690.2,
   ADA: 0.89, DOGE: 0.32, AVAX: 38.4, DOT: 7.1, LINK: 22.6,
+  UNI: 14.2, MATIC: 0.52, TRX: 0.24, TON: 5.4, SHIB: 0.000024,
 }
 
 async function fetchDirectForex(pairSymbol: string): Promise<number> {
