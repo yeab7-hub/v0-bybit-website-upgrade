@@ -1,6 +1,8 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { TRADING_FEE_RATE } from "@/lib/trading-fees"
+import { elapsedFundingIntervals, calcFundingFee } from "@/lib/futures"
+import { getLivePrice } from "@/lib/live-price"
 
 /**
  * GET /api/trade/monitor
@@ -14,58 +16,16 @@ import { TRADING_FEE_RATE } from "@/lib/trading-fees"
  * Called on an interval by the trade page while positions are open.
  */
 
-const NON_CRYPTO = new Set([
-  "EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "USD/CHF",
-  "XAU/USD", "XAG/USD", "WTI", "BRENT", "NG",
-  "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA",
-])
-
-async function internalPrices(): Promise<any | null> {
-  try {
-    const { headers } = await import("next/headers")
-    const headersList = await headers()
-    const host = headersList.get("host") || "localhost:3000"
-    const protocol = host.includes("localhost") ? "http" : "https"
-    const res = await fetch(`${protocol}://${host}/api/prices`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(5000),
-    })
-    if (res.ok) return await res.json()
-  } catch { /* ignore */ }
-  return null
-}
-
+// Thin per-run memoization around the shared price lookup, so multiple open
+// positions on the same pair within one monitor pass don't each trigger a
+// separate external fetch.
 async function getPrice(pair: string, cache: { internal?: any }): Promise<number> {
+  if (!cache.internal) cache.internal = {}
+  if (cache.internal[pair] !== undefined) return cache.internal[pair]
   const baseAsset = pair.split("/")[0]
-  const lookup = pair.includes("/") ? pair : baseAsset
-
-  if (NON_CRYPTO.has(lookup) || NON_CRYPTO.has(baseAsset)) {
-    if (!cache.internal) cache.internal = await internalPrices()
-    const data = cache.internal
-    if (data) {
-      const all = [...(data.forex ?? []), ...(data.commodities ?? []), ...(data.stocks ?? [])]
-      const match = all.find((a: { symbol: string }) => a.symbol === lookup || a.symbol === baseAsset)
-      if (match?.price > 0) return match.price
-    }
-    return 0
-  }
-
-  // Crypto via Binance
-  try {
-    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${baseAsset}USDT`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(5000),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      const price = Number.parseFloat(data.price)
-      if (price > 0) return price
-    }
-  } catch { /* fallback */ }
-
-  if (!cache.internal) cache.internal = await internalPrices()
-  const coin = cache.internal?.crypto?.find((c: { symbol: string }) => c.symbol === baseAsset)
-  return coin?.price > 0 ? coin.price : 0
+  const price = await getLivePrice(baseAsset, pair)
+  cache.internal[pair] = price
+  return price
 }
 
 export async function GET() {
@@ -87,7 +47,7 @@ export async function GET() {
   }
 
   const withThresholds = positions.filter(
-    (p: any) => Number(p.take_profit) > 0 || Number(p.stop_loss) > 0,
+    (p: any) => Number(p.take_profit) > 0 || Number(p.stop_loss) > 0 || p.position_mode === "futures",
   )
   if (withThresholds.length === 0) return NextResponse.json({ closed: 0 })
 
@@ -99,18 +59,55 @@ export async function GET() {
     if (currentPrice <= 0) continue
 
     const isShort = position.side === "sell"
+    const isFuturesPosition = position.position_mode === "futures"
+
+    // Lazily settle funding for open futures positions (no cron job exists,
+    // so this is charged whenever the position is checked while still open).
+    if (isFuturesPosition) {
+      const intervals = elapsedFundingIntervals(position.last_funding_at, position.created_at)
+      if (intervals > 0) {
+        const notional = Number(position.price) * Number(position.amount)
+        const fundingFee = calcFundingFee(notional, intervals)
+        if (fundingFee > 0) {
+          const quoteAsset = position.pair.split("/")[1] || "USDT"
+          const { data: qBal } = await adminSupabase
+            .from("balances").select("*")
+            .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
+          if (qBal) {
+            await adminSupabase.from("balances").update({
+              available: Math.max(0, qBal.available - fundingFee),
+              updated_at: new Date().toISOString(),
+            }).eq("user_id", position.user_id).eq("asset", quoteAsset)
+          }
+          await adminSupabase.from("trades").update({
+            last_funding_at: new Date().toISOString(),
+            funding_paid: Number(position.funding_paid || 0) + fundingFee,
+          }).eq("id", position.id)
+        }
+      }
+    }
+
     const tp = Number(position.take_profit) || 0
     const sl = Number(position.stop_loss) || 0
+    const liqPrice = Number(position.liquidation_price) || 0
 
     let triggerPrice = 0
-    let reason: "take_profit" | "stop_loss" | null = null
+    let reason: "take_profit" | "stop_loss" | "liquidation" | null = null
 
-    if (isShort) {
-      if (tp > 0 && currentPrice <= tp) { triggerPrice = tp; reason = "take_profit" }
-      else if (sl > 0 && currentPrice >= sl) { triggerPrice = sl; reason = "stop_loss" }
-    } else {
-      if (tp > 0 && currentPrice >= tp) { triggerPrice = tp; reason = "take_profit" }
-      else if (sl > 0 && currentPrice <= sl) { triggerPrice = sl; reason = "stop_loss" }
+    // Liquidation takes priority over TP/SL -- it means the margin is gone.
+    if (isFuturesPosition && liqPrice > 0) {
+      if (isShort && currentPrice >= liqPrice) { triggerPrice = liqPrice; reason = "liquidation" }
+      else if (!isShort && currentPrice <= liqPrice) { triggerPrice = liqPrice; reason = "liquidation" }
+    }
+
+    if (!reason) {
+      if (isShort) {
+        if (tp > 0 && currentPrice <= tp) { triggerPrice = tp; reason = "take_profit" }
+        else if (sl > 0 && currentPrice >= sl) { triggerPrice = sl; reason = "stop_loss" }
+      } else {
+        if (tp > 0 && currentPrice >= tp) { triggerPrice = tp; reason = "take_profit" }
+        else if (sl > 0 && currentPrice <= sl) { triggerPrice = sl; reason = "stop_loss" }
+      }
     }
 
     if (!reason) continue
@@ -136,36 +133,55 @@ export async function GET() {
       pnl,
     }).eq("id", position.id)
 
-    // Settle balances (mirrors /api/trade/close). A LONG leg credited the base
-    // asset on open, so release it; a SHORT leg held no base.
-    if (!isShort) {
-      const { data: bBal } = await adminSupabase
+    // Settle balances. Futures: no base asset was ever held, only margin;
+    // credit back margin + pnl. Spot: a LONG leg held the base asset.
+    if (isFuturesPosition) {
+      const margin = Number(position.margin) || 0
+      const creditAmount = margin + pnl
+      const { data: qBal } = await adminSupabase
         .from("balances").select("*")
-        .eq("user_id", position.user_id).eq("asset", baseAsset).single()
-      if (bBal) {
+        .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
+      if (qBal) {
         await adminSupabase.from("balances").update({
-          available: Math.max(0, bBal.available - qty),
+          available: Math.max(0, qBal.available + creditAmount),
           updated_at: new Date().toISOString(),
-        }).eq("user_id", position.user_id).eq("asset", baseAsset)
+        }).eq("user_id", position.user_id).eq("asset", quoteAsset)
+      } else {
+        await adminSupabase.from("balances").insert({
+          user_id: position.user_id, asset: quoteAsset,
+          available: Math.max(0, creditAmount), in_order: 0,
+        })
       }
-    }
-
-    const creditAmount = (entryPrice * qty) + pnl
-    const { data: qBal } = await adminSupabase
-      .from("balances").select("*")
-      .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
-    if (qBal) {
-      await adminSupabase.from("balances").update({
-        available: Math.max(0, qBal.available + creditAmount),
-        updated_at: new Date().toISOString(),
-      }).eq("user_id", position.user_id).eq("asset", quoteAsset)
     } else {
-      await adminSupabase.from("balances").insert({
-        user_id: position.user_id,
-        asset: quoteAsset,
-        available: Math.max(0, creditAmount),
-        in_order: 0,
-      })
+      if (!isShort) {
+        const { data: bBal } = await adminSupabase
+          .from("balances").select("*")
+          .eq("user_id", position.user_id).eq("asset", baseAsset).single()
+        if (bBal) {
+          await adminSupabase.from("balances").update({
+            available: Math.max(0, bBal.available - qty),
+            updated_at: new Date().toISOString(),
+          }).eq("user_id", position.user_id).eq("asset", baseAsset)
+        }
+      }
+
+      const creditAmount = (entryPrice * qty) + pnl
+      const { data: qBal } = await adminSupabase
+        .from("balances").select("*")
+        .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
+      if (qBal) {
+        await adminSupabase.from("balances").update({
+          available: Math.max(0, qBal.available + creditAmount),
+          updated_at: new Date().toISOString(),
+        }).eq("user_id", position.user_id).eq("asset", quoteAsset)
+      } else {
+        await adminSupabase.from("balances").insert({
+          user_id: position.user_id,
+          asset: quoteAsset,
+          available: Math.max(0, creditAmount),
+          in_order: 0,
+        })
+      }
     }
 
     closedCount++
