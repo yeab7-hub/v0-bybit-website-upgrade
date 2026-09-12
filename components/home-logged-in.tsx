@@ -8,6 +8,7 @@ import {
   Calendar, Coins, MoreHorizontal, Star, Check, Plus, RotateCcw,
 } from "lucide-react"
 import { useLivePrices, formatPrice, safeFindPrice, type PriceData } from "@/hooks/use-live-prices"
+import { NewsSection } from "@/components/news-section"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
@@ -56,7 +57,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from("balances").select("*").then(({ data }) => {
+    supabase.from("balances").select("*").eq("user_id", user.id).then(({ data }) => {
       if (data && data.length > 0) {
         const total = data.reduce((s: number, b: any) => {
           const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
@@ -67,7 +68,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
         setTotalAssets(total)
       }
     }).catch(() => {})
-    supabase.from("trades").select("pnl").order("created_at", { ascending: false }).limit(20).then(({ data }) => {
+    supabase.from("trades").select("pnl").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20).then(({ data }) => {
       if (data) {
         const pnl = data.reduce((s: number, t: any) => s + (Number(t.pnl) || 0), 0)
         const pct = totalAssets > 0 ? (pnl / totalAssets) * 100 : 0
@@ -213,6 +214,9 @@ export function HomeLoggedIn({ user }: { user: User }) {
           </div>
         </div>
       </div>
+
+      {/* Real, live crypto/financial news */}
+      <NewsSection />
 
       {/* Market Tabs */}
       <div className="mt-5 rounded-xl bg-card">
