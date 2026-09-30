@@ -15,6 +15,7 @@ import { PairSelector } from "@/components/trading/pair-selector"
 import { TradingViewChart } from "@/components/trading/tradingview-chart"
 import { BottomNav } from "@/components/bottom-nav"
 import { createClient } from "@/lib/supabase/client"
+import { FUNDING_RATE_PER_INTERVAL, calcLiquidationPrice } from "@/lib/futures"
 import useSWR, { mutate as globalMutate } from "swr"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -52,6 +53,26 @@ export default function TradePage() {
   const [stopLoss, setStopLoss] = useState("")
   const [leverage, setLeverage] = useState("10x")
   const [marginType, setMarginType] = useState("Cross")
+  const [durationSeconds, setDurationSeconds] = useState<number | null>(null)
+  const [fundingCountdown, setFundingCountdown] = useState("--:--:--")
+
+  // Real funding countdown to the next 00:00 / 08:00 / 16:00 UTC boundary --
+  // matches the same 8h interval the backend actually charges funding on.
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date()
+      const next = new Date(now)
+      next.setUTCHours(Math.floor(now.getUTCHours() / 8) * 8 + 8, 0, 0, 0)
+      const diff = next.getTime() - now.getTime()
+      const h = String(Math.floor(diff / 3_600_000)).padStart(2, "0")
+      const m = String(Math.floor((diff % 3_600_000) / 60_000)).padStart(2, "0")
+      const s = String(Math.floor((diff % 60_000) / 1000)).padStart(2, "0")
+      setFundingCountdown(`${h}:${m}:${s}`)
+    }
+    tick()
+    const iv = setInterval(tick, 1000)
+    return () => clearInterval(iv)
+  }, [])
 
   useEffect(() => {
     const p = searchParams.get("pair")
@@ -199,6 +220,9 @@ export default function TradePage() {
           price: orderType !== "Market" ? parseFloat(price.replace(/,/g, "")) : undefined,
           stop_price: orderType === "Stop-Limit" ? parseFloat(stopPrice.replace(/,/g, "")) : undefined,
           amount: baseQty,
+          is_futures: isFutures,
+          leverage: isFutures ? parseInt(leverage) : undefined,
+          duration_seconds: isFutures ? durationSeconds ?? undefined : undefined,
           take_profit: tpslEnabled ? parseFloat(takeProfit.replace(/,/g, "")) || undefined : undefined,
           stop_loss: tpslEnabled ? parseFloat(stopLoss.replace(/,/g, "")) || undefined : undefined,
         }),
@@ -206,7 +230,7 @@ export default function TradePage() {
       const data = await res.json()
       if (data.success) {
         setFeedback({ type: "success", msg: data.message })
-        setAmount(""); setSliderPct(0); setTakeProfit(""); setStopLoss(""); setStopPrice("")
+        setAmount(""); setSliderPct(0); setTakeProfit(""); setStopLoss(""); setStopPrice(""); setDurationSeconds(null)
         globalMutate("/api/trade?type=balances")
         globalMutate("/api/trade?type=orders")
         globalMutate("/api/trade?type=positions")
@@ -321,7 +345,7 @@ export default function TradePage() {
       {isFutures && (
         <div className="px-2 py-1.5 text-right">
           <div className="text-[9px] text-muted-foreground">Funding Rate / Countdown</div>
-          <div className="font-mono text-[10px] text-foreground">-0.0013% / 02:35:40 (8h)</div>
+          <div className="font-mono text-[10px] text-foreground">{(FUNDING_RATE_PER_INTERVAL * 100).toFixed(4)}% / {fundingCountdown} (8h)</div>
         </div>
       )}
       <div className="flex items-center justify-between px-2 py-1">
@@ -399,6 +423,43 @@ export default function TradePage() {
             <option>50x</option>
             <option>100x</option>
           </select>
+        </div>
+      )}
+
+      {/* Futures: optional timed auto-close -- settles at whatever the REAL
+          market price is when the timer ends. No preset or guaranteed
+          outcome; it's exactly the same as closing manually, just scheduled. */}
+      {isFutures && (
+        <div className="mb-3">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Auto-close (optional)</span>
+          </div>
+          <div className="flex gap-1.5">
+            {[
+              { label: "None", value: null },
+              { label: "30s", value: 30 },
+              { label: "60s", value: 60 },
+              { label: "120s", value: 120 },
+            ].map((opt) => (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => setDurationSeconds(opt.value)}
+                className={`flex-1 rounded-lg border py-1.5 text-xs font-medium transition-colors ${
+                  durationSeconds === opt.value
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-secondary/40 text-muted-foreground"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {durationSeconds && (
+            <p className="mt-1.5 text-[10px] text-muted-foreground">
+              Closes automatically after {durationSeconds}s at the real market price. Result depends entirely on actual price movement -- win, loss, or breakeven.
+            </p>
+          )}
         </div>
       )}
 
@@ -505,7 +566,11 @@ export default function TradePage() {
         </div>
         <div className="mt-1 flex items-center justify-between">
           <span className="text-muted-foreground">Liq. Price</span>
-          <span className="font-mono text-primary cursor-pointer">Calculate</span>
+          <span className="font-mono text-primary">
+            {isFutures && effectivePrice > 0 && parseInt(leverage) > 0
+              ? `~${calcLiquidationPrice(effectivePrice, parseInt(leverage), side === "sell").toFixed(2)}`
+              : "--"}
+          </span>
         </div>
       </div>
 
@@ -691,7 +756,8 @@ export default function TradePage() {
                 const curPrice = posCoin?.price ?? entryPrice
                 const isSell = pos.side === "sell"
                 const unrealizedPnl = isSell ? (entryPrice - curPrice) * qty : (curPrice - entryPrice) * qty
-                const pnlPct = entryPrice > 0 ? (isSell ? ((entryPrice - curPrice) / entryPrice) * 100 : ((curPrice - entryPrice) / entryPrice) * 100) : 0
+                const pnlBase = pos.position_mode === "futures" && Number(pos.margin) > 0 ? Number(pos.margin) : entryPrice * qty
+                const pnlPct = pnlBase > 0 ? (unrealizedPnl / pnlBase) * 100 : 0
                 const isClosing = closingId === pos.id
                 const logoSymbol = posCoin?.symbol ?? pairStr.split("/")[0] ?? "BTC"
 
@@ -708,11 +774,25 @@ export default function TradePage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-semibold text-foreground">{pos.pair}</span>
                             <span className={`rounded px-1 py-0.5 text-[9px] font-bold ${pos.side === "sell" ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>{pos.side === "sell" ? "SHORT" : "LONG"}</span>
+                            {pos.position_mode === "futures" && (
+                              <span className="rounded bg-primary/10 px-1 py-0.5 text-[9px] font-bold text-primary">{pos.leverage}x</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                             <span>Entry: ${entryPrice.toLocaleString()}</span>
                             <span>Qty: {qty.toFixed(4)}</span>
                           </div>
+                          {pos.position_mode === "futures" && (
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                              <span>Margin: ${Number(pos.margin).toFixed(2)}</span>
+                              <span className="text-destructive/80">Liq: ${Number(pos.liquidation_price).toFixed(2)}</span>
+                            </div>
+                          )}
+                          {pos.auto_close_at && (
+                            <div className="mt-0.5 text-[10px] font-medium text-primary">
+                              {Math.max(0, Math.round((new Date(pos.auto_close_at).getTime() - Date.now()) / 1000))}s until auto-close
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
