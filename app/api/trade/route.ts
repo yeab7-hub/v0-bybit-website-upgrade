@@ -88,11 +88,11 @@ async function handleFuturesOrder(params: {
   pair: string; side: "buy" | "sell"; order_type: string; price: number; amount: number
   marketPrice: number; leverage: number
   takeProfit: number | null; stopLoss: number | null
-  baseAsset: string; quoteAsset: string
+  baseAsset: string; quoteAsset: string; durationSeconds: number | null
 }) {
   const {
     adminSupabase, userId, userEmail, pair, side, order_type, price, amount,
-    marketPrice, leverage, takeProfit, stopLoss, baseAsset, quoteAsset,
+    marketPrice, leverage, takeProfit, stopLoss, baseAsset, quoteAsset, durationSeconds,
   } = params
 
   const isShort = side === "sell"
@@ -133,6 +133,7 @@ async function handleFuturesOrder(params: {
   }
 
   const liquidationPrice = calcLiquidationPrice(execPrice, leverage, isShort)
+  const autoCloseAt = durationSeconds ? new Date(Date.now() + durationSeconds * 1000).toISOString() : null
 
   const { data: order, error: orderErr } = await adminSupabase.from("orders").insert({
     user_id: userId, pair, side, order_type,
@@ -148,6 +149,7 @@ async function handleFuturesOrder(params: {
     liquidation_price: liquidationPrice,
     last_funding_at: new Date().toISOString(),
     take_profit: takeProfit, stop_loss: stopLoss,
+    auto_close_at: autoCloseAt,
   })
   if (tradeErr) return NextResponse.json({ error: tradeErr.message }, { status: 500 })
 
@@ -157,7 +159,7 @@ async function handleFuturesOrder(params: {
     updated_at: new Date().toISOString(),
   }).eq("user_id", userId).eq("asset", quoteAsset)
 
-  const message = `${isShort ? "Short" : "Long"} opened: ${amount} ${baseAsset} @ $${execPrice.toLocaleString()} | ${leverage}x | Margin: $${margin.toFixed(2)} | Liq: $${liquidationPrice.toFixed(2)}`
+  const message = `${isShort ? "Short" : "Long"} opened: ${amount} ${baseAsset} @ $${execPrice.toLocaleString()} | ${leverage}x | Margin: $${margin.toFixed(2)} | Liq: $${liquidationPrice.toFixed(2)}${durationSeconds ? ` | Auto-closes in ${durationSeconds}s at real market price` : ""}`
 
   notifyAdmin({
     subject: `Futures ${isShort ? "Short" : "Long"} - ${amount} ${baseAsset}`,
@@ -185,7 +187,7 @@ export async function POST(request: NextRequest) {
   const adminSupabase = await createAdminClient()
 
   const body = await request.json()
-  const { pair, side, order_type, price, stop_price, amount, take_profit, stop_loss, is_futures, leverage } = body
+  const { pair, side, order_type, price, stop_price, amount, take_profit, stop_loss, is_futures, leverage, duration_seconds } = body
 
   if (!pair || !side || !order_type || !amount || amount <= 0) {
     return NextResponse.json({ error: "Invalid order parameters" }, { status: 400 })
@@ -202,6 +204,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Could not fetch current market price" }, { status: 500 })
   }
 
+  // Only a small fixed set of durations are allowed, matching the UI.
+  const ALLOWED_DURATIONS = new Set([30, 60, 120])
+  const durationSeconds = ALLOWED_DURATIONS.has(Number(duration_seconds)) ? Number(duration_seconds) : null
+
   // Leveraged Futures orders are handled in a completely separate path (real
   // margin, liquidation price, and funding) so the Spot logic below is never
   // touched or put at risk by this.
@@ -210,7 +216,7 @@ export async function POST(request: NextRequest) {
       adminSupabase, userId: user.id, userEmail: user.email || "unknown",
       pair, side, order_type, price, amount, marketPrice,
       leverage: Math.max(1, Math.min(125, Number(leverage) || 1)),
-      takeProfit, stopLoss, baseAsset, quoteAsset,
+      takeProfit, stopLoss, baseAsset, quoteAsset, durationSeconds,
     })
   }
 
