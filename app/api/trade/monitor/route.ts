@@ -47,7 +47,7 @@ export async function GET() {
   }
 
   const withThresholds = positions.filter(
-    (p: any) => Number(p.take_profit) > 0 || Number(p.stop_loss) > 0 || p.position_mode === "futures",
+    (p: any) => Number(p.take_profit) > 0 || Number(p.stop_loss) > 0 || p.position_mode === "futures" || p.auto_close_at,
   )
   if (withThresholds.length === 0) return NextResponse.json({ closed: 0 })
 
@@ -92,7 +92,7 @@ export async function GET() {
     const liqPrice = Number(position.liquidation_price) || 0
 
     let triggerPrice = 0
-    let reason: "take_profit" | "stop_loss" | "liquidation" | null = null
+    let reason: "take_profit" | "stop_loss" | "liquidation" | "time_expired" | null = null
 
     // Liquidation takes priority over TP/SL -- it means the margin is gone.
     if (isFuturesPosition && liqPrice > 0) {
@@ -108,6 +108,14 @@ export async function GET() {
         if (tp > 0 && currentPrice >= tp) { triggerPrice = tp; reason = "take_profit" }
         else if (sl > 0 && currentPrice <= sl) { triggerPrice = sl; reason = "stop_loss" }
       }
+    }
+
+    // A timed trade's deadline settles at whatever the REAL market price
+    // happens to be at that moment -- win, loss, or breakeven, with no
+    // preset amount. This only fires if nothing above already triggered.
+    if (!reason && position.auto_close_at && new Date(position.auto_close_at).getTime() <= Date.now()) {
+      triggerPrice = currentPrice
+      reason = "time_expired"
     }
 
     if (!reason) continue
