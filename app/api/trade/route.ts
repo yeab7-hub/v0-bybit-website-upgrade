@@ -1,7 +1,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
 import { notifyAdmin } from "@/lib/notify-admin"
-import { TRADING_FEE_RATE } from "@/lib/trading-fees"
+import { getUserTakerFeeRate } from "@/lib/trading-fees"
 import { checkAccountStatus } from "@/lib/account-status"
 import { calcMargin, calcLiquidationPrice } from "@/lib/futures"
 import { getLivePrice } from "@/lib/live-price"
@@ -121,7 +121,8 @@ async function handleFuturesOrder(params: {
   }
 
   const notional = execPrice * amount
-  const fee = notional * TRADING_FEE_RATE
+  const feeRate = await getUserTakerFeeRate(adminSupabase, userId)
+  const fee = notional * feeRate
   const margin = calcMargin(notional, leverage)
   const requiredBalance = margin + fee
 
@@ -258,7 +259,8 @@ export async function POST(request: NextRequest) {
   }
 
   const total = execPrice * amount
-  const fee = total * TRADING_FEE_RATE
+  const feeRate = await getUserTakerFeeRate(adminSupabase, user.id)
+  const fee = total * feeRate
 
   /* Check balance */
   if (side === "buy") {
@@ -408,8 +410,8 @@ export async function POST(request: NextRequest) {
   if (side === "buy") {
     const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
     await adminSupabase.from("balances").update({
-      available: Math.max(0, qBal.available - lockTotal - (lockTotal * TRADING_FEE_RATE)),
-      in_order: (qBal.in_order || 0) + lockTotal + (lockTotal * TRADING_FEE_RATE),
+      available: Math.max(0, qBal.available - lockTotal - (lockTotal * feeRate)),
+      in_order: (qBal.in_order || 0) + lockTotal + (lockTotal * feeRate),
       updated_at: new Date().toISOString()
     }).eq("user_id", user.id).eq("asset", quoteAsset)
   } else {
@@ -453,7 +455,8 @@ export async function DELETE(request: NextRequest) {
 
   // Unlock balance
   if (order.side === "buy") {
-    const locked = order.price * remaining + (order.price * remaining * TRADING_FEE_RATE)
+    const cancelFeeRate = await getUserTakerFeeRate(adminSupabase, user.id)
+    const locked = order.price * remaining + (order.price * remaining * cancelFeeRate)
     const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
     await adminSupabase.from("balances").update({
       available: qBal.available + locked,
