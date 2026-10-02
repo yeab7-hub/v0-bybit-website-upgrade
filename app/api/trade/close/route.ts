@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
-import { TRADING_FEE_RATE } from "@/lib/trading-fees"
+import { getUserTakerFeeRate } from "@/lib/trading-fees"
 import { getLivePrice } from "@/lib/live-price"
 
 export async function POST(request: NextRequest) {
@@ -56,7 +56,8 @@ export async function POST(request: NextRequest) {
   const entryPrice = Number(position.price)
   const qty = Number(position.amount)
   const closeTotal = currentPrice * qty
-  const fee = closeTotal * TRADING_FEE_RATE
+  const feeRate = await getUserTakerFeeRate(adminSupabase, position.user_id)
+  const fee = closeTotal * feeRate
 
   // Direction of the open position leg. A "buy" leg is LONG (profit when price rises),
   // a "sell" leg is SHORT (profit when price falls).
