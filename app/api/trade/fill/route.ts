@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
-import { TRADING_FEE_RATE } from "@/lib/trading-fees"
+import { getUserTakerFeeRate } from "@/lib/trading-fees"
+import { getLivePrice } from "@/lib/live-price"
 
 /**
  * GET /api/trade/fill
@@ -26,50 +27,14 @@ export async function GET() {
     return NextResponse.json({ filled: 0 })
   }
 
-  // Get current prices - try Binance first, then fallback to our /api/prices
-  const uniquePairs = [...new Set(openOrders.map(o => o.pair.split("/")[0]))]
+  // Fast, direct, fallback-safe per-pair lookups (shared with every other
+  // trade route) -- never silently returns empty the way the old batched
+  // Binance-then-self-fetch approach could.
+  const uniquePairFulls = [...new Set(openOrders.map((o) => o.pair as string))]
   const prices: Record<string, number> = {}
-
-  // Try Binance
-  try {
-    const symbols = uniquePairs.map(s => `"${s}USDT"`).join(",")
-    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=[${symbols}]`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(5000),
-    })
-    if (res.ok) {
-      const data: { symbol: string; price: string }[] = await res.json()
-      for (const d of data) {
-        const base = d.symbol.replace("USDT", "")
-        prices[base] = parseFloat(d.price) || 0
-      }
-    }
-  } catch { /* Binance failed */ }
-
-  // Fallback: use our own prices API
-  if (Object.keys(prices).length === 0) {
-    try {
-      const { headers } = await import("next/headers")
-      const headersList = await headers()
-      const host = headersList.get("host") || "localhost:3000"
-      const protocol = host.includes("localhost") ? "http" : "https"
-      const res = await fetch(`${protocol}://${host}/api/prices`, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(5000),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        for (const coin of data.crypto ?? []) {
-          if (uniquePairs.includes(coin.symbol)) {
-            prices[coin.symbol] = coin.price
-          }
-        }
-      }
-    } catch { /* all failed */ }
-  }
-
-  if (Object.keys(prices).length === 0) {
-    return NextResponse.json({ filled: 0, message: "Could not fetch prices" })
+  for (const fullPair of uniquePairFulls) {
+    const base = fullPair.split("/")[0]
+    prices[base] = await getLivePrice(base, fullPair)
   }
 
   let filledCount = 0
@@ -99,7 +64,8 @@ export async function GET() {
     if (!shouldFill) continue
 
     const total = fillPrice * remaining
-    const fee = total * TRADING_FEE_RATE
+    const feeRate = await getUserTakerFeeRate(adminSupabase, user.id)
+    const fee = total * feeRate
 
     let pnl = 0
     if (order.side === "sell") {
@@ -146,7 +112,7 @@ export async function GET() {
     if (order.side === "buy") {
       const { data: qBal } = await adminSupabase.from("balances").select("*").eq("user_id", user.id).eq("asset", quoteAsset).single()
       if (qBal) {
-        const lockedAmount = order.price * remaining + (order.price * remaining * TRADING_FEE_RATE)
+        const lockedAmount = order.price * remaining + (order.price * remaining * feeRate)
         await adminSupabase.from("balances").update({
           in_order: Math.max(0, (qBal.in_order || 0) - lockedAmount),
           available: qBal.available + Math.max(0, (order.price - fillPrice) * remaining),
