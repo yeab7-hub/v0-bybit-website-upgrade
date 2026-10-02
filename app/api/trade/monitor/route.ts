@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
-import { TRADING_FEE_RATE } from "@/lib/trading-fees"
+import { getUserTakerFeeRate } from "@/lib/trading-fees"
 import { elapsedFundingIntervals, calcFundingFee } from "@/lib/futures"
 import { getLivePrice } from "@/lib/live-price"
 
@@ -125,7 +125,8 @@ export async function GET() {
     const entryPrice = Number(position.price)
     const qty = Number(position.amount)
     const closeTotal = triggerPrice * qty
-    const fee = closeTotal * TRADING_FEE_RATE
+    const feeRate = await getUserTakerFeeRate(adminSupabase, position.user_id)
+    const fee = closeTotal * feeRate
 
     // Direction-aware realized PnL at the TP/SL target, net of both legs' fees.
     const priceDelta = isShort ? entryPrice - triggerPrice : triggerPrice - entryPrice
