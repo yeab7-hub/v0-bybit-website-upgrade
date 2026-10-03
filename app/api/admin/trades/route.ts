@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextResponse, type NextRequest } from "next/server"
-import { TRADING_FEE_RATE } from "@/lib/trading-fees"
+import { getUserTakerFeeRate } from "@/lib/trading-fees"
 
 async function verifyAdmin() {
   const supabase = await createClient()
@@ -159,7 +159,8 @@ export async function POST(request: NextRequest) {
     const remaining = order.amount - order.filled
 
     if (order.side === "buy") {
-      const locked = order.price * remaining + (order.price * remaining * TRADING_FEE_RATE)
+      const cancelFeeRate = await getUserTakerFeeRate(adminSupabase, order.user_id)
+      const locked = order.price * remaining + (order.price * remaining * cancelFeeRate)
       const qBal = await ensureBalance(adminSupabase, order.user_id, quoteAsset)
       await adminSupabase.from("balances").update({
         available: qBal.available + locked,
@@ -215,7 +216,8 @@ export async function POST(request: NextRequest) {
     }
 
     const total = execPrice * amount
-    const fee = total * TRADING_FEE_RATE
+    const feeRate = await getUserTakerFeeRate(adminSupabase, target_user_id)
+    const fee = total * feeRate
 
     // Check balance
     if (side === "buy") {
