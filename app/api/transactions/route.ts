@@ -107,30 +107,49 @@ export async function POST(request: NextRequest) {
     const accountStatus = await checkAccountStatus(supabase, user.id)
     if (accountStatus.blocked) return NextResponse.json({ error: accountStatus.reason }, { status: 403 })
 
-    // Check balance
-    const { data: balance } = await supabase
+    const { data: supportedNetwork, error: networkError } = await supabase
+      .from("deposit_addresses")
+      .select("symbol, network")
+      .eq("symbol", asset)
+      .eq("network", network)
+      .eq("is_active", true)
+      .maybeSingle()
+    if (networkError) return NextResponse.json({ error: "Could not verify the selected network" }, { status: 503 })
+    if (!supportedNetwork) return NextResponse.json({ error: "This asset/network is not currently supported for withdrawals" }, { status: 400 })
+
+    // Read and lock the balance with a compare-and-set condition to prevent
+    // concurrent withdrawal requests from spending the same available funds.
+    const { data: balance, error: balanceError } = await supabase
       .from("balances")
       .select("available, in_order")
       .eq("user_id", user.id)
       .eq("asset", asset)
-      .single()
+      .maybeSingle()
 
-    if (!balance || balance.available < amountNum) {
+    if (balanceError) return NextResponse.json({ error: "Could not read your balance" }, { status: 500 })
+    if (!balance || Number(balance.available) < amountNum) {
       return NextResponse.json({ error: "Insufficient balance" }, { status: 400 })
     }
 
-    // Lock the funds (move from available to in_order)
-    const { error: lockErr } = await supabase
+    const oldAvailable = Number(balance.available)
+    const oldInOrder = Number(balance.in_order || 0)
+    const newAvailable = oldAvailable - amountNum
+    const newInOrder = oldInOrder + amountNum
+    const { data: lockedBalance, error: lockErr } = await supabase
       .from("balances")
       .update({
-        available: balance.available - amountNum,
-        in_order: (balance.in_order || 0) + amountNum,
+        available: newAvailable,
+        in_order: newInOrder,
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", user.id)
       .eq("asset", asset)
+      .eq("available", oldAvailable)
+      .select("id")
+      .maybeSingle()
 
-    if (lockErr) return NextResponse.json({ error: lockErr.message }, { status: 500 })
+    if (lockErr) return NextResponse.json({ error: "Could not reserve withdrawal funds" }, { status: 500 })
+    if (!lockedBalance) return NextResponse.json({ error: "Your balance changed. Refresh and try again." }, { status: 409 })
 
     const { data, error } = await supabase.from("transactions").insert({
       user_id: user.id,
@@ -143,7 +162,21 @@ export async function POST(request: NextRequest) {
       status: "pending",
     }).select().single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      // Roll back only if the balance still matches the exact values written above.
+      const { data: rollback } = await supabase.from("balances").update({
+        available: oldAvailable,
+        in_order: oldInOrder,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", user.id).eq("asset", asset)
+        .eq("available", newAvailable).eq("in_order", newInOrder)
+        .select("id").maybeSingle()
+      return NextResponse.json({
+        error: rollback
+          ? "Could not create the withdrawal request; the reserved funds were restored."
+          : "Could not create the withdrawal request and the reserved balance could not be restored automatically. Contact support before retrying.",
+      }, { status: 500 })
+    }
 
     notifyAdmin({
       subject: `New Withdrawal Request - ${amountNum} ${asset}`,
