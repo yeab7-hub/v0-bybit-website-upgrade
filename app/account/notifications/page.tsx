@@ -267,7 +267,7 @@ export default function NotificationsPage() {
             </div>
 
             {saveError && <p role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{saveError}</p>}
-            <p className="mb-4 text-xs text-muted-foreground">Preferences are saved to your account profile. Email, push, and SMS delivery still depends on the corresponding delivery service being configured.</p>
+            <p className="mb-4 text-xs text-muted-foreground">Preferences are saved to your profile, but event delivery is not yet wired to respect these preferences. Push and SMS delivery services are not configured.</p>
 
             {/* Channel legend */}
             <div className="mb-6 flex items-center gap-6 rounded-xl border border-border bg-card px-5 py-3">
