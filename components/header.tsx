@@ -364,9 +364,27 @@ export function Header() {
       {mobileOpen && (
         <div className="max-h-[80vh] overflow-y-auto border-t border-border bg-card px-4 pb-6 pt-3 lg:hidden">
           {/* Mobile search */}
-          <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <input type="text" placeholder="Search..." className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+          <div className="mb-3 rounded-lg border border-border bg-background">
+            <div className="flex items-center gap-2 px-3 py-2">
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <input
+                type="search"
+                placeholder="Search pages..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
+              />
+              {searchQuery && <button type="button" onClick={() => setSearchQuery("")} aria-label="Clear search" className="p-1 text-muted-foreground"><X className="h-4 w-4" /></button>}
+            </div>
+            {searchQuery && (
+              <div className="max-h-52 overflow-y-auto border-t border-border py-1">
+                {filteredSearch.length ? filteredSearch.map((item) => (
+                  <Link key={item.href + item.label} href={item.href} onClick={() => { setMobileOpen(false); setSearchQuery("") }} className="block px-4 py-3 text-sm text-foreground hover:bg-secondary">
+                    {item.label}
+                  </Link>
+                )) : <p className="px-4 py-4 text-center text-xs text-muted-foreground">No results found</p>}
+              </div>
+            )}
           </div>
 
           <nav className="flex flex-col">
