@@ -590,6 +590,7 @@ function TransferTab({ bals, mutTx, mutBal }: any) {
   const [amount, setAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [error, setError] = useState("")
 
   const accounts = ["Spot", "Funding", "Derivatives", "Earn"]
   const bal = bals.find((b: any) => b.asset === coin)
@@ -597,10 +598,27 @@ function TransferTab({ bals, mutTx, mutBal }: any) {
   const swap = () => { setFrom(to); setTo(from) }
 
   const submit = async () => {
-    if (!amount || parseFloat(amount) <= 0) return
+    if (!amount || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || from === to) return
     setSubmitting(true)
-    await fetch("/api/transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "transfer", asset: coin, amount, from_account: from, to_account: to }) })
-    mutTx(); mutBal(); setDone(true); setSubmitting(false)
+    setError("")
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "transfer", asset: coin, amount, from_account: from, to_account: to }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setError(result.error || "Transfer could not be completed.")
+        return
+      }
+      await Promise.all([mutTx(), mutBal()])
+      setDone(true)
+    } catch {
+      setError("Network error. No transfer confirmation was received.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (done) return (
@@ -647,7 +665,8 @@ function TransferTab({ bals, mutTx, mutBal }: any) {
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">Available: {avail.toFixed(coin === "USDT" ? 2 : 6)} {coin}</p>
       </div>
-      <button onClick={submit} disabled={submitting || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > avail}
+      {error && <p role="alert" className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+      <button onClick={submit} disabled={submitting || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > avail || from === to}
         className="w-full rounded-lg bg-[#f7a600] py-3 text-sm font-bold text-[#0a0e17] transition hover:bg-[#e09800] disabled:opacity-50">
         {submitting ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : "Transfer"}
       </button>
