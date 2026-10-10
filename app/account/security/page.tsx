@@ -109,7 +109,7 @@ export default function SecurityPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full border border-border px-2 py-1 text-[10px] text-muted-foreground">Provider-managed</span>
+                    <span className="rounded-full bg-[#0ecb81]/10 px-2 py-0.5 text-[10px] font-medium text-[#0ecb81]">Available</span>
                     <Button size="sm" variant="ghost" onClick={() => setShowChangePassword(!showChangePassword)} className="h-7 text-xs text-primary">Change</Button>
                   </div>
                 </div>
@@ -150,7 +150,7 @@ export default function SecurityPage() {
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary"><Mail className="h-4 w-4 text-foreground" /></div>
                     <div><h3 className="text-sm font-semibold text-foreground">Email Authentication</h3><p className="text-xs text-muted-foreground">Sign-in and recovery are managed by the configured authentication provider.</p></div>
                   </div>
-                  <span className="rounded-full bg-[#0ecb81]/10 px-2 py-0.5 text-[10px] font-medium text-[#0ecb81]">Enabled</span>
+                  <span className="rounded-full border border-border px-2 py-1 text-[10px] text-muted-foreground">Provider-managed</span>
                 </div>
               </div>
 
