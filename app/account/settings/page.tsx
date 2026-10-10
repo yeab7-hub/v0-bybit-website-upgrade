@@ -123,35 +123,20 @@ export default function AccountSettingsPage() {
                 <ChevronRight className="h-5 w-5 rotate-180" />
               </button>
               <h1 className="text-base font-semibold text-foreground">User Center</h1>
-              <div className="flex items-center gap-2">
-                <button className="p-1 text-muted-foreground"><Moon className="h-5 w-5" /></button>
-                <button className="p-1 text-muted-foreground"><Globe className="h-5 w-5" /></button>
-              </div>
+              <span className="text-xs text-muted-foreground">Account settings</span>
             </div>
 
             {/* Profile Header */}
             <div className="mb-6 flex items-center gap-4">
-              <div className="relative">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#87ceeb]/30 text-xl font-bold text-primary">
-                  {initials}
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-success text-success-foreground">
-                  <Check className="h-3 w-3" />
-                </div>
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-xl font-bold text-primary">
+                {initials}
               </div>
               <div>
                 <h2 className="text-lg font-bold text-foreground">{maskedEmail}</h2>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm text-muted-foreground">Security level</span>
-                  <span className="text-sm font-medium text-success">High</span>
-                  <div className="flex gap-0.5">
-                    <div className="h-1.5 w-3 rounded-full bg-success" />
-                    <div className="h-1.5 w-3 rounded-full bg-success" />
-                    <div className="h-1.5 w-3 rounded-full bg-success" />
-                  </div>
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-                <span className="mt-0.5 inline-block rounded bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">Site: Bybit Global</span>
+                <Link href="/account/security" className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+                  Review account security <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+                <span className="mt-1 inline-block rounded bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">Trading Platform Account</span>
               </div>
             </div>
 
@@ -261,13 +246,8 @@ export default function AccountSettingsPage() {
                     <div className="rounded-xl bg-card p-5">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#87ceeb]/30 text-lg font-bold text-primary">
-                              {initials}
-                            </div>
-                            <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-success text-success-foreground">
-                              <Check className="h-2.5 w-2.5" />
-                            </div>
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-lg font-bold text-primary">
+                            {initials}
                           </div>
                           <div>
                             <h3 className="text-lg font-bold text-foreground">{maskedEmail}</h3>
@@ -280,12 +260,11 @@ export default function AccountSettingsPage() {
                               <span>Site: Bybit Gl...</span>
                             </div>
                             <div className="mt-1 flex items-center gap-2">
-                              <span className="flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] text-foreground">
-                                <Check className="h-2.5 w-2.5" /> Verified
+                              <span className={`flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] ${user?.email_confirmed_at ? "text-success" : "text-muted-foreground"}`}>
+                                {user?.email_confirmed_at ? <Check className="h-2.5 w-2.5" /> : <Mail className="h-2.5 w-2.5" />}
+                                {user?.email_confirmed_at ? "Email verified" : "Email not verified"}
                               </span>
-                              <span className="flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                                Non-VIP <ChevronRight className="h-2.5 w-2.5" />
-                              </span>
+                              <span className="rounded bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">Standard account</span>
                             </div>
                           </div>
                         </div>
