@@ -262,6 +262,7 @@ export function OpenOrders() {
       {/* ===== Order Detail Modal ===== */}
       {selectedOrder && (() => {
         const o = selectedOrder
+        const baseAsset = String(o.pair ?? "").split("/")[0] || "—"
         const currentPrice = safeFindPrice(allAssets, o.pair)?.price ?? 0
         const remaining = Number(o.amount) - Number(o.filled)
         const fillPercent = Number(o.amount) > 0 ? (Number(o.filled) / Number(o.amount)) * 100 : 0
