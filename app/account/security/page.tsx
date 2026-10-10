@@ -84,7 +84,7 @@ export default function SecurityPage() {
 
             {/* Security level */}
             <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-5">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wider text-primary">Security Level</div>
                   <div className="mt-1 text-lg font-bold text-foreground">Password protected</div>
@@ -100,7 +100,7 @@ export default function SecurityPage() {
             <div className="space-y-4">
               {/* Password */}
               <div className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary"><Lock className="h-4 w-4 text-foreground" /></div>
                     <div>
@@ -131,7 +131,7 @@ export default function SecurityPage() {
 
               {/* 2FA */}
               <div className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary"><Smartphone className="h-4 w-4 text-foreground" /></div>
                     <div><h3 className="text-sm font-semibold text-foreground">Two-Factor Authentication (2FA)</h3><p className="text-xs text-muted-foreground">Google Authenticator or SMS verification</p></div>
@@ -145,7 +145,7 @@ export default function SecurityPage() {
 
               {/* Email verification */}
               <div className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary"><Mail className="h-4 w-4 text-foreground" /></div>
                     <div><h3 className="text-sm font-semibold text-foreground">Email Authentication</h3><p className="text-xs text-muted-foreground">Sign-in and recovery are managed by the configured authentication provider.</p></div>
@@ -156,7 +156,7 @@ export default function SecurityPage() {
 
               {/* Anti-phishing */}
               <div className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary"><Fingerprint className="h-4 w-4 text-foreground" /></div>
                     <div><h3 className="text-sm font-semibold text-foreground">Anti-Phishing Code</h3><p className="text-xs text-muted-foreground">Custom code shown in official emails to verify authenticity</p></div>
@@ -167,7 +167,7 @@ export default function SecurityPage() {
 
               {/* Withdrawal whitelist */}
               <div className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary"><Globe className="h-4 w-4 text-foreground" /></div>
                     <div><h3 className="text-sm font-semibold text-foreground">Withdrawal Whitelist</h3><p className="text-xs text-muted-foreground">Only withdraw to pre-approved addresses</p></div>
