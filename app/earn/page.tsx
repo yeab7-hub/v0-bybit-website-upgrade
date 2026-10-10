@@ -21,7 +21,6 @@ export default function EarnPage() {
   const [category, setCategory] = useState<EarnCategory>("easy")
   const [productTab, setProductTab] = useState<ProductTab>("steady")
   const [expandedCoin, setExpandedCoin] = useState<string | null>("BTC")
-  const [autoEarn] = useState(false)
 
   const filteredProducts = searchQuery
     ? earnProducts.filter(p => p.coin.toLowerCase().includes(searchQuery.toLowerCase()) || p.name.toLowerCase().includes(searchQuery.toLowerCase()))
