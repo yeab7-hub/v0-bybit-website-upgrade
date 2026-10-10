@@ -66,8 +66,9 @@ export default function WalletPage() {
   }
 
   const totalUsd = balArr.reduce((s: number, b: any) => s + (Number(b.available) + Number(b.in_order || 0)) * (pm[b.asset] || 0), 0)
+  const availableUsd = balArr.reduce((s: number, b: any) => s + Number(b.available || 0) * (pm[b.asset] || 0), 0)
+  const inUseUsd = balArr.reduce((s: number, b: any) => s + Number(b.in_order || 0) * (pm[b.asset] || 0), 0)
   const btcVal = pm["BTC"] > 0 ? totalUsd / pm["BTC"] : 0
-  const todayPnl = 0 // Placeholder for real P&L
 
   const filteredBal = balArr.filter((b: any) => {
     const total = Number(b.available) + Number(b.in_order || 0)
@@ -125,54 +126,37 @@ export default function WalletPage() {
                       {showBal ? `~ ${btcVal.toFixed(8)} BTC` : "******"}
                     </p>
                   </div>
-                  {/* Mini chart placeholder */}
-                  <div className="h-10 w-20">
-                    <svg viewBox="0 0 80 40" className="h-full w-full text-[#f7a600]">
-                      <polyline fill="none" stroke="currentColor" strokeWidth="1.5" points="0,30 10,25 20,28 30,20 40,22 50,15 60,18 70,12 80,16" />
-                    </svg>
-                  </div>
+
                 </div>
               </div>
 
-              {/* Today's P&L */}
-              <button className="mb-5 flex items-center gap-1">
+              <div className="mb-5 flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">{"Today's P&L"}</span>
-                <span className={`text-sm font-medium ${todayPnl >= 0 ? "text-success" : "text-destructive"}`}>
-                  {showBal ? `${todayPnl >= 0 ? "+" : ""}${todayPnl.toFixed(2)}` : "******"}
-                </span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
+                <span className="text-sm text-muted-foreground">Not available</span>
+              </div>
 
               {/* Available / In Use */}
               <div className="mb-6 flex gap-8">
                 <div>
                   <p className="text-xs text-muted-foreground">Available balance</p>
                   <p className="font-mono text-sm font-semibold text-foreground">
-                    {showBal ? totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "******"}
+                    {showBal ? availableUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "******"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">In Use</p>
                   <p className="font-mono text-sm font-semibold text-foreground">
-                    {showBal ? balArr.reduce((s: number, b: any) => s + Number(b.in_order || 0) * (pm[b.asset] || 0), 0).toFixed(2) : "******"}
+                    {showBal ? inUseUsd.toFixed(2) : "******"}
                   </p>
                 </div>
               </div>
 
-              {/* My Card */}
-              <Link href="/card" className="mb-6 block rounded-xl bg-gradient-to-r from-[#e8e8e8] to-[#d0d0d0] p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-semibold text-[#1a1a1a]">My Card</span>
-                    <ChevronRight className="h-3.5 w-3.5 text-[#1a1a1a]/60" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs tracking-wider text-[#1a1a1a]/60">**** **** **** 4774</span>
-                    <div className="flex h-6 w-8 items-center justify-center rounded bg-[#eb001b]/80">
-                      <div className="h-4 w-4 rounded-full bg-[#f79e1b]/80" />
-                    </div>
-                  </div>
+              <Link href="/card" className="mb-6 flex items-center justify-between rounded-xl border border-border bg-card p-4">
+                <div>
+                  <span className="text-sm font-semibold text-foreground">Card services</span>
+                  <p className="mt-1 text-xs text-muted-foreground">Explore available card features</p>
                 </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </Link>
 
               {/* Action Buttons - circular icons like Bybit */}
@@ -228,16 +212,13 @@ export default function WalletPage() {
                   const inOrder = Number(b.in_order || 0)
                   const total = Number(b.available) + inOrder
                   const usd = total * (pm[b.asset] || 0)
-                  const change = ((pm[b.asset] || 0) - (pm[b.asset] || 0)) // placeholder
                   return (
                     <div key={b.asset} className="flex items-center justify-between py-4">
                       <div className="flex items-center gap-3">
                         <MarketAsset symbol={b.asset} size={36} />
                         <div>
                           <p className="text-sm font-bold text-foreground">{b.asset}</p>
-                          <p className={`text-xs ${change >= 0 ? "text-muted-foreground" : "text-destructive"}`}>
-                            {COIN_NAMES[b.asset] || b.asset}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{COIN_NAMES[b.asset] || b.asset}</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -288,12 +269,12 @@ export default function WalletPage() {
                 <div className="mt-4 flex gap-6">
                   <div>
                     <p className="text-xs text-muted-foreground">Available balance</p>
-                    <p className="font-mono text-lg font-semibold text-foreground">{showBal ? `$${totalUsd.toFixed(2)}` : "****"}</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">{showBal ? `${availableUsd.toFixed(2)}` : "****"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">In Use</p>
                     <p className="font-mono text-lg font-semibold text-foreground">
-                      {showBal ? `$${balArr.reduce((s: number, b: any) => s + Number(b.in_order || 0) * (pm[b.asset] || 0), 0).toFixed(2)}` : "****"}
+                      {showBal ? `${inUseUsd.toFixed(2)}` : "****"}
                     </p>
                   </div>
                 </div>
