@@ -270,7 +270,7 @@ export default function NotificationsPage() {
             <p className="mb-4 text-xs text-muted-foreground">Preferences are saved to your profile, but event delivery is not yet wired to respect these preferences. Push and SMS delivery services are not configured.</p>
 
             {/* Channel legend */}
-            <div className="mb-6 flex items-center gap-6 rounded-xl border border-border bg-card px-5 py-3">
+            <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:gap-6 sm:px-5">
               <span className="text-xs font-medium text-muted-foreground">Channels:</span>
               <div className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs text-foreground">Email</span></div>
               <div className="flex items-center gap-1.5"><BellRing className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs text-foreground">Push</span></div>
@@ -285,12 +285,12 @@ export default function NotificationsPage() {
                     <h2 className="text-sm font-semibold text-foreground">{cat.category}</h2>
                   </div>
                   {cat.items.map((item, itemIdx) => (
-                    <div key={item.label} className="flex items-center justify-between border-b border-border px-5 py-4 last:border-0">
+                    <div key={item.label} className="flex flex-col gap-3 border-b border-border px-4 py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                       <div className="flex-1 pr-4">
                         <div className="text-sm font-medium text-foreground">{item.label}</div>
                         <div className="text-xs text-muted-foreground">{item.description}</div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-end gap-4">
                         {(["email", "push", "sms"] as const).map(ch => (
                           <button key={ch} onClick={() => toggleSetting(catIdx, itemIdx, ch)} className={`relative h-5 w-9 rounded-full transition-colors ${item[ch] ? "bg-primary" : "bg-border"}`}>
                             <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${item[ch] ? "translate-x-4" : "translate-x-0.5"}`} />
