@@ -11,16 +11,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-const masterTraders = [
-  { name: "CryptoAlpha", roi: "+342.5%", pnl: "$1.2M", followers: 8432, winRate: "78%", aum: "$4.2M", days: 180, trades: 1247, avatar: "CA" },
-  { name: "BTCWhale", roi: "+256.8%", pnl: "$890K", followers: 6218, winRate: "72%", aum: "$3.1M", days: 365, trades: 2103, avatar: "BW" },
-  { name: "DeFiKing", roi: "+198.3%", pnl: "$650K", followers: 5104, winRate: "68%", aum: "$2.8M", days: 270, trades: 1892, avatar: "DK" },
-  { name: "ScalpMaster", roi: "+178.4%", pnl: "$540K", followers: 4329, winRate: "82%", aum: "$1.9M", days: 150, trades: 3421, avatar: "SM" },
-  { name: "SwingTrader", roi: "+156.2%", pnl: "$420K", followers: 3875, winRate: "65%", aum: "$1.5M", days: 200, trades: 876, avatar: "ST" },
-  { name: "AltHunter", roi: "+134.7%", pnl: "$380K", followers: 3102, winRate: "71%", aum: "$1.2M", days: 120, trades: 1543, avatar: "AH" },
-  { name: "MomentumPro", roi: "+128.9%", pnl: "$310K", followers: 2894, winRate: "69%", aum: "$980K", days: 90, trades: 2210, avatar: "MP" },
-  { name: "TrendFollower", roi: "+112.5%", pnl: "$270K", followers: 2456, winRate: "66%", aum: "$750K", days: 240, trades: 654, avatar: "TF" },
-]
+const masterTraders: { name: string; roi: string; pnl: string; followers: number; winRate: string; aum: string; days: number; trades: number; avatar: string }[] = []
 
 const sortOptions = ["ROI", "PnL", "Followers", "Win Rate", "AUM"]
 
@@ -55,45 +46,30 @@ export default function CopyTradingPage() {
           <div className="mx-auto max-w-[1400px] px-4 py-12 lg:py-20">
             <div className="mx-auto max-w-3xl text-center">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary">
-                <Users className="h-4 w-4" /> 50,000+ Active Copiers
+                <Users className="h-4 w-4" /> Feature preview
               </div>
               <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground lg:text-5xl">
                 Copy Top Traders Automatically
               </h1>
               <p className="mt-4 text-pretty text-lg text-muted-foreground">
-                Follow expert traders and automatically mirror their positions in real-time.
-                No experience required -- let the pros trade for you.
+                Explore the copy-trading experience. Live trader data, copy execution, and risk controls are not connected in this project yet.
               </p>
               <div className="mt-8 flex items-center justify-center gap-3">
-                <Link href="/register">
+                <Link href="/support">
                   <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                    Start Copying <ArrowRight className="ml-2 h-4 w-4" />
+                    Ask about availability <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                </Link>
-                <Link href="/register">
-                  <Button size="lg" variant="outline">Become a Master Trader</Button>
                 </Link>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Stats */}
-        <section className="border-b border-border">
-          <div className="mx-auto max-w-[1400px] px-4 py-8">
-            <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
-              {[
-                { label: "Master Traders", value: "2,800+" },
-                { label: "Active Copiers", value: "50,000+" },
-                { label: "Total Copied Volume", value: "$12B+" },
-                { label: "Avg. Copier ROI", value: "+45.8%" },
-              ].map((s) => (
-                <div key={s.label} className="text-center">
-                  <div className="font-mono text-3xl font-bold text-primary">{s.value}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">{s.label}</div>
-                </div>
-              ))}
-            </div>
+        <section className="border-y border-amber-500/20 bg-amber-500/5">
+          <div className="mx-auto max-w-[1400px] px-4 py-6">
+            <p role="status" className="text-center text-sm leading-6 text-muted-foreground">
+              No live trader performance data is available. The app will not show invented ROI, profit, win-rate, or follower statistics, and copying trades is not enabled.
+            </p>
           </div>
         </section>
 
@@ -119,6 +95,14 @@ export default function CopyTradingPage() {
               </div>
             </div>
 
+            {filtered.length === 0 && (
+              <div role="status" className="mb-4 rounded-xl border border-border bg-card p-6 text-center sm:p-10">
+                <BarChart3 className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+                <h3 className="text-lg font-semibold text-foreground">No verified master traders available</h3>
+                <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Connect a verified trader-performance source and a real copy-execution engine before offering live copy trading.</p>
+                <Link href="/support" className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-secondary">Contact support</Link>
+              </div>
+            )}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {filtered.map((trader) => (
                 <div key={trader.name} className="group rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/30">
