@@ -93,7 +93,7 @@ export default function AccountSettingsPage() {
    ]
 
   const preferenceItems = [
-    { icon: Wallet, label: "Withdrawal Address", right: null, href: "/wallet?tab=withdraw" },
+    { icon: Wallet, label: "Wallet & Withdrawal", right: null, href: "/wallet" },
     { icon: BellRing, label: "Notification Settings", right: null, href: "/account/notifications" },
     { icon: Shield, label: "Security Settings", right: null, href: "/account/security" },
   ]
