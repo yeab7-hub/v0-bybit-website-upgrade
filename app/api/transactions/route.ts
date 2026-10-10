@@ -49,14 +49,19 @@ export async function POST(request: NextRequest) {
     }
     if (txHash.length > 256) return NextResponse.json({ error: "Transaction hash is too long" }, { status: 400 })
 
-    const lookupSymbol = assetName === "ETH" ? "Ethereum" : assetName
-    const { data: destination, error: destinationError } = await supabase
+    const findDestination = (symbol: string) => supabase
       .from("deposit_addresses")
       .select("symbol, network, is_active, min_deposit")
-      .eq("symbol", lookupSymbol)
+      .eq("symbol", symbol)
       .eq("network", networkName)
       .eq("is_active", true)
       .maybeSingle()
+    let { data: destination, error: destinationError } = await findDestination(assetName)
+    if (!destination && !destinationError && assetName === "ETH") {
+      const legacyResult = await findDestination("Ethereum")
+      destination = legacyResult.data
+      destinationError = legacyResult.error
+    }
     if (destinationError) return NextResponse.json({ error: "Deposit routing is unavailable. Please try again later." }, { status: 503 })
     if (!destination) return NextResponse.json({ error: "This deposit asset/network is not currently available" }, { status: 400 })
     if (Number(destination.min_deposit || 0) > amountNum) return NextResponse.json({ error: `Minimum deposit is ${destination.min_deposit} ${assetName}` }, { status: 400 })
@@ -108,14 +113,19 @@ export async function POST(request: NextRequest) {
     const accountStatus = await checkAccountStatus(supabase, user.id)
     if (accountStatus.blocked) return NextResponse.json({ error: accountStatus.reason }, { status: 403 })
 
-    const lookupSymbol = asset === "ETH" ? "Ethereum" : asset
-    const { data: supportedNetwork, error: networkError } = await supabase
+    const findNetwork = (symbol: string) => supabase
       .from("deposit_addresses")
       .select("symbol, network")
-      .eq("symbol", lookupSymbol)
+      .eq("symbol", symbol)
       .eq("network", network)
       .eq("is_active", true)
       .maybeSingle()
+    let { data: supportedNetwork, error: networkError } = await findNetwork(asset)
+    if (!supportedNetwork && !networkError && asset === "ETH") {
+      const legacyResult = await findNetwork("Ethereum")
+      supportedNetwork = legacyResult.data
+      networkError = legacyResult.error
+    }
     if (networkError) return NextResponse.json({ error: "Could not verify the selected network" }, { status: 503 })
     if (!supportedNetwork) return NextResponse.json({ error: "This asset/network is not currently supported for withdrawals" }, { status: 400 })
 
