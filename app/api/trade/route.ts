@@ -52,6 +52,17 @@ export async function GET(request: NextRequest) {
   const adminSupabase = await createAdminClient()
   const type = request.nextUrl.searchParams.get("type") ?? "orders"
 
+  if (type === "order_history") {
+    const { data, error } = await adminSupabase
+      .from("orders")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(200)
+    if (error) return NextResponse.json({ error: "Could not load order history" }, { status: 500 })
+    return NextResponse.json({ orders: data ?? [] })
+  }
+
   if (type === "balances") {
     const { data } = await adminSupabase.from("balances").select("*").eq("user_id", user.id)
     return NextResponse.json({ balances: data ?? [] })
