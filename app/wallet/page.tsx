@@ -505,7 +505,7 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
   const net = cd.networks[netIdx] || cd.networks[0]
   const bal = bals.find((b: any) => b.asset === coin)
   const avail = Number(bal?.available || 0)
-  const fee = coin === "USDT" ? 1 : coin === "BTC" ? 0.0005 : coin === "ETH" ? 0.005 : coin === "SOL" ? 0.01 : 0.001
+  // Network fees are not configured server-side; do not invent or subtract a fake fee.
 
   const submit = async () => {
     if (!amount || !address) return
@@ -564,17 +564,17 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
         <div className="flex items-center rounded-lg border border-border bg-background">
           <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00"
             className="flex-1 bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none" />
-          <button onClick={() => setAmount(String(Math.max(0, avail - fee)))} className="px-2 text-xs font-bold text-[#f7a600]">MAX</button>
+          <button onClick={() => setAmount(String(avail))} className="px-2 text-xs font-bold text-[#f7a600]">MAX</button>
           <span className="px-4 text-sm font-semibold text-muted-foreground">{coin}</span>
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">Available: {avail.toFixed(coin === "USDT" ? 2 : 6)} {coin}</p>
       </div>
       <div className="mb-6 rounded-lg bg-secondary/50 p-3 text-xs">
-        <div className="flex justify-between"><span className="text-muted-foreground">Network Fee</span><span className="text-foreground">{fee} {coin}</span></div>
-        <div className="mt-1 flex justify-between"><span className="text-muted-foreground">You Receive</span><span className="font-semibold text-foreground">{amount ? Math.max(0, parseFloat(amount) - fee).toFixed(coin === "USDT" ? 2 : 6) : "0"} {coin}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">Network Fee</span><span className="text-foreground">Confirmed during review</span></div>
+        <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Requested Amount</span><span className="font-semibold text-foreground">{amount && Number.isFinite(Number(amount)) ? Number(amount).toFixed(coin === "USDT" ? 2 : 6) : "0"} {coin}</span></div>
       </div>
       {error && <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">{error}</div>}
-      <button onClick={submit} disabled={submitting || !amount || !address || parseFloat(amount) <= fee}
+      <button onClick={submit} disabled={submitting || !amount || !address || !Number.isFinite(Number(amount)) || parseFloat(amount) <= 0 || parseFloat(amount) > avail}
         className="w-full rounded-lg bg-[#f7a600] py-3 text-sm font-bold text-[#0a0e17] transition hover:bg-[#e09800] disabled:opacity-50">
         {submitting ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : "Submit Withdrawal Request"}
       </button>
