@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 import { checkAccountStatus } from "@/lib/account-status"
+import { getLivePrice } from "@/lib/live-price"
 
 const STABLE = new Set(["USDT", "USDC"])
 
@@ -47,26 +48,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Cannot convert an asset to itself" }, { status: 400 })
   }
 
-  // Fetch authoritative live prices server-side -- never trust a rate
-  // sent from the client, since it could be tampered with.
-  const origin = request.nextUrl.origin
-  let fromPrice = STABLE.has(from_asset) ? 1 : null
-  let toPrice = STABLE.has(to_asset) ? 1 : null
-
-  if (fromPrice === null || toPrice === null) {
-    try {
-      const priceRes = await fetch(`${origin}/api/prices`, { cache: "no-store" })
-      if (!priceRes.ok) {
-        return NextResponse.json({ error: "Live prices are temporarily unavailable. Please try again." }, { status: 502 })
-      }
-      const priceData = await priceRes.json()
-      const all = Array.isArray(priceData.crypto) ? priceData.crypto : []
-      if (fromPrice === null) fromPrice = all.find((c: any) => c.symbol === from_asset)?.price ?? null
-      if (toPrice === null) toPrice = all.find((c: any) => c.symbol === to_asset)?.price ?? null
-    } catch {
-      return NextResponse.json({ error: "Could not fetch live prices, try again" }, { status: 502 })
-    }
-  }
+  // Resolve current prices directly from external market sources. The dashboard
+  // endpoint may display cached/demo fallback values and must not be used to
+  // settle a conversion.
+  const fromPrice = STABLE.has(from_asset) ? 1 : await getLivePrice(from_asset, `${from_asset}/USDT`)
+  const toPrice = STABLE.has(to_asset) ? 1 : await getLivePrice(to_asset, `${to_asset}/USDT`)
 
   if (!Number.isFinite(fromPrice) || !Number.isFinite(toPrice) || Number(fromPrice) <= 0 || Number(toPrice) <= 0) {
     return NextResponse.json({ error: "A valid live price is unavailable for one of the selected assets" }, { status: 400 })
