@@ -58,7 +58,7 @@ export default function WalletPage() {
 
   const balArr: any[] = Array.isArray(balances) ? balances : (balances?.balances ?? [])
   const txArr: any[] = Array.isArray(transactions) ? transactions : []
-  const pm: Record<string, number> = { USDT: 1 }
+  const pm: Record<string, number> = { USDT: 1, USDC: 1 }
   if (prices && !prices.error && prices.crypto) {
     for (const c of prices.crypto) {
       if (c.symbol && c.price) pm[c.symbol] = c.price
@@ -502,10 +502,18 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
   const [error, setError] = useState("")
 
   const cd = WITHDRAW_ADDRESSES.find(c => c.symbol === coin) || WITHDRAW_ADDRESSES[0]
-  const net = cd.networks[netIdx] || cd.networks[0]
+  const net = cd?.networks?.[netIdx] || cd?.networks?.[0]
   const bal = bals.find((b: any) => b.asset === coin)
   const avail = Number(bal?.available || 0)
   // Network fees are not configured server-side; do not invent or subtract a fake fee.
+
+  if (!cd || !net) return (
+    <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-8 text-center">
+      <AlertTriangle className="mx-auto mb-4 h-8 w-8 text-primary" />
+      <h3 className="mb-2 text-lg font-bold text-foreground">Withdrawals unavailable</h3>
+      <p className="text-sm text-muted-foreground">No supported withdrawal networks are configured. Please contact support before requesting a withdrawal.</p>
+    </div>
+  )
 
   const submit = async () => {
     if (!amount || !address) return
