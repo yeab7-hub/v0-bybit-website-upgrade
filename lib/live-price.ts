@@ -5,11 +5,9 @@
 // in the others. Import this everywhere instead of writing a new copy.
 //
 // Direct, single-symbol lookups are used (not a self-referential call to
-// this project's own /api/prices dashboard endpoint) because that endpoint
-// aggregates every asset in a class at once and can legitimately take much
-// longer than a single order should ever wait on. A last-known/reasonable
-// fallback price is always returned so a transient external API hiccup
-// never blocks a trade outright.
+// this project's own /api/prices dashboard endpoint). Trade execution must
+// fail closed when no current external price can be verified; stale hardcoded
+// prices must never be used to execute or settle a financial transaction.
 
 const FOREX_META: Record<string, { currency: string; isInverse: boolean; fallback: number }> = {
   "EUR/USD": { currency: "EUR", isInverse: true, fallback: 1.0842 },
@@ -42,12 +40,6 @@ const CRYPTO_ID_MAP: Record<string, string> = {
   BNB: "binancecoin", ADA: "cardano", DOGE: "dogecoin", AVAX: "avalanche-2",
   DOT: "polkadot", LINK: "chainlink", UNI: "uniswap", MATIC: "matic-network",
   TRX: "tron", TON: "the-open-network", SHIB: "shiba-inu",
-}
-
-const CRYPTO_FALLBACK: Record<string, number> = {
-  BTC: 97842.5, ETH: 3456.78, SOL: 189.45, XRP: 2.87, BNB: 690.2,
-  ADA: 0.89, DOGE: 0.32, AVAX: 38.4, DOT: 7.1, LINK: 22.6,
-  UNI: 14.2, MATIC: 0.52, TRX: 0.24, TON: 5.4, SHIB: 0.000024,
 }
 
 async function fetchDirectForex(pairSymbol: string): Promise<number> {
@@ -102,13 +94,13 @@ export async function getLivePrice(baseAsset: string, pair?: string): Promise<nu
 
   if (FOREX_META[lookupSymbol]) {
     const price = await fetchDirectForex(lookupSymbol)
-    return price > 0 ? price : FOREX_META[lookupSymbol].fallback
+    return price > 0 ? price : 0
   }
 
   if (YAHOO_META[lookupSymbol] || YAHOO_META[baseAsset]) {
     const key = YAHOO_META[lookupSymbol] ? lookupSymbol : baseAsset
     const price = await fetchDirectYahoo(key)
-    return price > 0 ? price : YAHOO_META[key].fallback
+    return price > 0 ? price : 0
   }
 
   // Crypto
@@ -139,5 +131,5 @@ export async function getLivePrice(baseAsset: string, pair?: string): Promise<nu
     }
   } catch { /* fall through to hardcoded fallback */ }
 
-  return CRYPTO_FALLBACK[baseAsset] ?? 0
+  return 0
 }
