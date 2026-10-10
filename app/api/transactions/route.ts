@@ -146,6 +146,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "transfer") {
+    // The current balances schema does not track separate Spot/Funding/etc.
+    // Do not create a completed transaction unless funds can actually move.
+    return NextResponse.json({
+      error: "Internal account transfers are not configured yet. No funds were moved.",
+    }, { status: 501 })
+  }
+
+  if (false && action === "transfer") {
     const { asset, amount, from_account, to_account } = body
     const amountNum = parseFloat(amount)
 
