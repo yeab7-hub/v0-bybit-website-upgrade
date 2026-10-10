@@ -141,8 +141,6 @@ function LoginContent() {
               <div className="mt-6 flex items-center border-b border-border">
                 {([
                   { key: "email" as const, label: "Email", icon: Mail },
-                  { key: "phone" as const, label: "Mobile", icon: Smartphone },
-                  { key: "qr" as const, label: "QR Code", icon: QrCode },
                 ]).map((tab) => (
                   <button
                     key={tab.key}
@@ -238,7 +236,7 @@ function LoginContent() {
 
               {/* Having trouble */}
               <div className="mt-4 text-center">
-                <button className="text-xs text-muted-foreground hover:text-foreground">Having trouble logging in?</button>
+                <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">Having trouble logging in?</Link>
               </div>
 
               {/* Divider */}
