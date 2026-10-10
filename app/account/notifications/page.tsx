@@ -5,6 +5,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { User, Shield, Bell, Key, BellRing, Mail, Smartphone, MessageSquare, TrendingUp, AlertCircle, Megaphone, CheckCheck, Circle, Loader2, Inbox } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
 
 const sidebarItems = [
   { label: "Profile", href: "/account/settings", icon: User },
@@ -62,11 +63,37 @@ type Notification = {
 export default function NotificationsPage() {
   const [settings, setSettings] = useState(initialSettings)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState("")
   const [activeView, setActiveView] = useState<"inbox" | "settings">("inbox")
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loadingNotifs, setLoadingNotifs] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+    const loadPreferences = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const stored = user?.user_metadata?.notification_settings
+        if (!cancelled && Array.isArray(stored)) {
+          const defaults = initialSettings
+          const merged = defaults.map((category, categoryIndex) => ({
+            ...category,
+            items: category.items.map((item, itemIndex) => {
+              const savedItem = stored[categoryIndex]?.items?.[itemIndex]
+              return savedItem && savedItem.label === item.label
+                ? { ...item, email: Boolean(savedItem.email), push: Boolean(savedItem.push), sms: Boolean(savedItem.sms) }
+                : item
+            }),
+          }))
+          setSettings(merged)
+        }
+      } catch {
+        // Defaults remain available if profile metadata cannot be read.
+      }
+    }
+    void loadPreferences()
     fetch("/api/notifications")
       .then(r => r.json())
       .then(d => {
@@ -74,6 +101,7 @@ export default function NotificationsPage() {
         setLoadingNotifs(false)
       })
       .catch(() => setLoadingNotifs(false))
+    return () => { cancelled = true }
   }, [])
 
   const markAsRead = async (id: string) => {
@@ -101,7 +129,22 @@ export default function NotificationsPage() {
     setSaved(false)
   }
 
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  const handleSave = async () => {
+    setSaving(true)
+    setSaved(false)
+    setSaveError("")
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.updateUser({ data: { notification_settings: settings } })
+      if (error) throw error
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 3000)
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : "Could not save notification preferences.")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const getNotifIcon = (type: string) => {
     switch (type) {
@@ -218,10 +261,13 @@ export default function NotificationsPage() {
             {activeView === "settings" && (<div>
             <div className="mb-6 flex items-center justify-between">
               <h1 className="text-xl font-bold text-foreground">Notification Settings</h1>
-              <button onClick={handleSave} className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${saved ? "bg-[#0ecb81] text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
-                {saved ? "Saved!" : "Save Changes"}
+              <button onClick={handleSave} disabled={saving} className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${saved ? "bg-[#0ecb81] text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+                {saving ? "Saving…" : saved ? "Saved!" : "Save Changes"}
               </button>
             </div>
+
+            {saveError && <p role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{saveError}</p>}
+            <p className="mb-4 text-xs text-muted-foreground">Preferences are saved to your account profile. Email, push, and SMS delivery still depends on the corresponding delivery service being configured.</p>
 
             {/* Channel legend */}
             <div className="mb-6 flex items-center gap-6 rounded-xl border border-border bg-card px-5 py-3">
@@ -264,7 +310,7 @@ export default function NotificationsPage() {
                   <h3 className="text-sm font-semibold text-foreground">Do Not Disturb</h3>
                   <p className="text-xs text-muted-foreground">Mute all push and SMS notifications during set hours</p>
                 </div>
-                <button className="relative h-5 w-9 rounded-full bg-border transition-colors"><div className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow" /></button>
+                <span className="rounded-full border border-border px-2 py-1 text-[10px] text-muted-foreground">Not configured</span>
               </div>
             </div>
             </div>)}
