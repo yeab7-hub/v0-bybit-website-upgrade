@@ -105,7 +105,7 @@ function ChartContent() {
       >
         {/* ROW 1 - Top navigation */}
         <div className="scrollbar-none flex items-center gap-1 overflow-x-auto border-b border-border px-3 py-2">
-          <button className="rounded-lg p-1.5">
+          <button onClick={() => router.push("/trade")} aria-label="Back to trading" className="rounded-lg p-1.5">
             <div className="flex h-6 w-6 items-center justify-center rounded bg-[#f7a600]">
               <span className="text-[10px] font-bold text-background">{"="}</span>
             </div>
@@ -113,8 +113,8 @@ function ChartContent() {
           {["Convert", "Spot", "Futures", "Options", "TradFi"].map((label) => {
             const href = label === "Convert" ? "/convert"
               : label === "Spot" ? `/trade?pair=${rawPair}`
-              : label === "Options" ? "/derivatives"
-              : "#"
+              : label === "Options" || label === "Futures" ? "/derivatives"
+              : "/markets"
             return (
               <Link key={label} href={href}
                 className={`shrink-0 px-3 py-1.5 text-sm ${label === "Futures" ? "font-bold text-foreground" : "text-muted-foreground"}`}
