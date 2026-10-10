@@ -64,6 +64,25 @@ export async function PATCH(request: NextRequest) {
     .single()
 
   if (txErr || !tx) return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
+  if (action !== "approve" && action !== "reject") {
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+  }
+  if (tx.status !== "pending") {
+    return NextResponse.json({ error: "This transaction has already been reviewed or is being processed." }, { status: 409 })
+  }
+
+  // Claim a pending transaction before touching balances so concurrent admin
+  // requests cannot approve or reject the same request twice.
+  const { data: claimed, error: claimError } = await adminSupabase
+    .from("transactions")
+    .update({ status: "processing", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle()
+  if (claimError || !claimed) {
+    return NextResponse.json({ error: "This transaction is already being processed. Refresh and try again." }, { status: 409 })
+  }
 
   if (action === "approve") {
     if (tx.type === "deposit") {
@@ -110,7 +129,7 @@ export async function PATCH(request: NextRequest) {
       notes: admin_note || "Approved by admin",
       reviewed_at: new Date().toISOString(),
       reviewed_by: user.id,
-    }).eq("id", id)
+    }).eq("id", id).eq("status", "processing")
 
     // Notify the user that their deposit/withdrawal was approved
     const { data: approvedProfile } = await adminSupabase
@@ -157,7 +176,7 @@ export async function PATCH(request: NextRequest) {
       notes: admin_note || "Rejected by admin",
       reviewed_at: new Date().toISOString(),
       reviewed_by: user.id,
-    }).eq("id", id)
+    }).eq("id", id).eq("status", "processing")
 
     // Create in-app notification for the user
     const rejectionReason = admin_note || "Your withdrawal request did not meet our requirements."
