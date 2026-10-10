@@ -110,7 +110,7 @@ function AdminManagement() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f7a600]/10">
           <Shield className="h-5 w-5 text-[#f7a600]" />
@@ -130,7 +130,7 @@ function AdminManagement() {
           {admins.length === 0 ? (
             <p className="text-sm text-muted-foreground">No admins found</p>
           ) : admins.map((a: any) => (
-            <div key={a.id} className="flex items-center justify-between rounded-lg border border-border bg-secondary/20 px-4 py-3">
+            <div key={a.id} className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7a600]/10 text-xs font-bold text-[#f7a600]">
                   {(a.full_name || a.email)?.[0]?.toUpperCase() || "A"}
@@ -155,7 +155,7 @@ function AdminManagement() {
         <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
           <UserPlus className="h-4 w-4 text-green-400" /> Promote User to Admin
         </h3>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex flex-1 items-center rounded-lg border border-border bg-background px-3 py-2.5 focus-within:border-[#f7a600]/50">
             <input type="email" value={promoteEmail} onChange={(e) => setPromoteEmail(e.target.value)}
               placeholder="user@example.com" className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
@@ -176,7 +176,7 @@ function AdminManagement() {
         <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
           <Lock className="h-4 w-4 text-muted-foreground" /> Change My Password
         </h3>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex flex-1 items-center rounded-lg border border-border bg-background px-3 py-2.5 focus-within:border-[#f7a600]/50">
             <input type={showPw ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
               placeholder="New password (min 6 characters)" className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
@@ -200,7 +200,7 @@ function AdminManagement() {
         <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
           <Mail className="h-4 w-4 text-muted-foreground" /> Change My Email
         </h3>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex flex-1 items-center rounded-lg border border-border bg-background px-3 py-2.5 focus-within:border-[#f7a600]/50">
             <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
               placeholder="new-admin@example.com" className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
@@ -264,7 +264,7 @@ function WalletAddressManager() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f7a600]/10">
@@ -394,7 +394,7 @@ function WalletAddressManager() {
 /* ===== Platform Settings ===== */
 function PlatformSettings() {
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Settings className="h-5 w-5 text-primary" /></div>
         <div>
