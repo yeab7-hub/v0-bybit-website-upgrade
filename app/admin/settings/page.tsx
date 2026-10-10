@@ -393,6 +393,12 @@ function WalletAddressManager() {
 
 /* ===== Platform Settings ===== */
 function PlatformSettings() {
+  const settings = [
+    { icon: Key, title: "Require KYC for Trading", desc: "Users must complete KYC before placing orders" },
+    { icon: Bell, title: "Email Notifications", desc: "Send email alerts for new KYC submissions" },
+    { icon: Globe, title: "Maintenance Mode", desc: "Temporarily disable the platform for all users" },
+  ]
+
   return (
     <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
       <div className="flex items-center gap-3">
@@ -402,23 +408,20 @@ function PlatformSettings() {
           <p className="text-xs text-muted-foreground">General configuration options</p>
         </div>
       </div>
-      <div className="mt-4 flex flex-col gap-4">
-        {[
-          { icon: Key, title: "Require KYC for Trading", desc: "Users must complete KYC before placing orders", on: true },
-          { icon: Bell, title: "Email Notifications", desc: "Send email alerts for new KYC submissions", on: true },
-          { icon: Globe, title: "Maintenance Mode", desc: "Temporarily disable the platform for all users", on: false },
-        ].map((s) => (
-          <div key={s.title} className="flex items-center justify-between rounded-lg border border-border bg-secondary/20 p-4">
-            <div className="flex items-center gap-3">
-              <s.icon className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium text-foreground">{s.title}</p>
-                <p className="text-xs text-muted-foreground">{s.desc}</p>
+      <div role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">
+        These settings are not connected to persisted platform configuration yet. They are disabled so the interface does not imply a change has been saved when it has not.
+      </div>
+      <div className="mt-4 flex flex-col gap-3">
+        {settings.map((setting) => (
+          <div key={setting.title} className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <setting.icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{setting.title}</p>
+                <p className="text-xs text-muted-foreground">{setting.desc}</p>
               </div>
             </div>
-            <button className={`relative h-6 w-11 rounded-full transition-colors ${s.on ? "bg-primary" : "bg-secondary"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full transition-transform ${s.on ? "right-0.5 bg-primary-foreground" : "left-0.5 bg-muted-foreground"}`} />
-            </button>
+            <span className="w-fit shrink-0 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">Not configured</span>
           </div>
         ))}
       </div>
