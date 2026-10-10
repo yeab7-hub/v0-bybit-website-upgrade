@@ -20,6 +20,7 @@ export function OrderBook({ symbol = "BTCUSDT" }: OrderBookProps) {
   const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
   const allAssets = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
   const livePrice = safeFindPrice(allAssets, symbol)?.price ?? 0
+  const baseAsset = symbol.replace(/(USDT|USDC|BUSD|USD)$/i, "") || symbol
 
   const [asks, setAsks] = useState<OrderLevel[]>([])
   const [bids, setBids] = useState<OrderLevel[]>([])
