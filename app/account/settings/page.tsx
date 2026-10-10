@@ -32,6 +32,7 @@ export default function AccountSettingsPage() {
   const [nickname, setNickname] = useState("")
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [profileMessage, setProfileMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -43,13 +44,23 @@ export default function AccountSettingsPage() {
   }, [])
 
   const handleSaveNickname = async () => {
+    const nextNickname = nickname.trim()
+    if (!nextNickname || nextNickname.length > 60) {
+      setProfileMessage({ type: "error", text: "Nickname must be between 1 and 60 characters." })
+      return
+    }
+    setProfileMessage(null)
     try {
       const supabase = createClient()
-      await supabase.auth.updateUser({ data: { full_name: nickname } })
-      setEditing(null)
-      const { data } = await supabase.auth.getUser()
+      const { data, error } = await supabase.auth.updateUser({ data: { full_name: nextNickname } })
+      if (error) throw error
       setUser(data.user)
-    } catch {}
+      setNickname(nextNickname)
+      setEditing(null)
+      setProfileMessage({ type: "success", text: "Nickname updated." })
+    } catch (cause) {
+      setProfileMessage({ type: "error", text: cause instanceof Error ? cause.message : "Could not update your nickname." })
+    }
   }
 
   const handleSignOut = async () => {
@@ -72,25 +83,19 @@ export default function AccountSettingsPage() {
   const uid = user?.id?.slice(0, 8)?.toUpperCase() || "00000000"
 
   const myInfoItems = [
-    { icon: User, label: "Profile Picture", right: <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">{initials}</div>, href: "#" },
-    { icon: Pencil, label: "Nickname", right: <span className="text-sm text-muted-foreground">{maskedEmail}</span>, action: () => setEditing("nickname") },
+     
+    { icon: Pencil, label: "Nickname", right: <span className="text-sm text-muted-foreground">{nickname || "Set nickname"}</span>, action: () => { setProfileMessage(null); setEditing("nickname") } },
     { icon: Key, label: "UID", right: <button onClick={copyUID} className="flex items-center gap-1 text-sm text-muted-foreground">{uid} {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}</button> },
-    { icon: Shield, label: "Identity Verification", right: <span className="text-sm text-muted-foreground">Lv.1 Verified</span>, href: "/kyc" },
+    { icon: Shield, label: "Identity Verification", right: null, href: "/kyc" },
     { icon: Shield, label: "Security", right: null, href: "/account/security" },
-    { icon: Diamond, label: "VIP level", right: <span className="text-sm text-muted-foreground">Non-VIP</span>, href: "/fee-schedule" },
+    { icon: Diamond, label: "VIP level", right: null, href: "/fee-schedule" },
     { icon: Percent, label: "My Fee Rates", right: null, href: "/fee-schedule" },
-    { icon: Users, label: "Subaccount", right: null, href: "#" },
-    { icon: Link2, label: "Link Account", right: <Send className="h-4 w-4 text-primary" />, href: "#" },
-  ]
+   ]
 
   const preferenceItems = [
-    { icon: Clock, label: "Benchmark Time Zone", right: <span className="text-sm text-muted-foreground">Last 24 hours</span>, href: "#" },
-    { icon: Wallet, label: "Withdrawal Address", right: null, href: "#" },
-    { icon: Shield, label: "Manage Crypto Withdrawal Limits", right: null, href: "#" },
-    { icon: ArrowLeftRight, label: "Switch routing", right: null, href: "#" },
-    { icon: Route, label: "Route Deposits To", right: <span className="text-sm text-muted-foreground">Funding Account</span>, href: "#" },
+    { icon: Wallet, label: "Withdrawal Address", right: null, href: "/wallet?tab=withdraw" },
     { icon: BellRing, label: "Notification Settings", right: null, href: "/account/notifications" },
-    { icon: MailOpen, label: "Email Subscriptions", right: null, href: "#" },
+    { icon: Shield, label: "Security Settings", right: null, href: "/account/security" },
   ]
 
   return (
@@ -178,6 +183,7 @@ export default function AccountSettingsPage() {
                 {/* MY INFO TAB */}
                 {tab === "info" && (
                   <div className="flex flex-col">
+                    {profileMessage && <p role={profileMessage.type === "error" ? "alert" : "status"} className={`mb-3 rounded-lg p-3 text-sm ${profileMessage.type === "error" ? "bg-destructive/10 text-destructive" : "bg-emerald-500/10 text-emerald-500"}`}>{profileMessage.text}</p>}
                     {myInfoItems.map((item, i) => (
                       <div key={i}>
                         {editing === "nickname" && item.label === "Nickname" ? (
