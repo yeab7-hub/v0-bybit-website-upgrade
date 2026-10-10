@@ -53,20 +53,21 @@ export default function ConvertPage() {
     if (symbol === "USDT" || symbol === "USDC") return 1
     const live = safeFindPrice(allLivePrices, symbol)
     if (live) return live.price
-    const fallbacks: Record<string, number> = { BTC: 97842.50, ETH: 3456.78, SOL: 189.45, XRP: 2.87 }
-    return fallbacks[symbol] ?? 1
+    return 0
   }
 
   const fromUsd = getUsdPrice(fromSymbol)
   const toUsd = getUsdPrice(toSymbol)
-  const rate = toUsd > 0 ? fromUsd / toUsd : 1
-  const estimated = amount ? (parseFloat(amount) * rate).toFixed(toUsd >= 100 ? 4 : toUsd >= 1 ? 6 : 8) : "0.00"
+  const rate = fromUsd > 0 && toUsd > 0 ? fromUsd / toUsd : 0
+  const estimated = rate > 0 && amount && Number.isFinite(Number(amount))
+    ? (Number(amount) * rate).toFixed(toUsd >= 100 ? 4 : toUsd >= 1 ? 6 : 8)
+    : "—"
   const availableFrom = getBalance(fromSymbol)
 
   const canConvert = useMemo(() => {
     const amt = parseFloat(amount)
-    return !!amount && amt > 0 && amt <= availableFrom && !submitting
-  }, [amount, availableFrom, submitting])
+    return !!amount && Number.isFinite(amt) && amt > 0 && amt <= availableFrom && rate > 0 && fromSymbol !== toSymbol && !submitting
+  }, [amount, availableFrom, submitting, rate, fromSymbol, toSymbol])
 
   const setPct = (pct: number) => {
     setAmount((availableFrom * pct).toFixed(8).replace(/\.?0+$/, ""))
@@ -194,14 +195,14 @@ export default function ConvertPage() {
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Info className="h-3 w-3" /> Rate
               </div>
-              <span className="text-xs text-foreground">1 {fromSymbol} = {rate >= 1 ? formatPrice(rate) : rate.toFixed(8)} {toSymbol}</span>
+              <span className="text-xs text-foreground">{rate > 0 ? <>1 {fromSymbol} = {rate >= 1 ? formatPrice(rate) : rate.toFixed(8)} {toSymbol}</> : "Live conversion rate unavailable"}</span>
             </div>
 
             {error && <p className="mt-3 text-center text-xs text-red-400">{error}</p>}
             {success && <p className="mt-3 text-center text-xs text-green-400">{success}</p>}
 
             <Button onClick={handleConvert} disabled={!canConvert} className="mt-4 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90" size="lg">
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : amount && parseFloat(amount) > availableFrom ? "Insufficient balance" : "Convert"}
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : rate <= 0 ? "Live price unavailable" : amount && parseFloat(amount) > availableFrom ? "Insufficient balance" : "Convert"}
             </Button>
             <p className="mt-2 text-center text-[10px] text-muted-foreground">No trading fees. Price refreshes every 15s.</p>
           </div>
