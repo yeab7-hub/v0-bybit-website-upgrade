@@ -20,7 +20,7 @@ const quickActions = [
   { label: "Rewards Hub", href: "/rewards", icon: Gift, color: "bg-card" },
   { label: "Daily Delight", href: "/rewards", icon: Calendar, color: "bg-card" },
   { label: "Bybit Earn", href: "/earn", icon: Coins, color: "bg-card" },
-  { label: "More", href: "/dashboard", icon: MoreHorizontal, color: "bg-card" },
+  { label: "More", href: "/markets", icon: MoreHorizontal, color: "bg-card" },
 ]
 
 type MarketTab = "favorites" | "hot" | "new" | "gainers" | "losers" | "turnover"
@@ -53,9 +53,11 @@ export function HomeLoggedIn({ user }: { user: User }) {
     const loadAccountSummary = async () => {
       try {
         const supabase = createClient()
+        const startOfToday = new Date()
+        startOfToday.setHours(0, 0, 0, 0)
         const [{ data: balanceData }, { data: tradeData }] = await Promise.all([
           supabase.from("balances").select("*").eq("user_id", user.id),
-          supabase.from("trades").select("pnl").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
+          supabase.from("trades").select("pnl").eq("user_id", user.id).gte("created_at", startOfToday.toISOString()),
         ])
         const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
         const total = (balanceData ?? []).reduce((sum: number, balance: any) => {
@@ -138,7 +140,6 @@ export function HomeLoggedIn({ user }: { user: User }) {
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
         </div>
-        <button className="p-1.5 text-muted-foreground"><ScanLine className="h-5 w-5" /></button>
         <Link href="/account/notifications" className="relative p-1.5 text-muted-foreground">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
@@ -168,7 +169,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
               </span>
             </div>
             <div className="mt-1 flex items-center gap-1">
-              <span className="text-sm text-muted-foreground">{"Today's P&L"}</span>
+              <span className="text-sm text-muted-foreground">{"Today's Trade P&L"}</span>
               <span className={`text-sm font-medium ${todayPnl.amount >= 0 ? "text-success" : "text-destructive"}`}>
                 {showBalance ? `${todayPnl.amount >= 0 ? "+" : ""}${todayPnl.amount.toFixed(2)} USD(${todayPnl.percent >= 0 ? "+" : ""}${todayPnl.percent.toFixed(2)}%)` : "****"}
               </span>
@@ -305,15 +306,6 @@ export function HomeLoggedIn({ user }: { user: User }) {
         </div>
       </div>
 
-      {/* Add widget / Reset layout buttons */}
-      <div className="mt-4 flex items-center gap-3">
-        <button className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-3 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
-          <Plus className="h-4 w-4" /> Add widget
-        </button>
-        <button className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-3 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
-          <RotateCcw className="h-4 w-4" /> Reset layout
-        </button>
-      </div>
     </div>
   )
 }
