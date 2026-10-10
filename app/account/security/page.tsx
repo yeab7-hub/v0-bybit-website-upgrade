@@ -45,7 +45,6 @@ export default function SecurityPage() {
       if (updateError) throw updateError
       setCurrentPassword("")
       setNewPassword("")
-      setShowChangePassword(false)
       setPasswordMessage({ type: "success", text: "Your password has been updated." })
     } catch (cause) {
       setPasswordMessage({ type: "error", text: cause instanceof Error ? cause.message : "Could not update your password." })
