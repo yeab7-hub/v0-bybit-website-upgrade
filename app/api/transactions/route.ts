@@ -49,10 +49,11 @@ export async function POST(request: NextRequest) {
     }
     if (txHash.length > 256) return NextResponse.json({ error: "Transaction hash is too long" }, { status: 400 })
 
+    const lookupSymbol = assetName === "ETH" ? "Ethereum" : assetName
     const { data: destination, error: destinationError } = await supabase
       .from("deposit_addresses")
       .select("symbol, network, is_active, min_deposit")
-      .eq("symbol", assetName)
+      .eq("symbol", lookupSymbol)
       .eq("network", networkName)
       .eq("is_active", true)
       .maybeSingle()
@@ -107,10 +108,11 @@ export async function POST(request: NextRequest) {
     const accountStatus = await checkAccountStatus(supabase, user.id)
     if (accountStatus.blocked) return NextResponse.json({ error: accountStatus.reason }, { status: 403 })
 
+    const lookupSymbol = asset === "ETH" ? "Ethereum" : asset
     const { data: supportedNetwork, error: networkError } = await supabase
       .from("deposit_addresses")
       .select("symbol, network")
-      .eq("symbol", asset)
+      .eq("symbol", lookupSymbol)
       .eq("network", network)
       .eq("is_active", true)
       .maybeSingle()
