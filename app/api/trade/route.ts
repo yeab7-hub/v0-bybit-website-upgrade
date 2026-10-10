@@ -198,18 +198,39 @@ export async function POST(request: NextRequest) {
   // Use admin client for DB operations to bypass RLS constraints
   const adminSupabase = await createAdminClient()
 
-  const body = await request.json()
-  const { pair, side, order_type, price, stop_price, amount, take_profit, stop_loss, is_futures, leverage, duration_seconds } = body
+  let body: Record<string, unknown>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
 
-  if (!pair || !side || !order_type || !amount || amount <= 0) {
+  const pair = typeof body.pair === "string" ? body.pair.trim().toUpperCase() : ""
+  const side = typeof body.side === "string" ? body.side.trim().toLowerCase() : ""
+  const order_type = typeof body.order_type === "string" ? body.order_type.trim().toLowerCase() : ""
+  const amount = Number(body.amount)
+  const price = body.price == null || body.price === "" ? 0 : Number(body.price)
+  const stop_price = body.stop_price == null || body.stop_price === "" ? 0 : Number(body.stop_price)
+  const take_profit = body.take_profit
+  const stop_loss = body.stop_loss
+  const is_futures = body.is_futures === true
+  const leverage = body.leverage
+  const duration_seconds = body.duration_seconds
+
+  if (!/^[A-Z0-9]{2,12}\/[A-Z0-9]{2,12}$/.test(pair) ||
+      (side !== "buy" && side !== "sell") ||
+      !["market", "limit", "stop_limit"].includes(order_type) ||
+      !Number.isFinite(amount) || amount <= 0 ||
+      (body.price != null && body.price !== "" && (!Number.isFinite(price) || price < 0)) ||
+      (body.stop_price != null && body.stop_price !== "" && (!Number.isFinite(stop_price) || stop_price < 0))) {
     return NextResponse.json({ error: "Invalid order parameters" }, { status: 400 })
   }
 
-  const takeProfit = Number(take_profit) > 0 ? Number(take_profit) : null
-  const stopLoss = Number(stop_loss) > 0 ? Number(stop_loss) : null
+  const takeProfit = Number(take_profit) > 0 && Number.isFinite(Number(take_profit)) ? Number(take_profit) : null
+  const stopLoss = Number(stop_loss) > 0 && Number.isFinite(Number(stop_loss)) ? Number(stop_loss) : null
 
   const baseAsset = pair.split("/")[0]
-  const quoteAsset = pair.split("/")[1] || "USDT"
+  const quoteAsset = pair.split("/")[1]
   const marketPrice = await getLivePrice(baseAsset, pair)
 
   if (marketPrice <= 0) {
