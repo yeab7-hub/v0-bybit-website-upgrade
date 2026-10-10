@@ -30,11 +30,18 @@ export async function POST(request: NextRequest) {
   const status = await checkAccountStatus(supabase, user.id)
   if (status.blocked) return NextResponse.json({ error: status.reason }, { status: 403 })
 
-  const body = await request.json()
-  const { from_asset, to_asset, amount } = body
+  let body: { from_asset?: unknown; to_asset?: unknown; amount?: unknown }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
+  const from_asset = typeof body.from_asset === "string" ? body.from_asset.trim().toUpperCase() : ""
+  const to_asset = typeof body.to_asset === "string" ? body.to_asset.trim().toUpperCase() : ""
+  const amount = Number(body.amount)
 
-  if (!from_asset || !to_asset || !amount || amount <= 0) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 })
+  if (!/^[A-Z0-9]{2,12}$/.test(from_asset) || !/^[A-Z0-9]{2,12}$/.test(to_asset) || !Number.isFinite(amount) || amount <= 0) {
+    return NextResponse.json({ error: "Enter valid assets and a positive conversion amount" }, { status: 400 })
   }
   if (from_asset === to_asset) {
     return NextResponse.json({ error: "Cannot convert an asset to itself" }, { status: 400 })
@@ -49,8 +56,11 @@ export async function POST(request: NextRequest) {
   if (fromPrice === null || toPrice === null) {
     try {
       const priceRes = await fetch(`${origin}/api/prices`, { cache: "no-store" })
+      if (!priceRes.ok) {
+        return NextResponse.json({ error: "Live prices are temporarily unavailable. Please try again." }, { status: 502 })
+      }
       const priceData = await priceRes.json()
-      const all = [...(priceData.crypto ?? [])]
+      const all = Array.isArray(priceData.crypto) ? priceData.crypto : []
       if (fromPrice === null) fromPrice = all.find((c: any) => c.symbol === from_asset)?.price ?? null
       if (toPrice === null) toPrice = all.find((c: any) => c.symbol === to_asset)?.price ?? null
     } catch {
@@ -58,18 +68,21 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (!fromPrice || !toPrice) {
-    return NextResponse.json({ error: "Price unavailable for one of the selected assets" }, { status: 400 })
+  if (!Number.isFinite(fromPrice) || !Number.isFinite(toPrice) || Number(fromPrice) <= 0 || Number(toPrice) <= 0) {
+    return NextResponse.json({ error: "A valid live price is unavailable for one of the selected assets" }, { status: 400 })
   }
 
-  const rate = fromPrice / toPrice
-  const toAmount = Number(amount) * rate
+  const rate = Number(fromPrice) / Number(toPrice)
+  const toAmount = amount * rate
+  if (!Number.isFinite(toAmount) || toAmount <= 0) {
+    return NextResponse.json({ error: "Could not calculate a valid conversion amount" }, { status: 400 })
+  }
 
   const { error } = await supabase.rpc("perform_conversion", {
     p_user_id: user.id,
     p_from_asset: from_asset,
     p_to_asset: to_asset,
-    p_from_amount: Number(amount),
+    p_from_amount: amount,
     p_to_amount: toAmount,
     p_rate: rate,
   })
