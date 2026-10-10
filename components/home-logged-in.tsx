@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { useLivePrices, formatPrice, safeFindPrice, type PriceData } from "@/hooks/use-live-prices"
 import { NewsSection } from "@/components/news-section"
+import { EconomicCalendar } from "@/components/economic-calendar"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
@@ -22,13 +23,6 @@ const quickActions = [
   { label: "More", href: "/dashboard", icon: MoreHorizontal, color: "bg-card" },
 ]
 
-const events = [
-  { title: "800,000 USDC awaits", subtitle: "Events", cta: "Explore Now" },
-  { title: "Wednesday Airdrop: Trade to share over $150,000", subtitle: "Events", cta: "Explore Now" },
-  { title: "Trade gold and grab up to $2,000 gold bar airdrop!", subtitle: "Events", cta: "Explore Now" },
-  { title: "Up or down? Tap to predict. Win $5,000 airdrop", subtitle: "Today's pick", cta: "Explore Now" },
-]
-
 type MarketTab = "favorites" | "hot" | "new" | "gainers" | "losers" | "turnover"
 type MarketSubTab = "spot" | "derivatives" | "forex" | "stocks" | "commodities" | "cfd"
 
@@ -39,7 +33,6 @@ export function HomeLoggedIn({ user }: { user: User }) {
   const [todayPnl, setTodayPnl] = useState({ amount: 0, percent: 0 })
   const [activeTab, setActiveTab] = useState<MarketTab>("favorites")
   const [subTab, setSubTab] = useState<MarketSubTab>("spot")
-  const [eventIndex, setEventIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
   const [favorites, setFavorites] = useState<string[]>(["BTC", "ETH", "SOL", "XRP", "AVAX", "EUR/USD", "XAU/USD", "AAPL", "US500"])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -83,11 +76,6 @@ export function HomeLoggedIn({ user }: { user: User }) {
     return () => { cancelled = true }
   }, [user.id, crypto, forex, commodities, stocks, cfd])
 
-  useEffect(() => {
-    const timer = setInterval(() => setEventIndex(i => (i + 1) % events.length), 5000)
-    return () => clearInterval(timer)
-  }, [])
-
   const tabs: { key: MarketTab; label: string }[] = [
     { key: "favorites", label: "Favorites" },
     { key: "hot", label: "Hot" },
@@ -130,7 +118,6 @@ export function HomeLoggedIn({ user }: { user: User }) {
   }
 
   const filteredCoins = getFilteredCoins()
-  const event = events[eventIndex]
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pb-8">
@@ -206,22 +193,8 @@ export function HomeLoggedIn({ user }: { user: User }) {
         ))}
       </div>
 
-      {/* Events Carousel */}
-      <div className="mt-5 rounded-xl bg-card p-4">
-        <div className="text-[10px] font-medium uppercase tracking-wider text-primary">Events</div>
-        <h3 className="mt-1 text-sm font-semibold text-foreground">{event.title}</h3>
-        <div className="mt-2 flex items-center justify-between">
-          <Link href="/announcements" className="flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground">
-            {event.cta} <ChevronRight className="h-3 w-3" />
-          </Link>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-primary">{eventIndex + 1}</span>
-            <span className="text-[10px] text-muted-foreground">/{events.length}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Real, live crypto/financial news */}
+      {/* Real, live financial calendar and market news */}
+      <EconomicCalendar />
       <NewsSection />
 
       {/* Market Tabs */}
