@@ -1,38 +1,40 @@
-import { createAdminClient } from "@/lib/supabase/server"
-import { NextResponse, type NextRequest } from "next/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
+import { NextResponse } from "next/server"
 
 /**
  * POST /api/admin/auth
- * Verifies if a user is admin using the service role key (bypasses RLS).
- * This is a fallback for when RLS policies block the client-side profile check.
+ * Verify the currently authenticated session against the server-side profile.
+ * The caller cannot choose a user ID to impersonate.
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    const { userId } = await request.json()
-    if (!userId) {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 })
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ isAdmin: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Use service role client - bypasses RLS completely
-    const supabase = await createAdminClient()
-
-    const { data: profile, error } = await supabase
+    const adminSupabase = await createAdminClient()
+    const { data: profile, error } = await adminSupabase
       .from("profiles")
       .select("role, full_name")
-      .eq("id", userId)
+      .eq("id", user.id)
       .single()
 
     if (error || !profile) {
-      return NextResponse.json({ isAdmin: false, error: error?.message || "Profile not found" })
+      return NextResponse.json({ isAdmin: false, error: "Could not verify admin profile" }, { status: 503 })
     }
 
+    const isAdmin = profile.role === "admin" || profile.role === "super_admin"
+
     return NextResponse.json({
-      isAdmin: profile.role === "admin" || profile.role === "super_admin",
+      isAdmin,
       isSuperAdmin: profile.role === "super_admin",
       role: profile.role,
       name: profile.full_name,
-    })
-  } catch (e: any) {
-    return NextResponse.json({ isAdmin: false, error: e.message }, { status: 500 })
+    }, { status: isAdmin ? 200 : 403 })
+  } catch {
+    return NextResponse.json({ isAdmin: false, error: "Admin authentication is temporarily unavailable" }, { status: 503 })
   }
 }
