@@ -80,7 +80,7 @@ export default function APIManagementPage() {
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <div>
                 <p className="text-xs font-medium text-foreground">Keep your API keys secure</p>
-                <p className="text-[10px] text-muted-foreground">Never share your Secret Key. Use IP restrictions for added security. You can create up to 30 API keys.</p>
+                <p className="text-[10px] text-muted-foreground">When API-key creation is implemented, use IP restrictions and keep secrets private. API keys cannot currently be created or used from this app.</p>
               </div>
             </div>
 
