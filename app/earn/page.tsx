@@ -14,64 +14,14 @@ import { BottomNav } from "@/components/bottom-nav"
 type EarnCategory = "easy" | "onchain" | "advanced"
 type ProductTab = "steady" | "topGains" | "vip"
 
-const featuredProducts = [
-  { pair: "BTC-USDT", type: "Dual Asset Buy Low", apy: "401.85%", page: "1/2", icon: "BTC" },
-  { pair: "USDC", type: "Mantle Vault", apy: "4.34%", icon: "USDC" },
-  { pair: "USDT", type: "Mantle Vault", apy: "3.89%", icon: "USDT" },
-]
-
-const earnProducts = [
-  {
-    coin: "BTC", name: "Bitcoin",
-    products: [
-      { type: "Easy Earn", term: "Flexible", apr: "2.30%" },
-      { type: "Easy Earn", term: "30 Days", apr: "3.80%" },
-      { type: "Easy Earn", term: "60 Days", apr: "4.50%" },
-    ],
-  },
-  {
-    coin: "ETH", name: "Ethereum",
-    products: [
-      { type: "Easy Earn", term: "Flexible", apr: "2.80%" },
-      { type: "Easy Earn", term: "30 Days", apr: "5.50%" },
-    ],
-  },
-  {
-    coin: "USDT", name: "Tether",
-    products: [
-      { type: "Easy Earn", term: "Flexible", apr: "8.20%" },
-      { type: "Easy Earn", term: "7 Days", apr: "10.50%" },
-      { type: "Easy Earn", term: "30 Days", apr: "12.50%" },
-    ],
-  },
-  {
-    coin: "SOL", name: "Solana",
-    products: [
-      { type: "Easy Earn", term: "Flexible", apr: "3.20%" },
-      { type: "Easy Earn", term: "30 Days", apr: "7.80%" },
-    ],
-  },
-  {
-    coin: "USDC", name: "USD Coin",
-    products: [
-      { type: "Easy Earn", term: "Flexible", apr: "7.80%" },
-      { type: "Easy Earn", term: "30 Days", apr: "11.20%" },
-    ],
-  },
-  {
-    coin: "AVAX", name: "Avalanche",
-    products: [
-      { type: "Easy Earn", term: "Flexible", apr: "3.80%" },
-    ],
-  },
-]
+const earnProducts: { coin: string; name: string; products: { type: string; term: string; apr: string }[] }[] = []
 
 export default function EarnPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [category, setCategory] = useState<EarnCategory>("easy")
   const [productTab, setProductTab] = useState<ProductTab>("steady")
   const [expandedCoin, setExpandedCoin] = useState<string | null>("BTC")
-  const [autoEarn, setAutoEarn] = useState(true)
+  const [autoEarn] = useState(false)
 
   const filteredProducts = searchQuery
     ? earnProducts.filter(p => p.coin.toLowerCase().includes(searchQuery.toLowerCase()) || p.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -115,12 +65,10 @@ export default function EarnPage() {
 
         {/* Total Earn + Auto-Earn */}
         <div className="flex items-center gap-2 px-4 py-3">
-          <span className="text-sm text-muted-foreground">Total Earn Asset 0.00 USD</span>
+          <span className="text-sm text-muted-foreground">Earn balance: not connected</span>
           <span className="text-sm text-muted-foreground">|</span>
           <span className="text-sm text-muted-foreground">Auto-Earn</span>
-          <button onClick={() => setAutoEarn(!autoEarn)} className="flex items-center gap-1 rounded-full bg-[#f7a600]/10 px-2 py-0.5 text-xs font-medium text-[#f7a600]">
-            {autoEarn ? "On" : "Off"} <ChevronRight className="h-3 w-3" />
-          </button>
+          <span className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground">Not configured</span>
         </div>
 
         {/* Category Icons */}
@@ -156,57 +104,10 @@ export default function EarnPage() {
           ))}
         </div>
 
-        {/* Featured Products Cards */}
-        <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
-          {/* Left large card */}
-          <div className="shrink-0 rounded-xl border border-border bg-card p-4" style={{ minWidth: "200px" }}>
-            <div className="mb-2 flex items-center justify-between">
-              <MarketAsset symbol="BTC" size={28} />
-              <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">1/2</span>
-            </div>
-            <p className="text-sm font-bold text-foreground">BTC-USDT</p>
-            <p className="text-xs text-muted-foreground">Dual Asset Buy Low</p>
-            <p className="mt-2 text-2xl font-bold text-success">401.85%</p>
-          </div>
-          {/* Right stacked cards */}
-          <div className="flex shrink-0 flex-col gap-3">
-            <div className="rounded-xl border border-border bg-card p-4" style={{ minWidth: "180px" }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MarketAsset symbol="USDC" size={24} />
-                  <span className="text-sm font-bold text-foreground">USDC</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground">Mantle Vault</p>
-                  <p className="text-lg font-bold text-success">4.34%</p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-4" style={{ minWidth: "180px" }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MarketAsset symbol="USDT" size={24} />
-                  <span className="text-sm font-bold text-foreground">USDT</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground">Mantle Vault</p>
-                  <p className="text-lg font-bold text-success">3.89%</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Events Banner */}
-        <div className="mx-4 mb-4 flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f7a600]/10">
-            <Flame className="h-5 w-5 text-[#f7a600]" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[10px] text-muted-foreground">Events</p>
-            <p className="text-sm text-foreground">{"BYUSDT: Earn while you trade"} <ArrowRight className="inline h-3.5 w-3.5" /></p>
-          </div>
-          <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">1/4</span>
+        <div className="mx-4 my-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
+          <h2 className="font-semibold text-foreground">Earn products unavailable</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">Live products, current APRs, subscription orders, and yield accounting are not connected. No estimated or promotional yield is shown as an available offer.</p>
+          <Link href="/support" className="mt-3 inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-sm text-foreground hover:bg-secondary">Contact support</Link>
         </div>
 
         {/* Explore Products */}
@@ -234,6 +135,7 @@ export default function EarnPage() {
 
           {/* Product List - Expandable Cards */}
           <div className="flex flex-col gap-0">
+            {filteredProducts.length === 0 && <p className="rounded-lg border border-border p-5 text-center text-sm text-muted-foreground">No live earn products are configured.</p>}
             {filteredProducts.map((product) => (
               <div key={product.coin} className="border-b border-border">
                 {/* Header row */}
@@ -291,10 +193,7 @@ export default function EarnPage() {
               </div>
               <span className="text-sm text-muted-foreground">Total Earn Asset: 0.00 USD</span>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Auto-Earn</span>
-                <button onClick={() => setAutoEarn(!autoEarn)} className="flex items-center gap-1 rounded-full bg-[#f7a600]/10 px-2.5 py-1 text-xs font-medium text-[#f7a600]">
-                  {autoEarn ? "On" : "Off"} <ChevronRight className="h-3 w-3" />
-                </button>
+                <span className="text-sm text-muted-foreground">Auto-Earn: not configured</span>
               </div>
             </div>
           </div>
@@ -322,56 +221,11 @@ export default function EarnPage() {
               ))}
             </div>
 
-            {/* Featured cards - desktop */}
-            <div className="flex flex-1 gap-4">
-              <div className="flex-1 rounded-xl border border-border bg-card p-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <MarketAsset symbol="BTC" size={32} />
-                  <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">1/2</span>
-                </div>
-                <p className="text-base font-bold text-foreground">BTC-USDT</p>
-                <p className="text-sm text-muted-foreground">Dual Asset Buy Low</p>
-                <p className="mt-3 text-3xl font-bold text-success">401.85%</p>
-              </div>
-              <div className="flex flex-1 flex-col gap-4">
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <MarketAsset symbol="USDC" size={28} />
-                      <span className="text-base font-bold text-foreground">USDC</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Mantle Vault</p>
-                      <p className="text-xl font-bold text-success">4.34%</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <MarketAsset symbol="USDT" size={28} />
-                      <span className="text-base font-bold text-foreground">USDT</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Mantle Vault</p>
-                      <p className="text-xl font-bold text-success">3.89%</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="flex-1 rounded-xl border border-amber-500/30 bg-amber-500/5 p-6">
+              <h2 className="font-semibold text-foreground">Earn products unavailable</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Live product data, current APRs, subscription orders, and yield accounting are not connected. No estimated yield is offered as a live product.</p>
+              <Link href="/support" className="mt-3 inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-sm text-foreground hover:bg-secondary">Contact support</Link>
             </div>
-          </div>
-
-          {/* Events */}
-          <div className="mb-8 flex items-center gap-4 rounded-xl border border-border bg-card p-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#f7a600]/10">
-              <Flame className="h-6 w-6 text-[#f7a600]" />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground">Events</p>
-              <p className="text-base text-foreground">{"BYUSDT: Earn while you trade"} <ArrowRight className="inline h-4 w-4" /></p>
-            </div>
-            <span className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">1/4</span>
           </div>
 
           {/* Explore Products */}
@@ -397,6 +251,7 @@ export default function EarnPage() {
 
             {/* Product Table - Desktop */}
             <div className="rounded-xl border border-border bg-card">
+              {filteredProducts.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">No live earn products are configured.</p>}
               {filteredProducts.map((product) => (
                 <div key={product.coin} className="border-b border-border last:border-0">
                   <button
