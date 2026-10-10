@@ -401,12 +401,27 @@ function DepositTab({ mutTx, mutBal }: any) {
   const copy = () => { if (!net) return; navigator.clipboard.writeText(net.address); setCopied(true); setTimeout(() => setCopied(false), 2000) }
 
   const submit = async () => {
-    if (!amount || parseFloat(amount) <= 0 || !net) return
-    setSubmitting(true); setError("")
-    const response = await fetch("/api/transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deposit", asset: coin, network: net.network, amount, tx_hash: txHash }) })
-    const result = await response.json()
-    if (!response.ok) { setError(result.error || "Could not submit deposit"); setSubmitting(false); return }
-    mutTx(); mutBal(); setDone(true); setSubmitting(false)
+    if (!amount || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || !net) return
+    setSubmitting(true)
+    setError("")
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deposit", asset: coin, network: net.network, amount: Number(amount), tx_hash: txHash }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setError(result.error || "Could not submit deposit")
+        return
+      }
+      await Promise.all([mutTx(), mutBal()])
+      setDone(true)
+    } catch {
+      setError("Network error. Please check your connection and try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (done) return (
@@ -516,12 +531,27 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
   )
 
   const submit = async () => {
-    if (!amount || !address) return
-    setSubmitting(true); setError("")
-    const res = await fetch("/api/transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "withdraw", asset: coin, network: net.network, amount, address, memo }) })
-    const d = await res.json()
-    if (d.error) { setError(d.error); setSubmitting(false); return }
-    mutTx(); mutBal(); setDone(true); setSubmitting(false)
+    if (!amount || !address || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || Number(amount) > avail) return
+    setSubmitting(true)
+    setError("")
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "withdraw", asset: coin, network: net.network, amount: Number(amount), address, memo }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setError(result.error || "Could not submit withdrawal")
+        return
+      }
+      await Promise.all([mutTx(), mutBal()])
+      setDone(true)
+    } catch {
+      setError("Network error. Please check your connection and try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (done) return (
