@@ -56,26 +56,32 @@ export function HomeLoggedIn({ user }: { user: User }) {
   }, [])
 
   useEffect(() => {
-    const supabase = createClient()
-    supabase.from("balances").select("*").eq("user_id", user.id).then(({ data }) => {
-      if (data && data.length > 0) {
-        const total = data.reduce((s: number, b: any) => {
-          const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
-    const coin = safeFindPrice(allPrices, b.asset)
-          const price = coin ? coin.price : b.asset === "USDT" ? 1 : 0
-          return s + Number(b.available || 0) * price + Number(b.in_order || 0) * price
+    let cancelled = false
+    const loadAccountSummary = async () => {
+      try {
+        const supabase = createClient()
+        const [{ data: balanceData }, { data: tradeData }] = await Promise.all([
+          supabase.from("balances").select("*").eq("user_id", user.id),
+          supabase.from("trades").select("pnl").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
+        ])
+        const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
+        const total = (balanceData ?? []).reduce((sum: number, balance: any) => {
+          const coin = safeFindPrice(allPrices, balance.asset)
+          const price = coin ? coin.price : balance.asset === "USDT" ? 1 : 0
+          return sum + Number(balance.available || 0) * price + Number(balance.in_order || 0) * price
         }, 0)
-        setTotalAssets(total)
+        const pnl = (tradeData ?? []).reduce((sum: number, trade: any) => sum + (Number(trade.pnl) || 0), 0)
+        if (!cancelled) {
+          setTotalAssets(total)
+          setTodayPnl({ amount: pnl, percent: total > 0 ? (pnl / total) * 100 : 0 })
+        }
+      } catch {
+        // Keep the last known summary if the network or session is unavailable.
       }
-    }).catch(() => {})
-    supabase.from("trades").select("pnl").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20).then(({ data }) => {
-      if (data) {
-        const pnl = data.reduce((s: number, t: any) => s + (Number(t.pnl) || 0), 0)
-        const pct = totalAssets > 0 ? (pnl / totalAssets) * 100 : 0
-        setTodayPnl({ amount: pnl, percent: pct })
-      }
-    }).catch(() => {})
-  }, [crypto, totalAssets])
+    }
+    void loadAccountSummary()
+    return () => { cancelled = true }
+  }, [user.id, crypto, forex, commodities, stocks, cfd])
 
   useEffect(() => {
     const timer = setInterval(() => setEventIndex(i => (i + 1) % events.length), 5000)
