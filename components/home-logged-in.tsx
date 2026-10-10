@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import {
   Eye, EyeOff, ChevronRight, ChevronDown, Search, Bell,
-  ArrowDownLeft, ArrowUpRight, ArrowLeftRight, RefreshCw, Gift, CreditCard,
+  ArrowDownLeft, ArrowLeftRight, Gift, CreditCard,
   Calendar, Coins, MoreHorizontal, Check,
 } from "lucide-react"
 import { useLivePrices, formatPrice, safeFindPrice, type PriceData } from "@/hooks/use-live-prices"
@@ -27,7 +27,7 @@ type MarketTab = "favorites" | "hot" | "new" | "gainers" | "losers" | "turnover"
 type MarketSubTab = "spot" | "derivatives" | "forex" | "stocks" | "commodities" | "cfd"
 
 export function HomeLoggedIn({ user }: { user: User }) {
-  const { crypto, forex, commodities, stocks, cfd, isLoading } = useLivePrices(5000)
+  const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
   const [showBalance, setShowBalance] = useState(true)
   const [totalAssets, setTotalAssets] = useState(0)
   const [todayPnl, setTodayPnl] = useState({ amount: 0, percent: 0 })
