@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
+import { checkAccountStatus } from "@/lib/account-status"
 import { notifyAdmin } from "@/lib/notify-admin"
 import { renderDepositEmail, renderWithdrawalEmail, sendBrandedEmail } from "@/lib/email/templates"
 
@@ -30,7 +31,12 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await request.json()
+  let body: Record<string, any>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
   const { action } = body
 
   if (action === "deposit") {
@@ -86,8 +92,20 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "withdraw") {
-    const { asset, network, amount, address, memo } = body
-    const amountNum = parseFloat(amount)
+    const asset = String(body.asset ?? "").trim().toUpperCase()
+    const network = String(body.network ?? "").trim()
+    const amountNum = Number(body.amount)
+    const address = String(body.address ?? "").trim()
+    const memo = String(body.memo ?? "").trim()
+
+    if (!/^[A-Z0-9]{2,12}$/.test(asset) || !network || !address || !Number.isFinite(amountNum) || amountNum <= 0) {
+      return NextResponse.json({ error: "Enter a valid asset, network, destination address, and positive amount" }, { status: 400 })
+    }
+    if (address.length > 512 || network.length > 80 || memo.length > 256) {
+      return NextResponse.json({ error: "Withdrawal details exceed the allowed length" }, { status: 400 })
+    }
+    const accountStatus = await checkAccountStatus(supabase, user.id)
+    if (accountStatus.blocked) return NextResponse.json({ error: accountStatus.reason }, { status: 403 })
 
     // Check balance
     const { data: balance } = await supabase
@@ -151,35 +169,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       error: "Internal account transfers are not configured yet. No funds were moved.",
     }, { status: 501 })
-  }
-
-  if (false && action === "transfer") {
-    const { asset, amount, from_account, to_account } = body
-    const amountNum = parseFloat(amount)
-
-    // For internal transfers, auto-approve
-    const { data: balance } = await supabase
-      .from("balances")
-      .select("available")
-      .eq("user_id", user.id)
-      .eq("asset", asset)
-      .single()
-
-    if (!balance || balance.available < amountNum) {
-      return NextResponse.json({ error: "Insufficient balance" }, { status: 400 })
-    }
-
-    const { data, error } = await supabase.from("transactions").insert({
-      user_id: user.id,
-      type: "transfer",
-      asset,
-      amount: amountNum,
-      status: "completed",
-      notes: `${from_account} -> ${to_account}`,
-    }).select().single()
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data)
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 })
