@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import {
-  Eye, EyeOff, ChevronRight, ChevronDown, Search, ScanLine, Bell,
+  Eye, EyeOff, ChevronRight, ChevronDown, Search, Bell,
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight, RefreshCw, Gift, CreditCard,
-  Calendar, Coins, MoreHorizontal, Star, Check, Plus, RotateCcw,
+  Calendar, Coins, MoreHorizontal, Check,
 } from "lucide-react"
 import { useLivePrices, formatPrice, safeFindPrice, type PriceData } from "@/hooks/use-live-prices"
 import { NewsSection } from "@/components/news-section"
@@ -34,11 +34,10 @@ export function HomeLoggedIn({ user }: { user: User }) {
   const [activeTab, setActiveTab] = useState<MarketTab>("favorites")
   const [subTab, setSubTab] = useState<MarketSubTab>("spot")
   const [searchQuery, setSearchQuery] = useState("")
-  const [favorites, setFavorites] = useState<string[]>(["BTC", "ETH", "SOL", "XRP", "AVAX", "EUR/USD", "XAU/USD", "AAPL", "US500"])
+  const [favorites] = useState<string[]>(["BTC", "ETH", "SOL", "XRP", "AVAX", "EUR/USD", "XAU/USD", "AAPL", "US500"])
   const [unreadCount, setUnreadCount] = useState(0)
 
   const initials = (user.user_metadata?.full_name || user.email || "U").charAt(0).toUpperCase()
-  const maskedEmail = user.email ? user.email.replace(/(.{3}).*(@.*)/, "$1***$2") : "User"
 
   // Fetch notification count
   useEffect(() => {
@@ -113,10 +112,6 @@ export function HomeLoggedIn({ user }: { user: User }) {
       case "new": return coins.slice(0, 8)
       default: return coins.slice(0, 10)
     }
-  }
-
-  const toggleFavorite = (symbol: string) => {
-    setFavorites(prev => prev.includes(symbol) ? prev.filter(s => s !== symbol) : [...prev, symbol])
   }
 
   const filteredCoins = getFilteredCoins()
