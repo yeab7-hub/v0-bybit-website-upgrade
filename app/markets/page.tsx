@@ -349,13 +349,13 @@ export default function MarketsPage() {
                             ${formatVolume(coin.volume * coin.price)}
                           </td>
                           <td className="hidden px-4 py-3 lg:table-cell">
-                            {coin.sparkline && coin.sparkline.length > 1 && (
+                            {coin.sparkline && (coin.sparkline ?? []).length > 1 && (
                               <svg viewBox="0 0 80 24" className="ml-auto h-6 w-20" preserveAspectRatio="none">
                                 <path
-                                  d={coin.sparkline.map((v: number, i: number) => {
-                                    const x = (i / (coin.sparkline.length - 1)) * 80
-                                    const mn = Math.min(...coin.sparkline)
-                                    const mx = Math.max(...coin.sparkline)
+                                  d={(coin.sparkline ?? []).map((v: number, i: number) => {
+                                    const x = (i / ((coin.sparkline ?? []).length - 1)) * 80
+                                    const mn = Math.min(...(coin.sparkline ?? []))
+                                    const mx = Math.max(...(coin.sparkline ?? []))
                                     const y = 22 - ((v - mn) / (mx - mn || 1)) * 20
                                     return `${i === 0 ? "M" : "L"}${x},${y}`
                                   }).join(" ")}
