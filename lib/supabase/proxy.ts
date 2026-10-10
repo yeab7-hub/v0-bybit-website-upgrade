@@ -6,10 +6,21 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  // If env vars are missing, just pass through
+  const pathname = request.nextUrl.pathname
+  const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login'
+  const isAdminApi = pathname.startsWith('/api/admin')
+
+  // Never allow privileged routes through when authentication cannot be verified.
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseAnonKey) {
+    if (isAdminApi) return NextResponse.json({ error: 'Admin authentication is not configured' }, { status: 503 })
+    if (isAdminRoute) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin/login'
+      url.searchParams.set('error', 'auth_unavailable')
+      return NextResponse.redirect(url)
+    }
     return supabaseResponse
   }
 
@@ -41,12 +52,7 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    const pathname = request.nextUrl.pathname
-
     // Admin routes -- redirect to admin login if not authenticated or not admin
-    const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login'
-    const isAdminApi = pathname.startsWith('/api/admin')
-
     if ((isAdminRoute || isAdminApi) && !user) {
       if (isAdminApi) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -75,8 +81,14 @@ export async function updateSession(request: NextRequest) {
           return NextResponse.redirect(url)
         }
       } catch {
-        // If profile check fails, allow through -- the page/API will handle auth
-        // This prevents middleware crashes from blocking admin access
+        // Role verification failures must fail closed for privileged routes.
+        if (isAdminApi) {
+          return NextResponse.json({ error: 'Unable to verify admin permissions' }, { status: 503 })
+        }
+        const url = request.nextUrl.clone()
+        url.pathname = '/admin/login'
+        url.searchParams.set('error', 'auth_unavailable')
+        return NextResponse.redirect(url)
       }
     }
 
@@ -115,7 +127,16 @@ export async function updateSession(request: NextRequest) {
 
     return supabaseResponse
   } catch {
-    // If Supabase connection fails, allow the request through
+    // If Supabase is unavailable, never bypass authorization on privileged routes.
+    if (isAdminApi) {
+      return NextResponse.json({ error: 'Admin authentication is temporarily unavailable' }, { status: 503 })
+    }
+    if (isAdminRoute) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin/login'
+      url.searchParams.set('error', 'auth_unavailable')
+      return NextResponse.redirect(url)
+    }
     return supabaseResponse
   }
 }
