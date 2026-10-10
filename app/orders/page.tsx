@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { BottomNav } from "@/components/bottom-nav"
 import { Download, RefreshCw, XCircle, Clock, Loader2, ArrowUpRight, ClipboardList } from "lucide-react"
 import Link from "next/link"
 
@@ -40,7 +41,6 @@ const isOpen = (row: RecordRow) => ["open", "partially_filled", "partial"].inclu
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Open Orders")
-  const [market, setMarket] = useState("All")
   const [pair, setPair] = useState("All Pairs")
   const [side, setSide] = useState("All")
   const [orders, setOrders] = useState<RecordRow[]>([])
@@ -90,14 +90,8 @@ export default function OrdersPage() {
     if (activeTab === "Order History" && isOpen(row)) return false
     if (pair !== "All Pairs" && (row.pair ?? "").replace("-", "/").toUpperCase() !== pair) return false
     if (side !== "All" && (row.side ?? "").toLowerCase() !== side.toLowerCase()) return false
-    if (market !== "All" && (row.order_type ?? "").toLowerCase().includes(market.toLowerCase()) === false) {
-      // Spot/Futures is not consistently stored on every order, so only apply this
-      // filter when a row explicitly declares its trading market.
-      const rowMarket = (row as RecordRow & { market?: string }).market
-      if (rowMarket && rowMarket.toLowerCase() !== market.toLowerCase()) return false
-    }
     return true
-  }), [orders, activeTab, pair, side, market])
+  }), [orders, activeTab, pair, side])
 
   const filteredTrades = useMemo(() => trades.filter((row) => {
     if (pair !== "All Pairs" && (row.pair ?? "").replace("-", "/").toUpperCase() !== pair) return false
@@ -144,10 +138,10 @@ export default function OrdersPage() {
   }
 
   const exportCsv = () => {
-    const rows = activeTab === "Trade History" ? filteredTrades : activeTab === "Positions" ? positions : filteredOrders
+    const rows = activeTab === "Trade History" || activeTab === "PnL Analysis" ? filteredTrades : activeTab === "Positions" ? positions : filteredOrders
     const columns = ["pair", "side", "order_type", "price", "amount", "filled", "total", "status", "fee", "pnl", "created_at"]
     const escape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`
-    const csv = [columns.join(","), ...rows.map((row) => columns.map((column) => escape((row as Record<string, unknown>)[column])).join(","))].join("\r\n")
+    const csv = [columns.join(","), ...rows.map((row) => columns.map((column) => escape((row as unknown as Record<string, unknown>)[column])).join(","))].join("\r\n")
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }))
     const anchor = document.createElement("a")
     anchor.href = url
@@ -197,11 +191,6 @@ export default function OrdersPage() {
         </div>
 
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="flex gap-1 overflow-x-auto rounded-lg bg-secondary p-1">
-            {["All", "Spot", "Futures", "Options"].map((item) => (
-              <button key={item} onClick={() => setMarket(item)} className={`min-h-9 shrink-0 rounded-md px-3 text-xs font-medium ${market === item ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{item}</button>
-            ))}
-          </div>
           <select aria-label="Filter by pair" value={pair} onChange={(event) => setPair(event.target.value)} className="min-h-10 rounded-lg border border-border bg-secondary px-3 text-sm text-foreground sm:w-auto">
             {["All Pairs", "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT"].map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
@@ -248,6 +237,7 @@ export default function OrdersPage() {
         )}
       </main>
       <div className="hidden lg:block"><Footer /></div>
+      <BottomNav />
     </div>
   )
 }
