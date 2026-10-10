@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 
 /*
  * Price sources:
- *   Crypto:  CoinCap v2 -> Binance -> CoinGecko -> hardcoded
+ *   Crypto:  Bybit/Binance/CoinGecko live market data; no fabricated fallback prices
  *   Forex:   Frankfurter API (free, no key)
  *   Commodities / Stocks / CFDs: Multiple free sources tried in order
  */
@@ -164,13 +164,13 @@ async function fetchCoinGecko(): Promise<any[] | null> {
 
 // ─── Forex: Frankfurter API (free, no key) ───
 const FOREX_BASE_PAIRS = [
-  { symbol: "EUR/USD", name: "EUR/USD", fallback: 1.0842, currency: "EUR", isInverse: true },
-  { symbol: "GBP/USD", name: "GBP/USD", fallback: 1.2634, currency: "GBP", isInverse: true },
-  { symbol: "USD/JPY", name: "USD/JPY", fallback: 149.85, currency: "JPY", isInverse: false },
-  { symbol: "AUD/USD", name: "AUD/USD", fallback: 0.6543, currency: "AUD", isInverse: true },
-  { symbol: "USD/CHF", name: "USD/CHF", fallback: 0.8821, currency: "CHF", isInverse: false },
-  { symbol: "USD/CAD", name: "USD/CAD", fallback: 1.3612, currency: "CAD", isInverse: false },
-  { symbol: "NZD/USD", name: "NZD/USD", fallback: 0.6102, currency: "NZD", isInverse: true },
+  { symbol: "EUR/USD", name: "EUR/USD", currency: "EUR", isInverse: true },
+  { symbol: "GBP/USD", name: "GBP/USD", currency: "GBP", isInverse: true },
+  { symbol: "USD/JPY", name: "USD/JPY", currency: "JPY", isInverse: false },
+  { symbol: "AUD/USD", name: "AUD/USD", currency: "AUD", isInverse: true },
+  { symbol: "USD/CHF", name: "USD/CHF", currency: "CHF", isInverse: false },
+  { symbol: "USD/CAD", name: "USD/CAD", currency: "CAD", isInverse: false },
+  { symbol: "NZD/USD", name: "NZD/USD", currency: "NZD", isInverse: true },
 ]
 
 let cachedForexRates: Record<string, number> | null = null
