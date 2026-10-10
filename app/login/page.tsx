@@ -208,7 +208,7 @@ function LoginContent() {
                   <div className="mb-6">
                     <div className="mb-1.5 flex items-center justify-between">
                       <label className="text-xs text-muted-foreground">Password</label>
-                      <Link href="#" className="text-xs text-primary hover:underline">Forgot password?</Link>
+                      <Link href="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
                     </div>
                     <div className="flex items-center rounded-md border border-border bg-card px-3 focus-within:border-primary">
                       <input
