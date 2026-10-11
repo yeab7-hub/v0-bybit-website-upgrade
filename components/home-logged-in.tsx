@@ -199,7 +199,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
               </span>
             </div>
             <div className="mt-1 flex items-center gap-1">
-              <span className="text-sm text-muted-foreground">{"Today's Realized P&L"}</span>
+              <span className="text-sm text-muted-foreground" title="Based on this platform’s recorded trade ledger; not a broker-confirmed statement.">{"Today’s Recorded P&L"}</span>
               <span className={`text-sm font-medium ${dailyTradePnl >= 0 ? "text-success" : "text-destructive"}`}>
                 {showBalance ? `${dailyTradePnl >= 0 ? "+" : ""}${dailyTradePnl.toFixed(2)} USD` : "****"}
               </span>
