@@ -5,7 +5,7 @@ import Link from "next/link"
 import {
   Eye, EyeOff, ChevronRight, ChevronDown, Search, Bell,
   ArrowDownLeft, ArrowLeftRight, Gift, CreditCard,
-  Calendar, Coins, MoreHorizontal, Check, ClipboardList,
+  Coins, MoreHorizontal, Check, ClipboardList,
 } from "lucide-react"
 import { useLivePrices, formatPrice, safeFindPrice, type PriceData } from "@/hooks/use-live-prices"
 import { NewsSection } from "@/components/news-section"
