@@ -16,10 +16,10 @@ const features = [
 ]
 
 const solutions = [
-  { title: "OTC Trading", desc: "OTC liquidity, broker execution, and settlement are not connected.", benefits: ["$100K+ minimum", "Competitive spreads", "T+0 settlement", "150+ tokens"] },
-  { title: "Sub-Account Management", desc: "Institutional sub-account creation and risk segregation are not configured.", benefits: ["Up to 50 sub-accounts", "Individual risk limits", "Cross-collateral", "Unified reporting"] },
+  { title: "OTC Trading", desc: "OTC liquidity, broker execution, and settlement are not connected.", benefits: ["Liquidity provider not configured", "Spreads not verified", "Settlement terms not configured", "Supported assets not verified"] },
+  { title: "Sub-Account Management", desc: "Institutional sub-account creation and risk segregation are not configured.", benefits: ["Sub-account limits not configured", "Risk limits not configured", "Collateral rules not configured", "Reporting integration not configured"] },
   { title: "Custody Solutions", desc: "Institutional custody, MPC key management, and insurance integrations are not configured.", benefits: ["Custody provider required", "Insurance provider required", "Not verified", "Certification not verified"] },
-  { title: "API Trading Suite", desc: "A secure institutional API gateway, FIX protocol, and dedicated connectivity are not configured.", benefits: ["REST & WebSocket", "FIX protocol", "Co-location available", "99.99% uptime"] },
+  { title: "API Trading Suite", desc: "A secure institutional API gateway, FIX protocol, and dedicated connectivity are not configured.", benefits: ["API gateway not configured", "FIX not configured", "Co-location not verified", "Uptime not measured"] },
 ]
 
 const stats = [
@@ -64,7 +64,7 @@ export default function InstitutionalPage() {
         {/* Features */}
         <section className="border-b border-border">
           <div className="mx-auto max-w-[1200px] px-4 py-10 lg:py-14">
-            <h2 className="mb-8 text-center text-xl font-bold">Why Institutions Choose Bybit</h2>
+            <h2 className="mb-8 text-center text-xl font-bold">Institutional Capability Status</h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {features.map((f) => (
                 <div key={f.title} className="rounded-xl border border-border bg-card p-5">
