@@ -30,13 +30,14 @@ const COIN_NAMES: Record<string, string> = {
 
 export default function WalletPage() {
   const searchParams = useSearchParams()
-  const initialTab = (searchParams.get("tab") as Tab) || "overview"
+  const requestedTab = searchParams.get("tab")
+  const validTabs: Tab[] = ["overview", "deposit", "withdraw", "transfer", "history"]
+  const initialTab: Tab = validTabs.includes(requestedTab as Tab) ? requestedTab as Tab : "overview"
   const [tab, setTab] = useState<Tab>(initialTab)
   const [hideSmall, setHideSmall] = useState(false)
   const [hideZero, setHideZero] = useState(false)
   const [search, setSearch] = useState("")
   const [showBal, setShowBal] = useState(true)
-  const [assetView, setAssetView] = useState<"asset" | "account">("asset")
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function WalletPage() {
     }
   }
 
-  const totalUsd = balArr.reduce((s: number, b: any) => s + (Number(b.available) + Number(b.in_order || 0)) * (pm[b.asset] || 0), 0)
+  const totalUsd = balArr.reduce((s: number, b: any) => s + (Number(b.available || 0) + Number(b.in_order || 0)) * (pm[b.asset] || 0), 0)
   const availableUsd = balArr.reduce((s: number, b: any) => s + Number(b.available || 0) * (pm[b.asset] || 0), 0)
   const inUseUsd = balArr.reduce((s: number, b: any) => s + Number(b.in_order || 0) * (pm[b.asset] || 0), 0)
   const btcVal = pm["BTC"] > 0 ? totalUsd / pm["BTC"] : 0
@@ -193,8 +194,8 @@ export default function WalletPage() {
               {/* Asset / Account tabs */}
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <button onClick={() => setAssetView("asset")} className={`text-base font-semibold ${assetView === "asset" ? "text-foreground" : "text-muted-foreground"}`}>Asset</button>
-                  <button onClick={() => setAssetView("account")} className={`text-base font-semibold ${assetView === "account" ? "text-foreground" : "text-muted-foreground"}`}>Account</button>
+                  <button className="text-base font-semibold text-foreground" aria-current="page">Asset</button>
+                  <button disabled title="Separate account balances are not configured yet" className="cursor-not-allowed text-base font-semibold text-muted-foreground/60">Account (unavailable)</button>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setTab("history")} className="p-1.5 text-muted-foreground"><History className="h-4 w-4" /></button>
