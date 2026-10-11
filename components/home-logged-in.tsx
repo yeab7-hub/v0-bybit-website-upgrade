@@ -105,7 +105,13 @@ export function HomeLoggedIn({ user }: { user: User }) {
     const price = coin?.price ?? (balance.asset === "USDT" ? 1 : 0)
     return sum + (Number(balance.available || 0) + Number(balance.in_order || 0)) * price
   }, 0), [balanceRows, crypto, forex, commodities, stocks, cfd])
-  const todayPnlPercent = totalAssets > 0 ? (dailyTradePnl / totalAssets) * 100 : 0
+  const unpricedAssetCount = useMemo(() => balanceRows.filter((balance: any) => {
+    const quantity = Number(balance.available || 0) + Number(balance.in_order || 0)
+    if (quantity <= 0 || balance.asset === "USDT" || balance.asset === "USDC") return false
+    const quote = safeFindPrice(allPrices, balance.asset)
+    return !quote || !Number.isFinite(quote.price) || quote.price <= 0
+  }).length, [balanceRows, crypto, forex, commodities, stocks, cfd])
+  const todayPnlPercent = totalAssets > 0 && unpricedAssetCount === 0 ? (dailyTradePnl / totalAssets) * 100 : null
 
   const tabs: { key: MarketTab; label: string }[] = [
     { key: "favorites", label: "Favorites" },
@@ -180,14 +186,14 @@ export function HomeLoggedIn({ user }: { user: User }) {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Total Assets</span>
+              <span className="text-sm text-muted-foreground">{unpricedAssetCount > 0 ? "Total Assets (partial)" : "Total Assets"}</span>
               <button onClick={() => setShowBalance(!showBalance)} className="text-muted-foreground">
                 {showBalance ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
               </button>
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-3xl font-bold text-foreground">
-                {showBalance ? totalAssets.toFixed(2) : "****"}
+                {showBalance ? (unpricedAssetCount > 0 && totalAssets === 0 ? "—" : totalAssets.toFixed(2) + (unpricedAssetCount > 0 ? "*" : "")) : "****"}
               </span>
               <span className="flex items-center gap-0.5 text-sm text-muted-foreground">
                 USD <ChevronDown className="h-3 w-3" />
@@ -196,10 +202,15 @@ export function HomeLoggedIn({ user }: { user: User }) {
             <div className="mt-1 flex items-center gap-1">
               <span className="text-sm text-muted-foreground">{"Today's Trade P&L"}</span>
               <span className={`text-sm font-medium ${dailyTradePnl >= 0 ? "text-success" : "text-destructive"}`}>
-                {showBalance ? `${dailyTradePnl >= 0 ? "+" : ""}${dailyTradePnl.toFixed(2)} USD(${todayPnlPercent >= 0 ? "+" : ""}${todayPnlPercent.toFixed(2)}%)` : "****"}
+                {showBalance ? `${dailyTradePnl >= 0 ? "+" : ""}${dailyTradePnl.toFixed(2)} USD(${todayPnlPercent === null ? "—" : `${todayPnlPercent >= 0 ? "+" : ""}${todayPnlPercent.toFixed(2)}%`})` : "****"}
               </span>
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
             </div>
+            {unpricedAssetCount > 0 && (
+              <p className="mt-2 max-w-md text-[11px] text-muted-foreground">
+                * Partial estimate: {unpricedAssetCount} asset{unpricedAssetCount === 1 ? "" : "s"} lack a current quote and are excluded. P&L percentage is hidden until all holdings can be valued.
+              </p>
+            )}
           </div>
           <Link href="/deposit" className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground">
             Deposit
