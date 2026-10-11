@@ -489,30 +489,77 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Cannot cancel this order" }, { status: 400 })
   }
 
-  await adminSupabase.from("orders").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", orderId)
+  // Claim cancellation before touching balances. This races safely against the
+  // fill worker: only one request can transition an open order out of its active state.
+  const { data: cancelledOrder, error: cancelError } = await adminSupabase
+    .from("orders")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("id", orderId)
+    .eq("user_id", user.id)
+    .in("status", ["open", "partially_filled"])
+    .select("id")
+    .maybeSingle()
+
+  if (cancelError || !cancelledOrder) {
+    return NextResponse.json({ error: "This order was filled, cancelled, or changed. Refresh and try again." }, { status: 409 })
+  }
 
   const baseAsset = order.pair.split("/")[0]
   const quoteAsset = order.pair.split("/")[1] || "USDT"
-  const remaining = order.amount - order.filled
+  const remaining = Number(order.amount) - Number(order.filled || 0)
+  let unlockError: string | null = null
 
-  // Unlock balance
-  if (order.side === "buy") {
+  // Unlock only the remaining reserved funds and compare-and-set the observed
+  // balance so a concurrent wallet operation cannot overwrite a newer balance.
+  if (remaining > 0 && order.side === "buy") {
     const cancelFeeRate = await getUserTakerFeeRate(adminSupabase, user.id)
-    const locked = order.price * remaining + (order.price * remaining * cancelFeeRate)
+    const locked = Number(order.price) * remaining * (1 + cancelFeeRate)
     const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
-    await adminSupabase.from("balances").update({
-      available: qBal.available + locked,
-      in_order: Math.max(0, (qBal.in_order || 0) - locked),
-      updated_at: new Date().toISOString()
-    }).eq("user_id", user.id).eq("asset", quoteAsset)
-  } else {
+    if (!qBal) {
+      unlockError = "Could not load the reserved quote balance."
+    } else {
+      const oldAvailable = Number(qBal.available)
+      const oldInOrder = Number(qBal.in_order || 0)
+      const { data: unlocked, error: balanceError } = await adminSupabase.from("balances").update({
+        available: oldAvailable + locked,
+        in_order: Math.max(0, oldInOrder - locked),
+        updated_at: new Date().toISOString()
+      }).eq("user_id", user.id).eq("asset", quoteAsset)
+        .eq("available", qBal.available).eq("in_order", qBal.in_order)
+        .select("asset").maybeSingle()
+      if (balanceError || !unlocked) unlockError = "The quote balance changed before funds could be released."
+    }
+  } else if (remaining > 0) {
     const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
-    await adminSupabase.from("balances").update({
-      available: bBal.available + remaining,
-      in_order: Math.max(0, (bBal.in_order || 0) - remaining),
-      updated_at: new Date().toISOString()
-    }).eq("user_id", user.id).eq("asset", baseAsset)
+    if (!bBal) {
+      unlockError = "Could not load the reserved base balance."
+    } else {
+      const oldAvailable = Number(bBal.available)
+      const oldInOrder = Number(bBal.in_order || 0)
+      const { data: unlocked, error: balanceError } = await adminSupabase.from("balances").update({
+        available: oldAvailable + remaining,
+        in_order: Math.max(0, oldInOrder - remaining),
+        updated_at: new Date().toISOString()
+      }).eq("user_id", user.id).eq("asset", baseAsset)
+        .eq("available", bBal.available).eq("in_order", bBal.in_order)
+        .select("asset").maybeSingle()
+      if (balanceError || !unlocked) unlockError = "The base balance changed before funds could be released."
+    }
   }
 
-  return NextResponse.json({ success: true, message: "Order cancelled" })
+  if (unlockError) {
+    // Reopen only if the cancellation still owns the order state. If this fails,
+    // report the condition explicitly instead of claiming the funds were released.
+    const { data: restored } = await adminSupabase.from("orders")
+      .update({ status: order.status, updated_at: new Date().toISOString() })
+      .eq("id", orderId).eq("user_id", user.id).eq("status", "cancelled")
+      .select("id").maybeSingle()
+    return NextResponse.json({
+      error: restored
+        ? `${unlockError} The order was reopened; refresh and try again.`
+        : `${unlockError} The order state could not be restored automatically. Contact support before retrying.`,
+    }, { status: 409 })
+  }
+
+  return NextResponse.json({ success: true, message: "Order cancelled and remaining funds released." })
 }
