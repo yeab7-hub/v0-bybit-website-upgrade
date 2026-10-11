@@ -56,9 +56,11 @@ export async function GET() {
       if (order.side === "sell" && currentPrice >= order.price) shouldFill = true
       fillPrice = order.price
     } else if (order.order_type === "stop_limit") {
-      if (order.side === "buy" && currentPrice >= order.stop_price && currentPrice >= order.price) shouldFill = true
-      if (order.side === "sell" && currentPrice <= order.stop_price && currentPrice <= order.price) shouldFill = true
-      fillPrice = order.price
+      // Once triggered, the limit portion must also be marketable:
+      // buy fills at/below its limit; sell fills at/above its limit.
+      if (order.side === "buy" && currentPrice >= Number(order.stop_price) && currentPrice <= Number(order.price)) shouldFill = true
+      if (order.side === "sell" && currentPrice <= Number(order.stop_price) && currentPrice >= Number(order.price)) shouldFill = true
+      fillPrice = Number(order.price)
     }
 
     if (!shouldFill) continue
