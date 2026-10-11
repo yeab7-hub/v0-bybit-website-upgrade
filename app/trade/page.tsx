@@ -1043,18 +1043,18 @@ export default function TradePage() {
               const detailIsSell = selectedDetail.side === "sell"
               // Universal price lookup -- handles all formats
               const detailCoin = safeFindPrice(allPrices, detailPair)
-              const detailLivePrice = detailCoin?.price ?? detailEntryPrice
+              const detailLivePrice = detailCoin && Number(detailCoin.price) > 0 ? Number(detailCoin.price) : null
               const detailPnl = selectedDetail.status === "open"
-                ? (detailIsSell ? (detailEntryPrice - detailLivePrice) * detailQty : (detailLivePrice - detailEntryPrice) * detailQty)
+                ? detailLivePrice === null ? null : (detailIsSell ? (detailEntryPrice - detailLivePrice) * detailQty : (detailLivePrice - detailEntryPrice) * detailQty)
                 : Number(selectedDetail.pnl) || 0
-              const detailPnlPct = detailEntryPrice > 0
+              const detailPnlPct = detailLivePrice !== null && detailEntryPrice > 0
                 ? (detailIsSell ? ((detailEntryPrice - detailLivePrice) / detailEntryPrice) * 100 : ((detailLivePrice - detailEntryPrice) / detailEntryPrice) * 100)
-                : 0
+                : null
 
               return (
                 <div className="grid grid-cols-2 gap-2.5">
                   <DetailCell label={selectedDetail.status === "open" ? "Entry Price" : "Order Price"} value={`$${detailEntryPrice.toLocaleString()}`} />
-                  <DetailCell label="Current Price" value={detailLivePrice > 0 ? `$${formatPrice(detailLivePrice)}` : "--"} />
+                  <DetailCell label="Current Price" value={detailLivePrice !== null ? `${formatPrice(detailLivePrice)}` : "Unavailable"} />
                   <DetailCell label="Amount" value={`${detailQty.toFixed(6)} ${detailBase}`} />
                   <DetailCell label="Total" value={`$${(detailEntryPrice * detailQty).toFixed(2)}`} />
                   {selectedDetail.fee !== undefined && (
@@ -1063,8 +1063,8 @@ export default function TradePage() {
                   {selectedDetail.status === "open" ? (
                     <DetailCell
                       label="Unrealized P&L"
-                      value={`${detailPnl >= 0 ? "+" : ""}${detailPnl.toFixed(2)} USDT (${detailPnlPct >= 0 ? "+" : ""}${detailPnlPct.toFixed(2)}%)`}
-                      valueClass={detailPnl >= 0 ? "text-success" : "text-destructive"}
+                      value={detailPnl === null || detailPnlPct === null ? "Unavailable — no live quote" : `${detailPnl >= 0 ? "+" : ""}${detailPnl.toFixed(2)} USDT (${detailPnlPct >= 0 ? "+" : ""}${detailPnlPct.toFixed(2)}%)`}
+                      valueClass={detailPnl === null ? "text-muted-foreground" : detailPnl >= 0 ? "text-success" : "text-destructive"}
                     />
                   ) : selectedDetail.pnl !== undefined ? (
                     <DetailCell label="P&L" value={`${detailPnl >= 0 ? "+" : ""}${detailPnl.toFixed(2)} USDT`} valueClass={detailPnl >= 0 ? "text-success" : "text-destructive"} />
@@ -1078,8 +1078,15 @@ export default function TradePage() {
             {/* Close price and date for closed trades */}
             {selectedDetail.close_price && (
               <div className="mt-2 grid grid-cols-2 gap-2.5">
-                <DetailCell label="Close Price" value={`$${Number(selectedDetail.close_price).toLocaleString()}`} />
+                <DetailCell label="Close Price" value={`${Number(selectedDetail.close_price).toLocaleString()}`} />
                 <DetailCell label="Closed At" value={selectedDetail.closed_at ? new Date(selectedDetail.closed_at).toLocaleString() : "N/A"} />
+              </div>
+            )}
+            {selectedDetail.close_reason && (
+              <div className={`mt-2 rounded-lg border px-3 py-2 text-xs font-medium uppercase ${String(selectedDetail.close_reason).startsWith("admin_override_") ? "border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400" : "border-border text-muted-foreground"}`}>
+                {String(selectedDetail.close_reason).startsWith("admin_override_")
+                  ? `Admin override applied: ${String(selectedDetail.close_reason).replace("admin_override_", "")}`
+                  : String(selectedDetail.close_reason).replace(/_/g, " ")}
               </div>
             )}
             <div className="mt-4 flex gap-2">
