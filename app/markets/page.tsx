@@ -85,11 +85,9 @@ export default function MarketsPage() {
   }
 
   const currentAssets = getAssetsForClass()
-  const totalMarketValue = currentAssets.reduce((sum, asset) => sum + (asset.marketCap || asset.volume * asset.price), 0)
   const marketChange = currentAssets.length
     ? currentAssets.reduce((sum, asset) => sum + asset.change24h, 0) / currentAssets.length
     : 0
-  const formatCompactValue = (value: number) => value >= 1e12 ? `$${(value / 1e12).toFixed(2)}T` : value >= 1e9 ? `$${(value / 1e9).toFixed(2)}B` : value >= 1e6 ? `$${(value / 1e6).toFixed(2)}M` : "$0"
 
   const toggleFav = (symbol: string) => {
     setFavorites((prev) => {
@@ -122,7 +120,7 @@ export default function MarketsPage() {
         case "price": cmp = a.price - b.price; break
         case "change": cmp = a.change24h - b.change24h; break
         case "volume": cmp = (a.volume * a.price) - (b.volume * b.price); break
-        case "marketCap": cmp = (a.volume * a.price) - (b.volume * b.price); break
+        case "marketCap": cmp = (a.marketCap ?? 0) - (b.marketCap ?? 0); break
       }
       return sortDir === "asc" ? cmp : -cmp
     })
@@ -163,11 +161,11 @@ export default function MarketsPage() {
                assetClass === "stocks" ? "Stock Markets" : "CFD Markets"}
             </h1>
             <p className="mt-2 text-muted-foreground">
-              {assetClass === "crypto" ? <>The tracked crypto market value is <span className="font-semibold text-foreground">{formatCompactValue(totalMarketValue)}</span> across {currentAssets.length} live assets, with a <span className={marketChange >= 0 ? "text-success" : "text-destructive"}>{marketChange >= 0 ? "+" : ""}{marketChange.toFixed(2)}%</span> average change.</> :
-               assetClass === "forex" ? "Real-time foreign exchange rates for major, minor, and exotic currency pairs." :
-               assetClass === "commodities" ? "Live prices for gold, silver, oil, natural gas, and other commodities." :
-               assetClass === "stocks" ? "Track major US and global equity markets in real time." :
-               "Trade global indices and other CFD instruments with up to 100x leverage."}
+              {assetClass === "crypto" ? <>Tracking {currentAssets.length} listed crypto assets with a <span className={marketChange >= 0 ? "text-success" : "text-destructive"}>{marketChange >= 0 ? "+" : ""}{marketChange.toFixed(2)}%</span> average listed 24h move.</> :
+               assetClass === "forex" ? "Reference exchange rates for major, minor, and exotic currency pairs; update frequency depends on the provider." :
+               assetClass === "commodities" ? "Provider-sourced prices for gold, silver, oil, natural gas, and other commodities; some feeds may be delayed." :
+               assetClass === "stocks" ? "Track selected US and global equities; quotes may be delayed or unavailable outside provider coverage." :
+               "View selected index and CFD reference quotes. Tradability and leverage depend on a configured, verified broker integration."}
             </p>
             {/* Asset class tabs */}
             <div className="mt-6 flex items-center gap-1 overflow-x-auto rounded-lg bg-secondary p-1">
