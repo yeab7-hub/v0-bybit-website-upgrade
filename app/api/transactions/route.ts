@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     if (user.email) {
       sendBrandedEmail({
         to: user.email,
-        subject: `Deposit Received - ${amountNum} ${assetName}`,
+        subject: `Deposit Request Submitted - ${amountNum} ${assetName}`,
         html: renderDepositEmail({ status: "pending", amount: String(amountNum), asset: assetName, network: networkName }),
       }).catch(() => {})
     }
