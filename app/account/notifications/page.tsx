@@ -65,6 +65,7 @@ export default function NotificationsPage() {
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState("")
+  const [notificationError, setNotificationError] = useState("")
   const [activeView, setActiveView] = useState<"inbox" | "settings">("inbox")
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loadingNotifs, setLoadingNotifs] = useState(true)
@@ -105,21 +106,33 @@ export default function NotificationsPage() {
   }, [])
 
   const markAsRead = async (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-    await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    }).catch(() => {})
+    setNotificationError("")
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+      if (!response.ok) throw new Error("Could not mark this notification as read.")
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    } catch (cause) {
+      setNotificationError(cause instanceof Error ? cause.message : "Could not update notification.")
+    }
   }
 
   const markAllRead = async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-    await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mark_all: true }),
-    }).catch(() => {})
+    setNotificationError("")
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mark_all: true }),
+      })
+      if (!response.ok) throw new Error("Could not mark notifications as read.")
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    } catch (cause) {
+      setNotificationError(cause instanceof Error ? cause.message : "Could not update notifications.")
+    }
   }
 
   const toggleSetting = (catIdx: number, itemIdx: number, channel: "email" | "push" | "sms") => {
@@ -181,6 +194,8 @@ export default function NotificationsPage() {
                 </Link>
               ))}
             </div>
+
+            {notificationError && <p role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{notificationError}</p>}
 
             {/* View tabs: Inbox | Settings */}
             <div className="mb-6 flex items-center gap-4 border-b border-border">
