@@ -894,6 +894,12 @@ export default function TradePage() {
         Orders are recorded in this platform’s internal ledger; this app does not yet route them to an external broker or exchange. Resting-order fills and auto-close checks run only while the trading page is open because no background matching service is configured. Non-crypto quotes may be delayed. An internal fill is not proof of an externally executed trade.
       </div>
 
+      {livePrice <= 0 && (
+        <div role="status" className="border-b border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          No verified current price is available for {pairDisplay}. Order submission is disabled until a valid quote is available.
+        </div>
+      )}
+
       {/* Pair Bar */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2 lg:px-4">
         <button onClick={() => setShowPairSelector(true)} className="flex items-center gap-1.5">
