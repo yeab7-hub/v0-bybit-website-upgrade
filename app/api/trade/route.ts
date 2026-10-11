@@ -514,8 +514,9 @@ export async function DELETE(request: NextRequest) {
   if (remaining > 0 && order.side === "buy") {
     const cancelFeeRate = await getUserTakerFeeRate(adminSupabase, user.id)
     const locked = Number(order.price) * remaining * (1 + cancelFeeRate)
-    const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
-    if (!qBal) {
+    const { data: qBal, error: readBalanceError } = await adminSupabase.from("balances")
+      .select("*").eq("user_id", user.id).eq("asset", quoteAsset).maybeSingle()
+    if (readBalanceError || !qBal) {
       unlockError = "Could not load the reserved quote balance."
     } else {
       const oldAvailable = Number(qBal.available)
@@ -530,8 +531,9 @@ export async function DELETE(request: NextRequest) {
       if (balanceError || !unlocked) unlockError = "The quote balance changed before funds could be released."
     }
   } else if (remaining > 0) {
-    const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
-    if (!bBal) {
+    const { data: bBal, error: readBalanceError } = await adminSupabase.from("balances")
+      .select("*").eq("user_id", user.id).eq("asset", baseAsset).maybeSingle()
+    if (readBalanceError || !bBal) {
       unlockError = "Could not load the reserved base balance."
     } else {
       const oldAvailable = Number(bBal.available)
