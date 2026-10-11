@@ -305,6 +305,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid order type" }, { status: 400 })
   }
 
+  if (!shouldFillNow && (takeProfit !== null || stopLoss !== null)) {
+    return NextResponse.json({
+      error: "TP/SL cannot be attached to a resting order yet. Use a Market or immediately marketable Limit order so protection is saved with the filled position.",
+    }, { status: 400 })
+  }
+
   const total = execPrice * amount
   const feeRate = await getUserTakerFeeRate(adminSupabase, user.id)
   const fee = total * feeRate
