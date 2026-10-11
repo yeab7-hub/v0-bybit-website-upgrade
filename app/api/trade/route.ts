@@ -428,40 +428,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, order, message: tradeMsg, executed: true })
   }
 
-  /* ---------- PLACE AS OPEN (non-marketable limit / untriggered stop) ---------- */
-  const lockTotal = price * amount
-  const { data: order, error } = await adminSupabase.from("orders").insert({
-    user_id: user.id, pair, side, order_type,
-    price, stop_price: stop_price || null,
-    amount, filled: 0, total: lockTotal, status: "open"
-  }).select().single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Lock balance
-  if (side === "buy") {
-    const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
-    await adminSupabase.from("balances").update({
-      available: Math.max(0, qBal.available - lockTotal - (lockTotal * feeRate)),
-      in_order: (qBal.in_order || 0) + lockTotal + (lockTotal * feeRate),
-      updated_at: new Date().toISOString()
-    }).eq("user_id", user.id).eq("asset", quoteAsset)
-  } else {
-    const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
-    await adminSupabase.from("balances").update({
-      available: Math.max(0, bBal.available - amount),
-      in_order: (bBal.in_order || 0) + amount,
-      updated_at: new Date().toISOString()
-    }).eq("user_id", user.id).eq("asset", baseAsset)
-  }
-
+  /* ---------- Unsupported resting orders ---------- */
+  // There is no verified background matching worker in this deployment.
+  // Do not create an order that cannot fill or reserve funds indefinitely.
   return NextResponse.json({
-    success: true,
-    order,
-    message: `${order_type === "limit" ? "Limit" : "Stop-Limit"} ${side} placed: ${amount} ${baseAsset} @ $${Number(price).toLocaleString()} (waiting for fill)`,
-    executed: false
-  })
-}
+    error: "Resting Limit and Stop-Limit orders are not available yet because the order-matching service is not connected. Use Market, or a Limit order that would execute immediately.",
+    code: "RESTING_ORDERS_UNAVAILABLE",
+  }, { status: 501 })
 
 /* ---------- DELETE (cancel order) ---------- */
 export async function DELETE(request: NextRequest) {
