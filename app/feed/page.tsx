@@ -11,53 +11,7 @@ import { BottomNav } from "@/components/bottom-nav"
 
 type FeedTab = "byx" | "events" | "rooms" | "livestream" | "news"
 
-const mockPosts = [
-  {
-    id: 1, author: "BybitX", verified: true, avatar: "BX", time: "Feb 16",
-    title: "New Week, New Heights: IMPACT Leaderboard is LIVE!",
-    content: "A fresh week has begun, and a brand-new round of competition awaits...",
-    tags: [{ label: "#ByXLeaderboard", color: "text-primary" }],
-    likes: 580, comments: 104, reposts: 26, shares: 19,
-    sentiment: null,
-  },
-  {
-    id: 2, author: "Slonksss", verified: false, avatar: "SL", time: "16 minutes ago",
-    title: "Why OP Just Lost Market Confidence?",
-    content: "Continuing from our previous discussion on the OP ecosystem challenges...",
-    tags: [],
-    position: { pair: "OPUSDT", type: "Perp", leverage: "10X", side: "Long", pnl: "-0.66%" },
-    likes: 25, comments: 4, reposts: 0, shares: 2,
-    sentiment: "Bearish",
-  },
-  {
-    id: 3, author: "Fahatul", verified: true, avatar: "FA", time: "1 hours ago",
-    title: "Silver Wakes Up Again - Is $81 Just the Beginning?",
-    content: "XAGUSD is pushing higher again, now trading above key resistance levels...",
-    tags: [],
-    coinTags: [{ symbol: "ETH", change: "+0.00%" }, { symbol: "XAUT", change: "+0.00%" }],
-    position: { pair: "XAUT", side: "Hold", pnl: "--" },
-    likes: 30, comments: 2, reposts: 0, shares: 0,
-    sentiment: "Bullish",
-  },
-  {
-    id: 4, author: "Whale", verified: false, avatar: "WH", time: "5 hours ago",
-    title: "Made more then 12K dollars for my LONG Position",
-    content: "Yes Dear respect followers i already made more then 12K dollars for my LONG Position thanks for all...",
-    tags: [{ label: "$ENSOUSDT", color: "text-primary" }],
-    likes: 20, comments: 0, reposts: 0, shares: 0,
-    sentiment: "Bullish",
-  },
-  {
-    id: 5, author: "Fahatul", verified: true, avatar: "FA", time: "1 hours ago",
-    title: "94 Tons of Gold, Just 0.0016% Fees",
-    content: "Have you ever imagined that the value equivalent of 94 tons of gold could be traded digitally...",
-    tags: [],
-    coinTags: [{ symbol: "XAUT", change: "+0.00%" }],
-    position: { pair: "XAUT", type: "Perp", leverage: "10X", side: "Long", pnl: "-0.66%" },
-    likes: 26, comments: 4, reposts: 0, shares: 2,
-    sentiment: null,
-  },
-]
+const mockPosts: any[] = []
 
 export default function FeedPage() {
   const [activeTab, setActiveTab] = useState<FeedTab>("byx")
@@ -90,6 +44,7 @@ export default function FeedPage() {
 
         {activeTab === "byx" && (
           <div className="divide-y divide-border">
+            {mockPosts.length === 0 && <p className="px-4 py-16 text-center text-sm text-muted-foreground">The social feed is not connected. No mock posts or fabricated engagement counts are shown.</p>}
             {mockPosts.map(post => (
               <article key={post.id} className="px-4 py-4">
                 {/* Author row */}
@@ -197,12 +152,12 @@ export default function FeedPage() {
 
         {activeTab !== "byx" && (
           <div className="flex items-center justify-center py-20">
-            <p className="text-sm text-muted-foreground">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} coming soon</p>
+            <p className="text-sm text-muted-foreground">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} is not connected yet</p>
           </div>
         )}
 
         {/* FAB */}
-        <button className="fixed bottom-20 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary shadow-lg lg:bottom-8">
+        <button disabled title="Posting is unavailable until the social feed is connected" className="fixed bottom-20 right-4 flex h-12 w-12 cursor-not-allowed items-center justify-center rounded-full bg-secondary opacity-50 shadow-lg lg:bottom-8">
           <Plus className="h-6 w-6 text-primary-foreground" />
         </button>
       </main>
