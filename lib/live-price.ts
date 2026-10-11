@@ -10,29 +10,29 @@
 // prices must never be used to execute or settle a financial transaction.
 
 const FOREX_META: Record<string, { currency: string; isInverse: boolean; fallback: number }> = {
-  "EUR/USD": { currency: "EUR", isInverse: true, fallback: 1.0842 },
-  "GBP/USD": { currency: "GBP", isInverse: true, fallback: 1.2634 },
-  "USD/JPY": { currency: "JPY", isInverse: false, fallback: 149.85 },
-  "AUD/USD": { currency: "AUD", isInverse: true, fallback: 0.6543 },
-  "USD/CHF": { currency: "CHF", isInverse: false, fallback: 0.8821 },
-  "USD/CAD": { currency: "CAD", isInverse: false, fallback: 1.3612 },
-  "NZD/USD": { currency: "NZD", isInverse: true, fallback: 0.6102 },
+  "EUR/USD": { currency: "EUR", isInverse: true },
+  "GBP/USD": { currency: "GBP", isInverse: true },
+  "USD/JPY": { currency: "JPY", isInverse: false },
+  "AUD/USD": { currency: "AUD", isInverse: true },
+  "USD/CHF": { currency: "CHF", isInverse: false },
+  "USD/CAD": { currency: "CAD", isInverse: false },
+  "NZD/USD": { currency: "NZD", isInverse: true },
 }
 
 const YAHOO_META: Record<string, { yahooSymbol: string; fallback: number }> = {
-  "XAU/USD": { yahooSymbol: "GC=F", fallback: 2924.5 },
-  "XAG/USD": { yahooSymbol: "SI=F", fallback: 32.78 },
-  WTI: { yahooSymbol: "CL=F", fallback: 71.24 },
-  BRENT: { yahooSymbol: "BZ=F", fallback: 74.89 },
-  NG: { yahooSymbol: "NG=F", fallback: 3.42 },
-  HG: { yahooSymbol: "HG=F", fallback: 4.52 },
-  AAPL: { yahooSymbol: "AAPL", fallback: 232.4 },
-  MSFT: { yahooSymbol: "MSFT", fallback: 412.65 },
-  GOOGL: { yahooSymbol: "GOOGL", fallback: 178.2 },
-  AMZN: { yahooSymbol: "AMZN", fallback: 215.8 },
-  TSLA: { yahooSymbol: "TSLA", fallback: 348.9 },
-  NVDA: { yahooSymbol: "NVDA", fallback: 138.5 },
-  META: { yahooSymbol: "META", fallback: 582.3 },
+  "XAU/USD": { yahooSymbol: "GC=F" },
+  "XAG/USD": { yahooSymbol: "SI=F" },
+  WTI: { yahooSymbol: "CL=F" },
+  BRENT: { yahooSymbol: "BZ=F" },
+  NG: { yahooSymbol: "NG=F" },
+  HG: { yahooSymbol: "HG=F" },
+  AAPL: { yahooSymbol: "AAPL" },
+  MSFT: { yahooSymbol: "MSFT" },
+  GOOGL: { yahooSymbol: "GOOGL" },
+  AMZN: { yahooSymbol: "AMZN" },
+  TSLA: { yahooSymbol: "TSLA" },
+  NVDA: { yahooSymbol: "NVDA" },
+  META: { yahooSymbol: "META" },
 }
 
 const CRYPTO_ID_MAP: Record<string, string> = {
@@ -129,7 +129,7 @@ export async function getLivePrice(baseAsset: string, pair?: string): Promise<nu
         if (price > 0) return price
       }
     }
-  } catch { /* fall through to hardcoded fallback */ }
+  } catch { /* No verified quote is available from this provider. */ }
 
   return 0
 }
