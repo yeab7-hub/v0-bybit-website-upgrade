@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
     const assetName = String(body.asset || "").trim().toUpperCase()
     const networkName = String(body.network || "").trim()
     const amountNum = Number(body.amount)
-    const txHash = String(body.tx_hash || "").trim()
+    const submittedTxHash = String(body.tx_hash || "").trim()
+    const txHash = /^0x[a-fA-F0-9]{64}$/.test(submittedTxHash) ? submittedTxHash.toLowerCase() : submittedTxHash
     if (!assetName || !networkName || !Number.isFinite(amountNum) || amountNum <= 0) {
       return NextResponse.json({ error: "Enter a valid asset, network, and positive amount" }, { status: 400 })
     }
