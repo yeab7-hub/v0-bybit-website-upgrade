@@ -9,7 +9,7 @@
 // fail closed when no current external price can be verified; stale hardcoded
 // prices must never be used to execute or settle a financial transaction.
 
-const FOREX_META: Record<string, { currency: string; isInverse: boolean; fallback: number }> = {
+const FOREX_META: Record<string, { currency: string; isInverse: boolean }> = {
   "EUR/USD": { currency: "EUR", isInverse: true },
   "GBP/USD": { currency: "GBP", isInverse: true },
   "USD/JPY": { currency: "JPY", isInverse: false },
@@ -19,7 +19,7 @@ const FOREX_META: Record<string, { currency: string; isInverse: boolean; fallbac
   "NZD/USD": { currency: "NZD", isInverse: true },
 }
 
-const YAHOO_META: Record<string, { yahooSymbol: string; fallback: number }> = {
+const YAHOO_META: Record<string, { yahooSymbol: string }> = {
   "XAU/USD": { yahooSymbol: "GC=F" },
   "XAG/USD": { yahooSymbol: "SI=F" },
   WTI: { yahooSymbol: "CL=F" },
