@@ -60,11 +60,25 @@ export async function POST(request: NextRequest) {
   const isShort = position.side === "sell"
   const priceDelta = isShort ? entryPrice - currentPrice : currentPrice - entryPrice
 
-  // Check for admin trade overrides (forced win/loss)
   let pnl = priceDelta * qty - fee - Number(position.fee || 0)
   let pnlPercent = entryPrice > 0 ? (priceDelta / entryPrice) * 100 : 0
 
-  // Look for active override for this user (pair-specific first, then global)
+  // TP/SL is a user risk instruction and takes priority over any manual
+  // administrative outcome override when its threshold has already crossed.
+  const tp = Number(position.take_profit) || 0
+  const sl = Number(position.stop_loss) || 0
+  let triggeredExitReason: "take_profit" | "stop_loss" | null = null
+  if (isShort) {
+    if (tp > 0 && currentPrice <= tp) triggeredExitReason = "take_profit"
+    else if (sl > 0 && currentPrice >= sl) triggeredExitReason = "stop_loss"
+  } else {
+    if (tp > 0 && currentPrice >= tp) triggeredExitReason = "take_profit"
+    else if (sl > 0 && currentPrice <= sl) triggeredExitReason = "stop_loss"
+  }
+
+  // Preserve the existing admin override controls, but never silently apply
+  // them over an already-triggered TP/SL. Every adjusted close is disclosed
+  // in the persisted close reason and returned message.
   const { data: overrides } = await adminSupabase
     .from("trade_overrides")
     .select("*")
@@ -74,7 +88,10 @@ export async function POST(request: NextRequest) {
 
   const override = overrides?.find((o: any) => o.pair === position.pair) ||
                    overrides?.find((o: any) => !o.pair) || null
-  const forcedResult = outcome === "force_win" ? "win" : outcome === "force_loss" ? "loss" : override?.forced_result
+  const explicitOutcome = outcome === "normal" ? null : outcome === "force_win" ? "win" : outcome === "force_loss" ? "loss" : null
+  const forcedResult = triggeredExitReason
+    ? null
+    : explicitOutcome ?? override?.forced_result ?? null
 
   if (forcedResult === "win" || forcedResult === "loss") {
     const mult = Number(override?.multiplier) || 1
@@ -91,6 +108,7 @@ export async function POST(request: NextRequest) {
     status: "closed",
     close_price: currentPrice,
     closed_at: new Date().toISOString(),
+    close_reason: triggeredExitReason ?? (forcedResult ? `admin_override_${forcedResult}` : "manual_close"),
     fee: Number(position.fee || 0) + fee,
     pnl,
   }).eq("id", tradeId).eq("user_id", position.user_id).eq("status", "open").select("id").maybeSingle()
@@ -100,10 +118,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Consume an override only after this request has successfully claimed the position.
-  if (forcedResult === "win" || forcedResult === "loss") {
-    if (override?.id) {
-      await adminSupabase.from("trade_overrides").update({ active: false, used_at: new Date().toISOString() }).eq("id", override.id).eq("active", true)
-    }
+  if ((forcedResult === "win" || forcedResult === "loss") && override?.id) {
+    await adminSupabase.from("trade_overrides").update({ active: false, used_at: new Date().toISOString() }).eq("id", override.id).eq("active", true)
   }
 
   const isFuturesPosition = position.position_mode === "futures"
@@ -177,10 +193,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const overrideNotice = forcedResult
+    ? ` | ADMIN OVERRIDE APPLIED (${forcedResult.toUpperCase()}); adjusted settlement disclosed`
+    : ""
+  const exitNotice = triggeredExitReason ? ` | ${triggeredExitReason.replace("_", " ").toUpperCase()} triggered` : ""
+
   return NextResponse.json({
     success: true,
-    message: `Closed ${qty} ${baseAsset} @ $${currentPrice.toLocaleString()} | P&L: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} (${pnlPercent >= 0 ? "+" : ""}${pnlPercent.toFixed(2)}%)`,
+    message: `Closed ${qty} ${baseAsset} @ ${currentPrice.toLocaleString()} | P&L: ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} (${pnlPercent >= 0 ? "+" : ""}${pnlPercent.toFixed(2)}%)${exitNotice}${overrideNotice}`,
     pnl,
     closePrice: currentPrice,
+    closeReason: triggeredExitReason ?? (forcedResult ? `admin_override_${forcedResult}` : "manual_close"),
+    adminOverrideApplied: Boolean(forcedResult),
   })
 }
