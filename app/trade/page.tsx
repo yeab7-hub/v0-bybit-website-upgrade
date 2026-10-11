@@ -208,6 +208,9 @@ export default function TradePage() {
     const effectiveSide = sideOverride ?? side
     if (!user) { setFeedback({ type: "error", msg: "Please log in to trade" }); return }
     if (baseQty <= 0) { setFeedback({ type: "error", msg: "Enter a valid amount" }); return }
+    if (tpslEnabled && !isFutures && effectiveSide === "sell") { setFeedback({ type: "error", msg: "Spot TP/SL is available on buy positions. Use Futures for short-position TP/SL." }); return }
+    if (tpslEnabled && !takeProfit.trim() && !stopLoss.trim()) { setFeedback({ type: "error", msg: "Enter a Take Profit or Stop Loss price." }); return }
+    if (orderType === "Stop-Limit" && isFutures) { setFeedback({ type: "error", msg: "Futures Stop-Limit is not available yet. Choose Market or Limit." }); return }
     if (orderType === "Stop-Limit" && (!stopPrice || parseFloat(stopPrice) <= 0)) {
       setFeedback({ type: "error", msg: "Enter a trigger price" }); return
     }
@@ -478,7 +481,7 @@ export default function TradePage() {
           className="w-full bg-transparent text-sm font-medium text-foreground outline-none">
           <option value="Limit">Limit</option>
           <option value="Market">Market</option>
-          <option value="Stop-Limit">Stop-Limit</option>
+          <option value="Stop-Limit" disabled={isFutures}>Stop-Limit{isFutures ? " (Spot only)" : ""}</option>
         </select>
       </div>
 
@@ -611,7 +614,7 @@ export default function TradePage() {
             <span className="ml-2 text-xs text-muted-foreground">{quoteAsset}</span>
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Applies to positions opened by a Market buy. Closes automatically when the mark price crosses your level.
+            Applies to immediately filled positions. Long TP must be above market and SL below; short Futures TP must be below market and SL above. TP/SL on resting orders is not supported yet.
           </p>
         </div>
       )}
@@ -888,7 +891,7 @@ export default function TradePage() {
         </button>
         <div className="scrollbar-none flex items-center gap-1 overflow-x-auto">
           {tradeModes.map((m) => (
-            <button key={m} onClick={() => setTradeMode(m)}
+            <button key={m} onClick={() => { setTradeMode(m); if (m === "Futures" && orderType === "Stop-Limit") setOrderType("Limit") }}
               className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors ${tradeMode === m ? "font-bold text-foreground" : "text-muted-foreground"}`}
             >
               {m}
