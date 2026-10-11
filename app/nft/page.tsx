@@ -33,7 +33,7 @@ export default function NFTPage() {
               </div>
               <div className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2 lg:w-80">
                 <Search className="h-4 w-4 text-muted-foreground" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search collections or NFTs..." className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} disabled title="NFT listings are not connected" placeholder="Marketplace search unavailable" className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
               </div>
             </div>
           </div>
@@ -52,15 +52,15 @@ export default function NFTPage() {
               ))}
             </div>
             <div className="hidden items-center gap-1 lg:flex">
-              <button onClick={() => setViewMode("grid")} className={`rounded-md p-1.5 ${viewMode === "grid" ? "bg-secondary text-foreground" : "text-muted-foreground"}`}><Grid3X3 className="h-4 w-4" /></button>
-              <button onClick={() => setViewMode("list")} className={`rounded-md p-1.5 ${viewMode === "list" ? "bg-secondary text-foreground" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
+              <button disabled title="No listings are available to display" onClick={() => setViewMode("grid")} className={`rounded-md p-1.5 ${viewMode === "grid" ? "bg-secondary text-foreground" : "text-muted-foreground"}`}><Grid3X3 className="h-4 w-4" /></button>
+              <button disabled title="No listings are available to display" onClick={() => setViewMode("list")} className={`rounded-md p-1.5 ${viewMode === "list" ? "bg-secondary text-foreground" : "text-muted-foreground"}`}><LayoutGrid className="h-4 w-4" /></button>
             </div>
           </div>
 
           {/* Categories */}
           <div className="mb-6 flex gap-1 overflow-x-auto pb-2">
             {categories.map(c => (
-              <button key={c} onClick={() => setCat(c)} className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${cat === c ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>{c}</button>
+              <button disabled title="Marketplace categories are unavailable until listings are connected" key={c} onClick={() => setCat(c)} className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${cat === c ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>{c}</button>
             ))}
           </div>
 
