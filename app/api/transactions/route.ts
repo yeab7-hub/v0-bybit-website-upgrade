@@ -69,7 +69,13 @@ export async function POST(request: NextRequest) {
     if (txHash) {
       const { data: existing, error: duplicateError } = await supabase.from("transactions").select("*").eq("user_id", user.id).eq("type", "deposit").eq("asset", assetName).eq("network", networkName).eq("tx_hash", txHash).maybeSingle()
       if (duplicateError) return NextResponse.json({ error: "Could not verify transaction hash" }, { status: 503 })
-      if (existing) return NextResponse.json(existing)
+      if (existing) {
+        return NextResponse.json({
+          error: "A deposit request with this transaction hash already exists.",
+          existing_status: existing.status,
+          transaction_id: existing.id,
+        }, { status: 409 })
+      }
     }
 
     const { data, error } = await supabase.from("transactions").insert({
