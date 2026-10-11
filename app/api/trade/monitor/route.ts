@@ -132,15 +132,17 @@ export async function GET() {
     const priceDelta = isShort ? entryPrice - triggerPrice : triggerPrice - entryPrice
     const pnl = priceDelta * qty - fee - Number(position.fee || 0)
 
-    // Close the position leg in place.
-    await adminSupabase.from("trades").update({
+    // Claim the open position before settling. Multiple tabs may run the
+    // monitor concurrently; only the request that changes open -> closed pays out.
+    const { data: closedPosition, error: closeError } = await adminSupabase.from("trades").update({
       status: "closed",
       close_price: triggerPrice,
       closed_at: new Date().toISOString(),
       close_reason: reason,
       fee: Number(position.fee || 0) + fee,
       pnl,
-    }).eq("id", position.id)
+    }).eq("id", position.id).eq("user_id", position.user_id).eq("status", "open").select("id").maybeSingle()
+    if (closeError || !closedPosition) continue
 
     // Settle balances. Futures: no base asset was ever held, only margin;
     // credit back margin + pnl. Spot: a LONG leg held the base asset.
