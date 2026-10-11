@@ -455,6 +455,7 @@ export async function POST(request: NextRequest) {
 
     // Update the consumed Spot lots with compare-and-set guards. Keep enough
     // original data to restore them if balance settlement later fails.
+    const authenticatedUserId = user.id
     async function rollbackConsumedLots() {
       for (const lot of consumedLots) {
         if (!lot.applied) continue
@@ -469,7 +470,7 @@ export async function POST(request: NextRequest) {
           closed_at: lot.closedAt,
           close_reason: lot.closeReason,
           pnl: lot.pnl,
-        }).eq("id", lot.id).eq("user_id", user.id)
+        }).eq("id", lot.id).eq("user_id", authenticatedUserId)
       }
     }
 
