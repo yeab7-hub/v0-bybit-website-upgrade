@@ -155,7 +155,8 @@ export function useLivePrices(refreshInterval = 8000) {
   const baseData = restData && restIsFresh ? restData : INITIAL_DATA
 
   // Crypto: overlay WebSocket real-time prices
-  const crypto = (baseData.crypto ?? []).map((coin) => {
+  const restCrypto = baseData.crypto ?? []
+  const crypto = restCrypto.map((coin) => {
     const override = wsOverrides[coin.symbol]
     // Expire disconnected-stream quotes instead of displaying them indefinitely.
     if (override && Date.now() - override.receivedAt <= 30_000) {
@@ -169,6 +170,26 @@ export function useLivePrices(refreshInterval = 8000) {
     }
     return coin
   })
+
+  // If REST market data is unavailable, still expose only the fresh symbols
+  // actually received from the live WebSocket, without inventing volume/cap.
+  const restSymbols = new Set(restCrypto.map((coin) => coin.symbol))
+  for (const [symbol, override] of Object.entries(wsOverrides)) {
+    if (restSymbols.has(symbol) || Date.now() - override.receivedAt > 30_000) continue
+    crypto.push({
+      id: symbol.toLowerCase(),
+      symbol,
+      name: symbol,
+      price: override.price,
+      change24h: override.change24h,
+      volume: 0,
+      marketCap: 0,
+      high24h: override.high24h,
+      low24h: override.low24h,
+      sparkline: [],
+      category: "crypto",
+    })
+  }
 
   // Non-crypto values are server-sourced only; never simulate prices in the browser.
   const forex = baseData.forex ?? []
