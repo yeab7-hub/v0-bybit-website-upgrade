@@ -7,17 +7,17 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 const tiers = [
-  { name: "Bronze", commission: "30%", volume: "$0 - $100K", color: "from-amber-700/20 to-amber-900/20" },
-  { name: "Silver", commission: "35%", volume: "$100K - $500K", color: "from-gray-400/20 to-gray-600/20" },
-  { name: "Gold", commission: "40%", volume: "$500K - $2M", color: "from-yellow-500/20 to-amber-500/20" },
-  { name: "VIP", commission: "50%", volume: "$2M+", color: "from-primary/20 to-amber-400/20" },
+  { name: "Bronze", commission: "Not configured", volume: "Not configured", color: "from-amber-700/20 to-amber-900/20" },
+  { name: "Silver", commission: "Not configured", volume: "Not configured", color: "from-gray-400/20 to-gray-600/20" },
+  { name: "Gold", commission: "Not configured", volume: "Not configured", color: "from-yellow-500/20 to-amber-500/20" },
+  { name: "VIP", commission: "Not configured", volume: "Not configured", color: "from-primary/20 to-amber-400/20" },
 ]
 
 const benefits = [
-  { icon: DollarSign, title: "Up to 50% Commission", desc: "Earn industry-leading commissions on every trade your referrals make." },
-  { icon: Users, title: "No Referral Limit", desc: "Invite unlimited users. The more you refer, the more you earn." },
+  { icon: DollarSign, title: "Commission ledger unavailable", desc: "Referral commissions are not calculated or paid by this app yet." },
+  { icon: Users, title: "Referral tracking unavailable", desc: "Referral attribution and tracking are not connected." },
   { icon: BarChart3, title: "Real-Time Analytics", desc: "No affiliate analytics source is connected." },
-  { icon: Gift, title: "Exclusive Bonuses", desc: "Access special promotions and bonus pools for top affiliates." },
+  { icon: Gift, title: "Promotions unavailable", desc: "Affiliate promotions and bonus accounting are not configured." },
 ]
 
 const steps = [
@@ -45,7 +45,7 @@ export default function AffiliatesPage() {
             <h1 className="text-3xl font-bold tracking-tight lg:text-5xl">Affiliate Program</h1>
             <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground lg:text-base">Affiliate tracking, commission rates, analytics, and payouts are not connected. No commission offer is currently available.</p>
             <div className="mt-6 flex items-center justify-center gap-3">
-              <Link href="/register"><Button className="h-11 rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground">Apply Now <ArrowRight className="ml-1.5 h-4 w-4" /></Button></Link>
+              <Button disabled title="Affiliate application workflow is not configured" className="h-11 rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground opacity-60">Applications unavailable</Button>
               <Link href="/login"><Button variant="outline" className="h-11 rounded-lg border-border px-6 text-sm font-semibold">Log In</Button></Link>
             </div>
           </div>
