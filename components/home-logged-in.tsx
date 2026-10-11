@@ -319,7 +319,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
                       
                     </div>
                     <span className="font-mono text-[11px] text-muted-foreground">
-                      {((coin.volume || 0) / 1e6).toFixed(2)}M USDT
+                      {coin.category === "crypto" ? `${((coin.volume || 0) / 1e6).toFixed(2)}M USDT` : (coin.volume > 0 ? `Vol ${Math.round(coin.volume).toLocaleString()}` : "24h volume unavailable")}
                     </span>
                   </div>
                 </div>
