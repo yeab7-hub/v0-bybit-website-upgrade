@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { useLivePrices, formatPrice, formatVolume } from "@/hooks/use-live-prices"
+import { formatPrice } from "@/hooks/use-live-prices"
 import { MarketAsset } from "@/components/market-asset"
 import {
   ArrowRight, Shield, Zap, BarChart3, TrendingUp, Clock,
@@ -22,44 +22,19 @@ const derivTypes: { id: DerivType; label: string; desc: string }[] = [
 ]
 
 const features = [
-  { icon: Zap, title: "Up to 100x Leverage", desc: "Amplify your trading with industry-leading leverage across all major pairs." },
-  { icon: Shield, title: "Insurance Fund", desc: "Our insurance fund protects traders from socialized losses during extreme volatility." },
-  { icon: BarChart3, title: "Advanced Order Types", desc: "Stop-limit, trailing stop, take profit/stop loss, and conditional orders." },
-  { icon: Target, title: "Mark Price System", desc: "Fair price marking prevents unnecessary liquidations from price manipulation." },
-  { icon: Clock, title: "Funding Rate", desc: "Transparent funding rates updated every 8 hours to keep perpetual prices aligned." },
+  { icon: Zap, title: "Contract Feed", desc: "Verified derivatives market data is not configured yet." },
+  { icon: Shield, title: "Risk Engine", desc: "Exchange-grade margin, liquidation, and insurance-fund systems are not connected." },
+  { icon: BarChart3, title: "Order Routing", desc: "Orders are not routed to an external derivatives venue from this application." },
+  { icon: Target, title: "Mark and Index Prices", desc: "Verified mark/index prices and funding calculations are not available here." },
+  { icon: Clock, title: "Funding Data", desc: "Funding rates are not fabricated; live funding data is not connected." },
   { icon: Layers, title: "Cross & Isolated Margin", desc: "Choose between cross margin for flexibility or isolated margin for risk control." },
 ]
 
-const DERIV_FALLBACK = [
-  { id: "btc", symbol: "BTC", name: "Bitcoin", price: 97842.50, change24h: 2.34, volume: 28.5e9, marketCap: 1.92e12, category: "crypto" as const },
-  { id: "eth", symbol: "ETH", name: "Ethereum", price: 3456.78, change24h: 1.82, volume: 14.2e9, marketCap: 415e9, category: "crypto" as const },
-  { id: "sol", symbol: "SOL", name: "Solana", price: 189.45, change24h: -0.56, volume: 3.8e9, marketCap: 82e9, category: "crypto" as const },
-  { id: "xrp", symbol: "XRP", name: "XRP", price: 2.87, change24h: 3.12, volume: 5.1e9, marketCap: 148e9, category: "crypto" as const },
-  { id: "bnb", symbol: "BNB", name: "BNB", price: 654.32, change24h: 0.94, volume: 1.9e9, marketCap: 97e9, category: "crypto" as const },
-  { id: "ada", symbol: "ADA", name: "Cardano", price: 0.9876, change24h: -1.23, volume: 1.2e9, marketCap: 34e9, category: "crypto" as const },
-  { id: "doge", symbol: "DOGE", name: "Dogecoin", price: 0.3245, change24h: 5.67, volume: 2.3e9, marketCap: 47e9, category: "crypto" as const },
-  { id: "avax", symbol: "AVAX", name: "Avalanche", price: 35.67, change24h: -2.15, volume: 890e6, marketCap: 14e9, category: "crypto" as const },
-  { id: "dot", symbol: "DOT", name: "Polkadot", price: 7.89, change24h: 1.45, volume: 560e6, marketCap: 10.5e9, category: "crypto" as const },
-  { id: "link", symbol: "LINK", name: "Chainlink", price: 19.54, change24h: 0.78, volume: 780e6, marketCap: 12.3e9, category: "crypto" as const },
-]
+type DerivativeContract = { symbol: string; price: number; change24h: number; fundingRate: string; openInterest: string; leverage: string }
 
 export default function DerivativesPage() {
-  const { crypto } = useLivePrices(5000)
   const [activeType, setActiveType] = useState<DerivType>("usdt-perp")
-
-  const liveData = crypto.length > 0 ? crypto : DERIV_FALLBACK
-
-  const topContracts = useMemo(() => {
-    return [...liveData]
-      .sort((a, b) => (b.volume * b.price) - (a.volume * a.price))
-      .slice(0, 15)
-      .map((c) => ({
-        ...c,
-        leverage: c.symbol === "BTC" ? "100x" : c.symbol === "ETH" ? "100x" : "50x",
-        fundingRate: (Math.random() * 0.02 - 0.005).toFixed(4),
-        openInterest: formatVolume(c.volume * c.price * 0.3),
-      }))
-  }, [liveData])
+  const topContracts: DerivativeContract[] = []
 
   return (
     <div className="min-h-screen bg-background">
@@ -70,13 +45,13 @@ export default function DerivativesPage() {
           <div className="mx-auto max-w-[1400px] px-4 py-12 lg:py-20">
             <div className="mx-auto max-w-3xl text-center">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary">
-                <TrendingUp className="h-4 w-4" /> Up to 100x Leverage
+                <TrendingUp className="h-4 w-4" /> Derivatives unavailable
               </div>
               <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground lg:text-5xl">
                 Crypto Derivatives Trading
               </h1>
               <p className="mt-4 text-pretty text-lg text-muted-foreground">
-                Trade perpetual and futures contracts on 200+ trading pairs with deep liquidity,
+                Derivatives contracts, external order routing, live funding data, and a verified margin/liquidation engine are not configured yet.
                 advanced order types, and institutional-grade risk management tools.
               </p>
               <div className="mt-8 flex items-center justify-center gap-3">
@@ -98,10 +73,10 @@ export default function DerivativesPage() {
           <div className="mx-auto max-w-[1400px] px-4 py-8">
             <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
               {[
-                { label: "24h Trading Volume", value: "$8.6B" },
-                { label: "Open Interest", value: "$3.2B" },
-                { label: "Trading Pairs", value: "200+" },
-                { label: "Max Leverage", value: "100x" },
+                { label: "Derivatives data", value: "Unavailable" },
+                { label: "Open interest", value: "Not connected" },
+                { label: "Contract feed", value: "Not configured" },
+                { label: "Leverage", value: "Disabled" },
               ].map((s) => (
                 <div key={s.label} className="text-center">
                   <div className="font-mono text-3xl font-bold text-primary">{s.value}</div>
@@ -119,7 +94,7 @@ export default function DerivativesPage() {
               {derivTypes.map((dt) => (
                 <button
                   key={dt.id}
-                  onClick={() => setActiveType(dt.id)}
+                  disabled title="Contract feed is not configured"
                   className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                     activeType === dt.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
                   }`}
@@ -143,13 +118,14 @@ export default function DerivativesPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">No verified derivative quotes. Spot market prices are not presented as derivative contract prices.</td></tr>
                   {topContracts.map((c) => (
                     <tr key={c.symbol} className="border-b border-border/50 transition-colors hover:bg-card/30">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <MarketAsset symbol={c.symbol} size={24} />
                           <span className="text-sm font-semibold text-foreground">{c.symbol}USDT</span>
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground">Perp</span>
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground">Not listed</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-sm text-foreground">${formatPrice(c.price)}</td>
@@ -179,7 +155,7 @@ export default function DerivativesPage() {
         {/* Features */}
         <section className="border-b border-border">
           <div className="mx-auto max-w-[1400px] px-4 py-12">
-            <h2 className="mb-8 text-center text-3xl font-bold text-foreground">Why Trade Derivatives on Bybit</h2>
+            <h2 className="mb-8 text-center text-3xl font-bold text-foreground">Requirements for Derivatives Launch</h2>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {features.map((f) => (
                 <div key={f.title} className="rounded-xl border border-border bg-card p-6">
@@ -198,13 +174,13 @@ export default function DerivativesPage() {
         <section>
           <div className="mx-auto max-w-[1400px] px-4 py-12">
             <div className="rounded-2xl border border-border bg-card p-10 text-center">
-              <h2 className="text-3xl font-bold text-foreground">Ready to Trade Derivatives?</h2>
+              <h2 className="text-3xl font-bold text-foreground">Derivatives trading is not enabled</h2>
               <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-                Join millions of traders and access the most liquid derivatives market in crypto.
+                External execution, contract data, and risk controls must be integrated and tested before this product can accept orders.
               </p>
               <div className="mt-6 flex items-center justify-center gap-3">
-                <Link href="/register"><Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">Get Started</Button></Link>
-                <Link href="/trade"><Button size="lg" variant="outline">Go to Trading</Button></Link>
+                <Button disabled size="lg" title="Derivatives integration is not configured">Derivatives unavailable</Button>
+                <Link href="/markets"><Button size="lg" variant="outline">View available market quotes</Button></Link>
               </div>
             </div>
           </div>
