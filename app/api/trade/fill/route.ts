@@ -34,7 +34,7 @@ export async function POST() {
   const prices: Record<string, number> = {}
   for (const fullPair of uniquePairFulls) {
     const base = fullPair.split("/")[0]
-    prices[base] = await getLivePrice(base, fullPair)
+    prices[fullPair] = await getLivePrice(base, fullPair)
   }
 
   let filledCount = 0
@@ -42,7 +42,7 @@ export async function POST() {
   for (const order of openOrders) {
     const baseAsset = order.pair.split("/")[0]
     const quoteAsset = order.pair.split("/")[1] || "USDT"
-    const currentPrice = prices[baseAsset]
+    const currentPrice = prices[order.pair]
     if (!currentPrice || currentPrice <= 0) continue
 
     const remaining = order.amount - order.filled
