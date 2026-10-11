@@ -165,6 +165,13 @@ export async function GET() {
           available: qBal.available + total - fee,
           updated_at: new Date().toISOString()
         }).eq("user_id", user.id).eq("asset", quoteAsset)
+      } else {
+        await adminSupabase.from("balances").insert({
+          user_id: user.id,
+          asset: quoteAsset,
+          available: Math.max(0, total - fee),
+          in_order: 0,
+        })
       }
     }
 
