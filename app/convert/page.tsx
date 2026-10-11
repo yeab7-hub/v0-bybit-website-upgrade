@@ -204,7 +204,7 @@ export default function ConvertPage() {
             <Button onClick={handleConvert} disabled={!canConvert} className="mt-4 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90" size="lg">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : rate <= 0 ? "Live price unavailable" : amount && parseFloat(amount) > availableFrom ? "Insufficient balance" : "Convert"}
             </Button>
-            <p className="mt-2 text-center text-[10px] text-muted-foreground">The estimate can change before submission. Any applicable fees are shown only when configured by the platform.</p>
+            <p className="mt-2 text-center text-[10px] text-muted-foreground">Rates can change before submission. Fee treatment is not currently verified; review the final quote before confirming.</p>
           </div>
 
           {/* History */}
