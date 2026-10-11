@@ -88,15 +88,25 @@ export async function GET() {
       }
     }
 
-    // Update order to filled
-    await adminSupabase.from("orders").update({
-      filled: order.amount,
-      status: "filled",
-      updated_at: new Date().toISOString()
-    }).eq("id", order.id)
+    // Claim the order with a compare-and-set update. Multiple open browser tabs
+    // may poll this endpoint concurrently; only one request may settle an order.
+    const { data: claimedOrder, error: claimError } = await adminSupabase
+      .from("orders")
+      .update({
+        filled: order.amount,
+        status: "filled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order.id)
+      .eq("user_id", user.id)
+      .in("status", ["open", "partially_filled"])
+      .select("id")
+      .maybeSingle()
+    if (claimError || !claimedOrder) continue
 
-    // Create trade record -- buy = open position, sell = closed
-    await adminSupabase.from("trades").insert({
+    // Create trade record -- buy = open position, sell = closed. If this insert
+    // fails, reopen the order so the reserved funds can still be released later.
+    const { error: tradeInsertError } = await adminSupabase.from("trades").insert({
       user_id: user.id,
       order_id: order.id,
       pair: order.pair,
@@ -110,6 +120,14 @@ export async function GET() {
       close_price: order.side === "sell" ? fillPrice : null,
       closed_at: order.side === "sell" ? new Date().toISOString() : null,
     })
+    if (tradeInsertError) {
+      await adminSupabase.from("orders").update({
+        status: order.status,
+        filled: order.filled,
+        updated_at: new Date().toISOString(),
+      }).eq("id", order.id).eq("user_id", user.id).eq("status", "filled")
+      continue
+    }
 
     // Update balances
     if (order.side === "buy") {
