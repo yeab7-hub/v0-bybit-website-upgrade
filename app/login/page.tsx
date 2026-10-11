@@ -131,7 +131,7 @@ function LoginContent() {
         <div className="w-full max-w-[380px]">
           {!show2FA ? (
             <>
-              <h1 className="text-2xl font-bold text-foreground">Welcome to Bybit</h1>
+              <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
 
               {error && (
                 <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>
@@ -166,7 +166,7 @@ function LoginContent() {
                       ))}
                     </div>
                   </div>
-                  <p className="mt-4 text-center text-xs text-muted-foreground">Scan with Bybit app to log in</p>
+                  <p className="mt-4 text-center text-xs text-muted-foreground">QR sign-in is not available</p>
                 </div>
               ) : (
                 <form onSubmit={handleEmailLogin} className="mt-6">
