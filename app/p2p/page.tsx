@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Shield } from "lucide-react"
@@ -9,7 +10,7 @@ const currencies = ["USD", "EUR", "GBP", "CAD", "AUD", "NGN", "INR"]
 const merchants: { name: string; orders: number; completion: number; rating: number; price: number; minMax: string; methods: string[]; available: string; online: boolean; verified: boolean }[] = []
 
 export default function P2PPage() {
-  const tab = "buy"
+  const [tab, setTab] = useState<"buy" | "sell">("buy")
   const crypto = "BTC"
   const fiat = "USD"
   const payment = "All"
