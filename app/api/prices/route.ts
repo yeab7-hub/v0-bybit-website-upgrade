@@ -29,7 +29,9 @@ async function fetchBybit(): Promise<any[] | null> {
     const json = await res.json()
     const rows = json?.result?.list
     if (!Array.isArray(rows)) return null
-    return rows.map((ticker: any) => {
+    return rows
+      .filter((ticker: any) => BYBIT_SYMBOLS.some((item) => item.symbol === ticker.symbol))
+      .map((ticker: any) => {
       const info = BYBIT_SYMBOLS.find((item) => item.symbol === ticker.symbol)
       const price = Number(ticker.lastPrice)
       const prev = Number(ticker.prevPrice24h)
