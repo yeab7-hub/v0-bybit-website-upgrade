@@ -253,9 +253,21 @@ export default function TradePage() {
   }
 
   const cancelOrder = async (orderId: string) => {
-    await fetch(`/api/trade?id=${orderId}`, { method: "DELETE" })
-    globalMutate("/api/trade?type=orders")
-    globalMutate("/api/trade?type=balances")
+    setFeedback(null)
+    try {
+      const response = await fetch(`/api/trade?id=${encodeURIComponent(orderId)}`, { method: "DELETE" })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || "Could not cancel this order.")
+      await Promise.all([
+        globalMutate("/api/trade?type=orders"),
+        globalMutate("/api/trade?type=balances"),
+        globalMutate("/api/trade?type=order_history"),
+      ])
+      setFeedback({ type: "success", msg: "Order cancelled." })
+    } catch (cause) {
+      setFeedback({ type: "error", msg: cause instanceof Error ? cause.message : "Could not cancel this order." })
+    }
+    window.setTimeout(() => setFeedback(null), 4000)
   }
 
   const closePosition = async (tradeId: string, pair?: string) => {
