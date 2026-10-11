@@ -114,7 +114,9 @@ export async function POST(request: NextRequest) {
     // was locked. Credit back margin + pnl. pnl can exceed -margin only in
     // theory; clamp at 0 as a safety net (liquidation should catch this first).
     const margin = Number(position.margin) || 0
-    const creditAmount = margin + pnl
+    // The opening fee was already debited when margin was reserved. Add it
+    // back here because pnl is net of both opening and closing fees.
+    const creditAmount = margin + pnl + Number(position.fee || 0)
     const { data: qBal } = await adminSupabase
       .from("balances").select("*")
       .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
@@ -157,7 +159,9 @@ export async function POST(request: NextRequest) {
       .eq("asset", quoteAsset)
       .single()
 
-    const creditAmount = (entryPrice * qty) + pnl
+    // The opening fee was already charged at entry; pnl includes it for
+    // reporting, so add it back to the closing credit to avoid charging twice.
+    const creditAmount = (entryPrice * qty) + pnl + Number(position.fee || 0)
     if (qBal) {
       await adminSupabase.from("balances").update({
         available: Math.max(0, qBal.available + creditAmount),
