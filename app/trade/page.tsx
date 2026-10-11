@@ -354,8 +354,8 @@ export default function TradePage() {
       {/* Funding rate for futures */}
       {isFutures && (
         <div className="px-2 py-1.5 text-right">
-          <div className="text-[9px] text-muted-foreground">Funding Rate / Countdown</div>
-          <div className="font-mono text-[10px] text-foreground">{(FUNDING_RATE_PER_INTERVAL * 100).toFixed(4)}% / {fundingCountdown} (8h)</div>
+          <div className="text-[9px] text-muted-foreground">Configured platform funding / UTC interval</div>
+          <div className="font-mono text-[10px] text-foreground">{(FUNDING_RATE_PER_INTERVAL * 100).toFixed(4)}% configured / {fundingCountdown} (8h)</div>
         </div>
       )}
       <div className="flex items-center justify-between px-2 py-1">
