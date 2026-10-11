@@ -377,7 +377,7 @@ export default function MarketsPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">
-                            ${formatVolume(coin.volume * coin.price)}
+                            ${formatVolume(coin.category === "crypto" ? coin.volume : coin.volume * coin.price)}
                           </td>
                           <td className="hidden px-4 py-3 lg:table-cell">
                             {coin.sparkline && (coin.sparkline ?? []).length > 1 && (
