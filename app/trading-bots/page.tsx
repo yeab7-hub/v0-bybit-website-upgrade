@@ -12,34 +12,34 @@ import { Button } from "@/components/ui/button"
 
 const bots = [
   {
-    icon: BarChart3, title: "Grid Bot", desc: "Automatically buy low and sell high within a price range. Ideal for sideways markets.",
-    stats: "Performance not available", tag: "Most Popular", color: "text-primary bg-primary/10",
-    features: ["Set price range", "Auto grid orders", "Profit per grid"],
+    icon: BarChart3, title: "Grid Bot", desc: "Grid strategy information only. The bot engine is not connected, so no orders will be placed.",
+    stats: "Execution not connected", tag: "Unavailable", color: "text-primary bg-primary/10",
+    features: ["Price range UI not connected", "Order execution not connected", "Profit tracking not connected"],
   },
   {
-    icon: TrendingUp, title: "DCA Bot", desc: "Dollar-cost average into positions over time. Reduce the impact of volatility on your portfolio.",
-    stats: "Execution not connected", tag: "Beginner Friendly", color: "text-success bg-success/10",
-    features: ["Time-based entry", "Custom intervals", "Auto-reinvest"],
+    icon: TrendingUp, title: "DCA Bot", desc: "DCA strategy information only. Scheduled purchases and execution are not configured.",
+    stats: "Execution not connected", tag: "Unavailable", color: "text-success bg-success/10",
+    features: ["Scheduling not configured", "Intervals not configured", "Reinvestment not configured"],
   },
   {
     icon: RefreshCw, title: "Arbitrage Bot", desc: "A strategy concept that seeks price differences across markets; it is not risk-free and is not executable in this app yet.",
     stats: "Execution not connected", tag: "Advanced", color: "text-chart-4 bg-chart-4/10",
-    features: ["Cross-exchange", "Real-time detection", "Auto-execution"],
+    features: ["Exchange connections not configured", "Market monitoring not configured", "Execution not configured"],
   },
   {
-    icon: Target, title: "Smart Trade Bot", desc: "Advanced order types with trailing stop-loss and take-profit. Maximize gains, minimize losses.",
-    stats: "Risk controls not connected", tag: "Pro Trader", color: "text-chart-5 bg-chart-5/10",
-    features: ["Trailing stop", "Multiple targets", "Break-even stop"],
+    icon: Target, title: "Smart Trade Bot", desc: "Smart-order strategy information only. Trailing stops and automated risk controls are not connected.",
+    stats: "Risk controls not connected", tag: "Unavailable", color: "text-chart-5 bg-chart-5/10",
+    features: ["Trailing stops not configured", "Targets not configured", "Break-even logic not configured"],
   },
   {
-    icon: LineChart, title: "Futures Grid Bot", desc: "Grid trading with leverage on perpetual contracts. Amplify returns with controlled risk.",
-    stats: "Leverage not enabled", tag: "High Yield", color: "text-primary bg-primary/10",
-    features: ["Long/Short grid", "Leverage support", "Auto-deleverage"],
+    icon: LineChart, title: "Futures Grid Bot", desc: "Futures-grid strategy information only. Derivatives, leverage, and bot execution are not configured.",
+    stats: "Execution not connected", tag: "Unavailable", color: "text-primary bg-primary/10",
+    features: ["Position logic not configured", "Leverage not enabled", "Risk engine not configured"],
   },
   {
-    icon: DollarSign, title: "Spot-Futures Arbitrage", desc: "Earn funding rates by hedging spot positions with futures. Market-neutral strategy.",
-    stats: "Yield data not available", tag: "Stable Returns", color: "text-success bg-success/10",
-    features: ["Delta neutral", "Funding yield", "Auto-rebalance"],
+    icon: DollarSign, title: "Spot-Futures Arbitrage", desc: "Spot-futures arbitrage information only. Derivatives, funding data, and automated hedging are not connected.",
+    stats: "Yield data not available", tag: "Unavailable", color: "text-success bg-success/10",
+    features: ["Hedging logic not configured", "Funding data not connected", "Rebalancing not configured"],
   },
 ]
 
@@ -137,9 +137,9 @@ export default function TradingBotsPage() {
             <h2 className="mb-8 text-center text-3xl font-bold text-foreground">How It Works</h2>
             <div className="grid gap-8 md:grid-cols-3">
               {[
-                { step: "01", title: "Choose a Strategy", desc: "Pick from Grid, DCA, Arbitrage, or Smart Trade bots based on your goals and risk tolerance." },
-                { step: "02", title: "Configure Parameters", desc: "Set your price range, investment amount, and risk parameters. Use AI-recommended settings for easy setup." },
-                { step: "03", title: "Activate & Monitor", desc: "Start your bot and track performance in real-time. Adjust settings or stop anytime with full control." },
+                { step: "01", title: "Choose a Strategy", desc: "Strategy examples are shown for reference; no trading bot is currently available to activate." },
+                { step: "02", title: "Configure Parameters", desc: "Bot configuration and AI recommendations are not connected." },
+                { step: "03", title: "Activate & Monitor", desc: "Bot activation and performance tracking are not available until the execution engine is integrated." },
               ].map((s) => (
                 <div key={s.step} className="rounded-xl border border-border bg-card p-6">
                   <div className="mb-4 font-mono text-4xl font-bold text-primary/20">{s.step}</div>
