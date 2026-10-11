@@ -1,9 +1,8 @@
 "use client"
 
-import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Search, BookOpen, TrendingUp, Shield, Zap, ChevronRight, Play, Clock, BarChart3, Coins, Layers, GraduationCap } from "lucide-react"
+import { Search, BookOpen, TrendingUp, Shield, Zap, Clock, BarChart3, Coins, Layers, GraduationCap } from "lucide-react"
 import { useState } from "react"
 
 const categories = [
@@ -36,12 +35,7 @@ const articles = [
   { title: "Introduction to Layer 2 Solutions", category: "Blockchain", readTime: "11 min" },
 ]
 
-const videos = [
-  { title: "Getting Started with Bybit", duration: "5:30", views: "125K" },
-  { title: "How to Place Your First Trade", duration: "8:12", views: "98K" },
-  { title: "Copy Trading Tutorial", duration: "6:45", views: "76K" },
-  { title: "Understanding Leverage", duration: "10:20", views: "142K" },
-]
+
 
 export default function LearnPage() {
   const [activeCategory, setActiveCategory] = useState("All")
@@ -62,7 +56,7 @@ export default function LearnPage() {
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
               <GraduationCap className="h-6 w-6 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight lg:text-5xl">Bybit Learn</h1>
+            <h1 className="text-3xl font-bold tracking-tight lg:text-5xl">Crypto Learning Library</h1>
             <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground lg:text-base">Your gateway to understanding crypto, blockchain, and trading strategies.</p>
             <div className="mx-auto mt-6 flex max-w-md items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
               <Search className="h-4 w-4 text-muted-foreground" />
@@ -79,40 +73,27 @@ export default function LearnPage() {
 
         <div className="mx-auto max-w-[1200px] px-4 py-8 lg:py-12">
           {/* Featured */}
-          <h2 className="mb-6 text-lg font-semibold">Featured</h2>
+          <div role="status" className="mb-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-muted-foreground">These are article previews. Full article pages and video hosting are not connected yet.</div>
+          <h2 className="mb-6 text-lg font-semibold">Article previews</h2>
           <div className="mb-12 grid gap-4 md:grid-cols-3">
             {featuredArticles.map((a) => (
-              <Link key={a.title} href="/learn" className="group overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/30">
+              <article key={a.title} className="overflow-hidden rounded-xl border border-border bg-card">
                 <div className={`h-36 ${a.image}`} />
                 <div className="p-4">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">{a.category}</span>
-                  <h3 className="mt-1 text-sm font-semibold text-foreground group-hover:text-primary">{a.title}</h3>
+                  <h3 className="mt-1 text-sm font-semibold text-foreground">{a.title}</h3>
                   <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{a.desc}</p>
                   <div className="mt-3 flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <Clock className="h-3 w-3" /> {a.readTime} read
+                    <Clock className="h-3 w-3" /> {a.readTime} estimated read
                   </div>
                 </div>
-              </Link>
+              </article>
             ))}
           </div>
 
-          {/* Video Tutorials */}
-          <h2 className="mb-6 text-lg font-semibold">Video Tutorials</h2>
-          <div className="mb-12 grid gap-4 grid-cols-2 lg:grid-cols-4">
-            {videos.map((v) => (
-              <div key={v.title} className="group cursor-pointer overflow-hidden rounded-xl border border-border bg-card">
-                <div className="relative flex h-28 items-center justify-center bg-gradient-to-br from-secondary to-muted">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/90 text-primary-foreground transition-transform group-hover:scale-110">
-                    <Play className="h-4 w-4 ml-0.5" />
-                  </div>
-                  <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">{v.duration}</span>
-                </div>
-                <div className="p-3">
-                  <h3 className="text-xs font-semibold text-foreground">{v.title}</h3>
-                  <p className="mt-1 text-[10px] text-muted-foreground">{v.views} views</p>
-                </div>
-              </div>
-            ))}
+          <h2 className="mb-3 text-lg font-semibold">Video Tutorials</h2>
+          <div role="status" className="mb-12 rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">
+            Video tutorials are unavailable until verified video content and playback are connected.
           </div>
 
           {/* Categories + Articles */}
@@ -130,14 +111,13 @@ export default function LearnPage() {
 
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((a) => (
-              <Link key={a.title} href="/learn" className="group flex items-center justify-between rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/30">
+              <article key={a.title} className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
                 <div>
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">{a.category}</span>
-                  <h3 className="mt-0.5 text-sm font-medium text-foreground group-hover:text-primary">{a.title}</h3>
-                  <span className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground"><Clock className="h-3 w-3" /> {a.readTime}</span>
+                  <h3 className="mt-0.5 text-sm font-medium text-foreground">{a.title}</h3>
+                  <span className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground"><Clock className="h-3 w-3" /> {a.readTime} estimated</span>
                 </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
-              </Link>
+              </article>
             ))}
           </div>
           {filtered.length === 0 && (
