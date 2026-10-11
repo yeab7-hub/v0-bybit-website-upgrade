@@ -51,7 +51,7 @@ export default function MarketsPage() {
   const [category, setCategory] = useState<MarketCategory>("all")
   const [sortKey, setSortKey] = useState<SortKey>("volume")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
-  const [favorites, setFavorites] = useState<Set<string>>(new Set(["BTC", "ETH", "SOL", "XRP", "AVAX", "EUR/USD", "XAU/USD", "AAPL", "US500"]))
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
 
   // Share the watchlist with the dashboard and retain it after refresh.
   useEffect(() => {
