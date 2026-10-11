@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   if (!tradeId) return NextResponse.json({ error: "Trade ID required" }, { status: 400 })
 
   let isAdmin = false
-  if (outcome && ["normal", "force_win", "force_loss"].includes(outcome)) {
+  if (typeof outcome === "string" && ["normal", "force_win", "force_loss"].includes(outcome)) {
     const { data: profile } = await adminSupabase.from("profiles").select("role").eq("id", user.id).single()
     isAdmin = profile?.role === "admin" || profile?.role === "super_admin"
     if (!isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
