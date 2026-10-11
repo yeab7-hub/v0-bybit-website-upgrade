@@ -894,7 +894,7 @@ export default function TradePage() {
       </div>
 
       <div role="note" className="border-b border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[10px] leading-4 text-muted-foreground lg:px-4">
-        Orders are recorded in this platform’s internal ledger; this app does not yet route them to an external broker or exchange. Non-crypto quotes may be delayed. An internal fill is not proof of an externally executed trade.
+        Orders are recorded in this platform’s internal ledger; this app does not yet route them to an external broker or exchange. Resting-order fills and auto-close checks run only while the trading page is open because no background matching service is configured. Non-crypto quotes may be delayed. An internal fill is not proof of an externally executed trade.
       </div>
 
       {/* Pair Bar */}
