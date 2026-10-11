@@ -136,10 +136,17 @@ export default function NotificationsPage() {
   }
 
   const toggleSetting = (catIdx: number, itemIdx: number, channel: "email" | "push" | "sms") => {
-    const updated = [...settings]
-    updated[catIdx].items[itemIdx][channel] = !updated[catIdx].items[itemIdx][channel]
-    setSettings(updated)
+    setSettings((current) => current.map((category, categoryIndex) => {
+      if (categoryIndex !== catIdx) return category
+      return {
+        ...category,
+        items: category.items.map((item, itemIndex) =>
+          itemIndex === itemIdx ? { ...item, [channel]: !item[channel] } : item
+        ),
+      }
+    }))
     setSaved(false)
+    setSaveError("")
   }
 
   const handleSave = async () => {
