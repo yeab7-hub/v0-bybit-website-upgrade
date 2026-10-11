@@ -256,8 +256,6 @@ export default function AccountSettingsPage() {
                               <button onClick={copyUID}>
                                 {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
                               </button>
-                              <span>|</span>
-                              <span>Site: Bybit Gl...</span>
                             </div>
                             <div className="mt-1 flex items-center gap-2">
                               <span className={`flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] ${user?.email_confirmed_at ? "text-success" : "text-muted-foreground"}`}>
@@ -290,7 +288,7 @@ export default function AccountSettingsPage() {
                       <Link href="/card" className="flex items-center gap-3 rounded-xl bg-card p-4 transition-colors hover:bg-secondary/30">
                         <CreditCard className="h-6 w-6 text-muted-foreground" />
                         <div>
-                          <span className="text-sm font-medium text-foreground">Bybit Card</span>
+                          <span className="text-sm font-medium text-foreground">Card</span>
                           <p className="text-[11px] text-muted-foreground">Check Now</p>
                         </div>
                       </Link>
@@ -333,7 +331,7 @@ export default function AccountSettingsPage() {
                     {/* Bottom links */}
                     <div className="mt-8 flex items-center justify-center gap-8 border-t border-border pt-4">
                       <Link href="/about" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-                        Bybit Lite <ArrowLeftRight className="h-3.5 w-3.5" />
+                        About ByTradeBit <ArrowLeftRight className="h-3.5 w-3.5" />
                       </Link>
                       <div className="h-4 w-px bg-border" />
                       <Link href="/about" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
