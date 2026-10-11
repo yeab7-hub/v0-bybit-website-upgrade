@@ -153,7 +153,7 @@ async function handleFuturesOrder(params: {
   }).select().single()
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 })
 
-  const { error: tradeErr } = await adminSupabase.from("trades").insert({
+  const { data: insertedTrade, error: tradeErr } = await adminSupabase.from("trades").insert({
     user_id: userId, order_id: order.id, pair, side,
     price: execPrice, amount, total: notional, fee,
     status: "open", pnl: 0,
@@ -162,14 +162,24 @@ async function handleFuturesOrder(params: {
     last_funding_at: new Date().toISOString(),
     take_profit: takeProfit, stop_loss: stopLoss,
     auto_close_at: autoCloseAt,
-  })
-  if (tradeErr) return NextResponse.json({ error: tradeErr.message }, { status: 500 })
+  }).select("id").single()
+  if (tradeErr || !insertedTrade) {
+    await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", userId)
+    return NextResponse.json({ error: "Could not create the position; no funds were reserved." }, { status: 500 })
+  }
 
-  // Only the margin (not the full notional) is deducted -- that's the point of leverage.
-  await adminSupabase.from("balances").update({
-    available: Math.max(0, qBal.available - requiredBalance),
+  // Compare-and-set the balance so simultaneous orders cannot both spend the
+  // same observed balance. Roll back the uncommitted order/trade if it changed.
+  const { data: debitedBalance, error: balanceError } = await adminSupabase.from("balances").update({
+    available: Math.max(0, Number(qBal.available) - requiredBalance),
     updated_at: new Date().toISOString(),
-  }).eq("user_id", userId).eq("asset", quoteAsset)
+  }).eq("user_id", userId).eq("asset", quoteAsset).eq("available", qBal.available).select("asset").maybeSingle()
+
+  if (balanceError || !debitedBalance) {
+    await adminSupabase.from("trades").delete().eq("id", insertedTrade.id).eq("user_id", userId)
+    await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", userId)
+    return NextResponse.json({ error: "Your balance changed while placing this order. Refresh your balance and try again." }, { status: 409 })
+  }
 
   const message = `${isShort ? "Short" : "Long"} opened: ${amount} ${baseAsset} @ $${execPrice.toLocaleString()} | ${leverage}x | Margin: $${margin.toFixed(2)} | Liq: $${liquidationPrice.toFixed(2)}${durationSeconds ? ` | Auto-closes in ${durationSeconds}s at real market price` : ""}`
 
