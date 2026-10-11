@@ -28,6 +28,7 @@ export interface PricesResponse {
   stocks: PriceData[]
   cfd: PriceData[]
   timestamp: number
+  source?: string
 }
 
 /* ================================================================
@@ -74,7 +75,7 @@ const restFetcher = async (url: string) => {
    Hook: useLivePrices
    - Primary:  Binance WebSocket (real-time crypto, <100ms)
    - Secondary: REST /api/prices polling (all assets, every N seconds)
-   - Client tick: 500ms micro-drift for non-crypto assets
+   - No synthetic ticks: non-crypto assets use provider data only
    ================================================================ */
 export function useLivePrices(refreshInterval = 8000) {
   const { data: restData, isLoading, error } = useSWR<PricesResponse | null>(
@@ -287,9 +288,7 @@ export const NON_CRYPTO_BASE: Record<string, { price: number; category: string; 
  *  ISOLATION RULE: If the pair is a known non-crypto asset (forex,
  *  commodity, stock, CFD) this function ONLY searches within
  *  non-crypto entries. It will NEVER fall through to the Binance
- *  WebSocket crypto data, even as a fallback. If no live non-crypto
- *  match is found, it returns a synthetic PriceData from the
- *  NON_CRYPTO_BASE table. */
+ *  WebSocket crypto data. If no live non-crypto match is found, it returns null. */
 export function safeFindPrice(allPrices: PriceData[], pair: string): PriceData | null {
   const p = pair?.trim()
   if (!p) return null
