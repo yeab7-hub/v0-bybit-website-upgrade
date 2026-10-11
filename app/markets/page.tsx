@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -53,7 +53,27 @@ export default function MarketsPage() {
   const [category, setCategory] = useState<MarketCategory>("all")
   const [sortKey, setSortKey] = useState<SortKey>("volume")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
-  const [favorites, setFavorites] = useState<Set<string>>(new Set(["BTC", "ETH", "SOL", "EUR/USD", "XAU/USD", "AAPL"]))
+  const [favorites, setFavorites] = useState<Set<string>>(new Set(["BTC", "ETH", "SOL", "XRP", "AVAX", "EUR/USD", "XAU/USD", "AAPL", "US500"]))
+
+  // Share the watchlist with the dashboard and retain it after refresh.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("trading-platform-watchlist-v1")
+      if (saved) {
+        const parsed: unknown = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) setFavorites(new Set(parsed))
+      }
+    } catch { /* Keep the default list if browser storage is unavailable. */ }
+    const syncFromOtherTab = (event: StorageEvent) => {
+      if (event.key !== "trading-platform-watchlist-v1" || !event.newValue) return
+      try {
+        const parsed: unknown = JSON.parse(event.newValue)
+        if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) setFavorites(new Set(parsed))
+      } catch { /* Ignore malformed browser storage. */ }
+    }
+    window.addEventListener("storage", syncFromOtherTab)
+    return () => window.removeEventListener("storage", syncFromOtherTab)
+  }, [])
 
   const getAssetsForClass = (): PriceData[] => {
     switch (assetClass) {
@@ -78,6 +98,7 @@ export default function MarketsPage() {
       const next = new Set(prev)
       if (next.has(symbol)) next.delete(symbol)
       else next.add(symbol)
+      try { window.localStorage.setItem("trading-platform-watchlist-v1", JSON.stringify(Array.from(next))) } catch { /* Current-tab state still updates. */ }
       return next
     })
   }
