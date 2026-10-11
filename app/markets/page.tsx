@@ -352,7 +352,7 @@ export default function MarketsPage() {
                     : filtered.map((coin, idx) => (
                         <tr key={coin.symbol} className="group/row border-b border-border/50 transition-colors hover:bg-card/50">
                           <td className="px-4 py-3">
-                            <button onClick={() => toggleFav(coin.symbol)} className="text-muted-foreground hover:text-primary">
+                            <button type="button" onClick={() => toggleFav(coin.symbol)} aria-label={favorites.has(coin.symbol) ? `Remove ${coin.symbol} from favorites` : `Add ${coin.symbol} to favorites`} title={favorites.has(coin.symbol) ? "Remove from favorites" : "Add to favorites"} className="text-muted-foreground hover:text-primary">
                               <Star className={`h-4 w-4 ${favorites.has(coin.symbol) ? "fill-primary text-primary" : ""}`} />
                             </button>
                           </td>
