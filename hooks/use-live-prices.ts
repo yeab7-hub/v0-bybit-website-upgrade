@@ -31,7 +31,7 @@ export interface PricesResponse {
 }
 
 /* ================================================================
-   Static fallback data -- UI is NEVER empty
+   Static sample data is not used for displayed or executable quotes.
    ================================================================ */
 const FALLBACK_CRYPTO: PriceData[] = [
   { id: "btc", symbol: "BTC", name: "Bitcoin", price: 97842.50, change24h: 2.34, volume: 28.5e9, marketCap: 1.92e12, category: "crypto", sparkline: [96800, 97100, 96500, 97200, 97500, 97000, 97800, 97400, 97600, 97900] },
@@ -93,37 +93,11 @@ const SYMBOL_MAP: Record<string, string> = {
    REST fallback fetcher
    ================================================================ */
 const restFetcher = async (url: string) => {
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-    const json = await res.json()
-    if (!json || !json.crypto || json.crypto.length === 0) return null
-    return json
-  } catch {
-    return null
-  }
-}
-
-/* ================================================================
-   Micro-drift: simulate real-time price ticks for non-WebSocket
-   assets (forex, commodities, stocks, CFD) on the client side.
-   Updates every 500ms with small random movement around the
-   last known REST price.
-   ================================================================ */
-function applyMicroDrift(items: PriceData[], driftMap: Map<string, number>): PriceData[] {
-  return items.map((item) => {
-    const base = item.price
-    if (base <= 0) return item
-    const prev = driftMap.get(item.symbol) ?? base
-    // Volatility factor per asset class
-    const vol = item.category === "forex" ? 0.00002 : item.category === "commodity" ? 0.0003 : item.category === "stock" ? 0.0002 : 0.0003
-    const drift = prev + (Math.random() - 0.49) * base * vol
-    // Clamp within +-0.5% of base REST price
-    const clamped = Math.max(base * 0.995, Math.min(base * 1.005, drift))
-    driftMap.set(item.symbol, clamped)
-    const change = base > 0 ? ((clamped - base) / base) * 100 + item.change24h : item.change24h
-    return { ...item, price: clamped, change24h: change }
-  })
+  const res = await fetch(url, { cache: "no-store" })
+  if (!res.ok) throw new Error("Market data provider returned HTTP " + res.status)
+  const json = await res.json()
+  if (!json || typeof json !== "object") throw new Error("Market data response was invalid")
+  return json
 }
 
 /* ================================================================
@@ -133,7 +107,7 @@ function applyMicroDrift(items: PriceData[], driftMap: Map<string, number>): Pri
    - Client tick: 500ms micro-drift for non-crypto assets
    ================================================================ */
 export function useLivePrices(refreshInterval = 8000) {
-  const { data: restData } = useSWR<PricesResponse | null>(
+  const { data: restData, isLoading, error } = useSWR<PricesResponse | null>(
     "/api/prices",
     restFetcher,
     {
@@ -154,9 +128,6 @@ export function useLivePrices(refreshInterval = 8000) {
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null)
   const mountedRef = useRef(true)
 
-  // Client-side micro-drift state for non-crypto
-  const [tickCount, setTickCount] = useState(0)
-  const driftMapRef = useRef(new Map<string, number>())
 
   const connectWebSocket = useCallback(() => {
     if (!mountedRef.current) return
@@ -207,14 +178,6 @@ export function useLivePrices(refreshInterval = 8000) {
     }
   }, [connectWebSocket])
 
-  // 500ms micro-drift tick for non-crypto assets
-  useEffect(() => {
-    const iv = setInterval(() => {
-      setTickCount((c) => c + 1)
-    }, 500)
-    return () => clearInterval(iv)
-  }, [])
-
   // Merge everything
   const baseData = restData || INITIAL_DATA
 
@@ -234,7 +197,6 @@ export function useLivePrices(refreshInterval = 8000) {
   })
 
   // Non-crypto values are server-sourced only; never simulate prices in the browser.
-  void tickCount
   const forex = baseData.forex ?? []
   const commodities = baseData.commodities ?? []
   const stocks = baseData.stocks ?? []
@@ -247,8 +209,8 @@ export function useLivePrices(refreshInterval = 8000) {
     commodities,
     stocks,
     cfd: cfdArr,
-    isLoading: false,
-    isError: false,
+    isLoading,
+    isError: Boolean(error),
   }
 }
 
@@ -362,31 +324,15 @@ export function safeFindPrice(allPrices: PriceData[], pair: string): PriceData |
   const p = pair?.trim()
   if (!p) return null
 
-  const nonCrypto = NON_CRYPTO_BASE[p]
-
-  if (nonCrypto) {
-    // STRICT: only search non-crypto entries -- filter out ALL crypto first
-    const nonCryptoPool = allPrices.filter((a) => a.category !== "crypto")
-    const live = findPrice(nonCryptoPool, p)
-
-    // If found a real live price in non-crypto pool, use it
-    if (live && live.price > 0) return live
-
-    // Otherwise return the known base price (never falls back to crypto)
-    return {
-      id: p.toLowerCase().replace(/\//g, "-"),
-      symbol: p,
-      name: nonCrypto.name,
-      price: nonCrypto.price,
-      change24h: 0,
-      volume: 0,
-      marketCap: 0,
-      category: nonCrypto.category as PriceData["category"],
-    }
+  // Always return a provider-sourced quote or null. NON_CRYPTO_BASE is used
+  // only to prevent a non-crypto symbol from ever resolving to a crypto quote.
+  if (NON_CRYPTO_BASE[p]) {
+    const live = findPrice(allPrices.filter((asset) => asset.category !== "crypto"), p)
+    return live && Number.isFinite(live.price) && live.price > 0 ? live : null
   }
 
-  // For crypto pairs, search everything normally
-  return findPrice(allPrices, p)
+  const match = findPrice(allPrices, p)
+  return match && Number.isFinite(match.price) && match.price > 0 ? match : null
 }
 
 /* ================================================================
