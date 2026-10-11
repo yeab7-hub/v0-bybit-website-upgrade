@@ -621,14 +621,14 @@ export default function TradePage() {
         <div className="flex flex-col gap-2">
           <button
             onClick={() => { setSide("buy"); handleSubmit("buy") }}
-            disabled={submitting || !baseQty}
+            disabled={submitting || !baseQty || livePrice <= 0}
             className="w-full rounded-lg bg-success py-3.5 text-sm font-bold text-[#0a0e17] transition-colors disabled:opacity-40"
           >
             {submitting && side === "buy" ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Long"}
           </button>
           <button
             onClick={() => { setSide("sell"); handleSubmit("sell") }}
-            disabled={submitting || !baseQty}
+            disabled={submitting || !baseQty || livePrice <= 0}
             className="w-full rounded-lg bg-destructive py-3.5 text-sm font-bold text-white transition-colors disabled:opacity-40"
           >
             {submitting && side === "sell" ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Short"}
@@ -637,7 +637,7 @@ export default function TradePage() {
       ) : (
         <button
           onClick={() => handleSubmit(side)}
-          disabled={submitting || !baseQty}
+          disabled={submitting || !baseQty || livePrice <= 0}
           className={`w-full rounded-lg py-3.5 text-sm font-semibold transition-colors disabled:opacity-40 ${isBuy ? "bg-success text-[#0a0e17]" : "bg-destructive text-white"}`}
         >
           {submitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : (isBuy ? `Buy ${baseAsset}` : `Sell ${baseAsset}`)}
