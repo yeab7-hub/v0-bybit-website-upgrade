@@ -33,7 +33,11 @@ export async function POST(request: NextRequest) {
 
   let body: Record<string, any>
   try {
-    body = await request.json()
+    const parsed: unknown = await request.json()
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    }
+    body = parsed as Record<string, any>
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
