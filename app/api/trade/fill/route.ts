@@ -52,15 +52,16 @@ export async function GET() {
     let fillPrice = currentPrice
 
     if (order.order_type === "limit") {
-      if (order.side === "buy" && currentPrice <= order.price) shouldFill = true
-      if (order.side === "sell" && currentPrice >= order.price) shouldFill = true
-      fillPrice = order.price
+      if (order.side === "buy" && currentPrice <= Number(order.price)) shouldFill = true
+      if (order.side === "sell" && currentPrice >= Number(order.price)) shouldFill = true
+      // Settle at the observed quote when the limit is marketable, not at a worse limit price.
+      fillPrice = currentPrice
     } else if (order.order_type === "stop_limit") {
       // Once triggered, the limit portion must also be marketable:
       // buy fills at/below its limit; sell fills at/above its limit.
       if (order.side === "buy" && currentPrice >= Number(order.stop_price) && currentPrice <= Number(order.price)) shouldFill = true
       if (order.side === "sell" && currentPrice <= Number(order.stop_price) && currentPrice >= Number(order.price)) shouldFill = true
-      fillPrice = Number(order.price)
+      fillPrice = currentPrice
     }
 
     if (!shouldFill) continue
