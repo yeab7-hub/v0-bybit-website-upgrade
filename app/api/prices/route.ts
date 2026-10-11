@@ -311,22 +311,6 @@ async function fetchYahooQuotes(symbols: string[]): Promise<Record<string, { pri
   return Object.keys(cachedYahooData).length > 0 ? cachedYahooData : null
 }
 
-// ─── Drift for when APIs are unavailable ───
-const driftState = new Map<string, number>()
-function getDriftPrice(symbol: string, base: number) {
-  const existing = driftState.get(symbol)
-  const maxDrift = base * 0.015
-  const step = base * 0.0004
-  let current: number
-  if (existing !== undefined) {
-    current = Math.max(base - maxDrift, Math.min(base + maxDrift, existing + (Math.random() - 0.48) * step * 2))
-  } else {
-    current = base + (Math.random() - 0.5) * base * 0.004
-  }
-  driftState.set(symbol, current)
-  return { price: current, change: ((current - base) / base) * 100 }
-}
-
 // ─── Cache ───
 let cachedCrypto: any[] | null = null
 let cacheTime = 0
