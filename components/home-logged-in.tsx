@@ -66,8 +66,9 @@ export function HomeLoggedIn({ user }: { user: User }) {
       .catch(() => {})
   }, [])
 
-  // Load ledger data when the signed-in user changes. Do not refetch the
-  // database on every live-price tick; value balances separately below.
+  // Load ledger data when the signed-in user changes. Daily P&L uses trades
+  // actually closed today (closed_at), not positions merely opened today.
+  // Do not refetch the database on every live-price tick; value balances separately below.
   useEffect(() => {
     let cancelled = false
     const loadAccountSummary = async () => {
@@ -77,7 +78,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
         startOfToday.setHours(0, 0, 0, 0)
         const [{ data: balanceData, error: balanceError }, { data: tradeData, error: tradeError }] = await Promise.all([
           supabase.from("balances").select("*").eq("user_id", user.id),
-          supabase.from("trades").select("pnl").eq("user_id", user.id).gte("created_at", startOfToday.toISOString()),
+          supabase.from("trades").select("pnl, closed_at").eq("user_id", user.id).eq("status", "closed").gte("closed_at", startOfToday.toISOString()),
         ])
         if (balanceError) throw balanceError
         if (tradeError) throw tradeError
