@@ -1,5 +1,5 @@
 export function BybitLogo({ className = "h-6", white = true }: { className?: string; white?: boolean }) {
-  // Official Bybit wordmark rendered as SVG text for crisp rendering at all sizes
+  // BYBIT wordmark rendered as SVG paths for crisp rendering at all sizes
   const color = white ? "#ffffff" : "#0a0e17"
   return (
     <svg
@@ -7,7 +7,7 @@ export function BybitLogo({ className = "h-6", white = true }: { className?: str
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      aria-label="Bybit"
+      aria-label="BYBIT"
     >
       {/* B */}
       <path
