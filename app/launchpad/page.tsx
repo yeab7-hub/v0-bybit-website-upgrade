@@ -30,7 +30,7 @@ export default function LaunchpadPage() {
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary">
                 <Rocket className="h-4 w-4" /> Token Launch Platform
               </div>
-              <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground lg:text-5xl">Bybit Launchpad</h1>
+              <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground lg:text-5xl">Token Launchpad</h1>
               <p className="mt-4 text-pretty text-lg text-muted-foreground">Project listings, eligibility checks, subscriptions, token allocation, and settlement are not connected. No launchpad participation is currently available.</p>
               <div className="mt-8 flex items-center justify-center gap-3">
                 <Button disabled title="Launchpad subscriptions are not connected" size="lg">Participation unavailable</Button>
