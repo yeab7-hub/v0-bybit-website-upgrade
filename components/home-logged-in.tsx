@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import {
   Eye, EyeOff, ChevronRight, ChevronDown, Search, Bell,
@@ -29,12 +29,31 @@ type MarketSubTab = "spot" | "derivatives" | "forex" | "stocks" | "commodities" 
 export function HomeLoggedIn({ user }: { user: User }) {
   const { crypto, forex, commodities, stocks, cfd } = useLivePrices(5000)
   const [showBalance, setShowBalance] = useState(true)
-  const [totalAssets, setTotalAssets] = useState(0)
-  const [todayPnl, setTodayPnl] = useState({ amount: 0, percent: 0 })
+  const [balanceRows, setBalanceRows] = useState<any[]>([])
+  const [dailyTradePnl, setDailyTradePnl] = useState(0)
   const [activeTab, setActiveTab] = useState<MarketTab>("favorites")
   const [subTab, setSubTab] = useState<MarketSubTab>("spot")
   const [searchQuery, setSearchQuery] = useState("")
-  const [favorites] = useState<string[]>(["BTC", "ETH", "SOL", "XRP", "AVAX", "EUR/USD", "XAU/USD", "AAPL", "US500"])
+  const [favorites, setFavorites] = useState<string[]>(["BTC", "ETH", "SOL", "XRP", "AVAX", "EUR/USD", "XAU/USD", "AAPL", "US500"])
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("trading-platform-watchlist-v1")
+      if (saved) {
+        const parsed: unknown = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) setFavorites(parsed)
+      }
+    } catch { /* Use the default list if browser storage is unavailable. */ }
+    const syncFromOtherTab = (event: StorageEvent) => {
+      if (event.key !== "trading-platform-watchlist-v1" || !event.newValue) return
+      try {
+        const parsed: unknown = JSON.parse(event.newValue)
+        if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) setFavorites(parsed)
+      } catch { /* Ignore malformed browser storage. */ }
+    }
+    window.addEventListener("storage", syncFromOtherTab)
+    return () => window.removeEventListener("storage", syncFromOtherTab)
+  }, [])
   const [unreadCount, setUnreadCount] = useState(0)
 
   const initials = (user.user_metadata?.full_name || user.email || "U").charAt(0).toUpperCase()
@@ -47,6 +66,8 @@ export function HomeLoggedIn({ user }: { user: User }) {
       .catch(() => {})
   }, [])
 
+  // Load ledger data when the signed-in user changes. Do not refetch the
+  // database on every live-price tick; value balances separately below.
   useEffect(() => {
     let cancelled = false
     const loadAccountSummary = async () => {
@@ -54,28 +75,32 @@ export function HomeLoggedIn({ user }: { user: User }) {
         const supabase = createClient()
         const startOfToday = new Date()
         startOfToday.setHours(0, 0, 0, 0)
-        const [{ data: balanceData }, { data: tradeData }] = await Promise.all([
+        const [{ data: balanceData, error: balanceError }, { data: tradeData, error: tradeError }] = await Promise.all([
           supabase.from("balances").select("*").eq("user_id", user.id),
           supabase.from("trades").select("pnl").eq("user_id", user.id).gte("created_at", startOfToday.toISOString()),
         ])
-        const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
-        const total = (balanceData ?? []).reduce((sum: number, balance: any) => {
-          const coin = safeFindPrice(allPrices, balance.asset)
-          const price = coin ? coin.price : balance.asset === "USDT" ? 1 : 0
-          return sum + Number(balance.available || 0) * price + Number(balance.in_order || 0) * price
-        }, 0)
+        if (balanceError) throw balanceError
+        if (tradeError) throw tradeError
         const pnl = (tradeData ?? []).reduce((sum: number, trade: any) => sum + (Number(trade.pnl) || 0), 0)
         if (!cancelled) {
-          setTotalAssets(total)
-          setTodayPnl({ amount: pnl, percent: total > 0 ? (pnl / total) * 100 : 0 })
+          setBalanceRows(balanceData ?? [])
+          setDailyTradePnl(pnl)
         }
       } catch {
-        // Keep the last known summary if the network or session is unavailable.
+        // Do not replace the last known account summary with invented values.
       }
     }
     void loadAccountSummary()
     return () => { cancelled = true }
-  }, [user.id, crypto, forex, commodities, stocks, cfd])
+  }, [user.id])
+
+  const allPrices = [...crypto, ...forex, ...commodities, ...stocks, ...cfd]
+  const totalAssets = useMemo(() => balanceRows.reduce((sum: number, balance: any) => {
+    const coin = safeFindPrice(allPrices, balance.asset)
+    const price = coin?.price ?? (balance.asset === "USDT" ? 1 : 0)
+    return sum + (Number(balance.available || 0) + Number(balance.in_order || 0)) * price
+  }, 0), [balanceRows, crypto, forex, commodities, stocks, cfd])
+  const todayPnlPercent = totalAssets > 0 ? (dailyTradePnl / totalAssets) * 100 : 0
 
   const tabs: { key: MarketTab; label: string }[] = [
     { key: "favorites", label: "Favorites" },
@@ -165,8 +190,8 @@ export function HomeLoggedIn({ user }: { user: User }) {
             </div>
             <div className="mt-1 flex items-center gap-1">
               <span className="text-sm text-muted-foreground">{"Today's Trade P&L"}</span>
-              <span className={`text-sm font-medium ${todayPnl.amount >= 0 ? "text-success" : "text-destructive"}`}>
-                {showBalance ? `${todayPnl.amount >= 0 ? "+" : ""}${todayPnl.amount.toFixed(2)} USD(${todayPnl.percent >= 0 ? "+" : ""}${todayPnl.percent.toFixed(2)}%)` : "****"}
+              <span className={`text-sm font-medium ${dailyTradePnl >= 0 ? "text-success" : "text-destructive"}`}>
+                {showBalance ? `${dailyTradePnl >= 0 ? "+" : ""}${dailyTradePnl.toFixed(2)} USD(${todayPnlPercent >= 0 ? "+" : ""}${todayPnlPercent.toFixed(2)}%)` : "****"}
               </span>
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
             </div>
