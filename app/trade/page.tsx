@@ -359,6 +359,9 @@ export default function TradePage() {
         <div className="px-2 py-1.5 text-right">
           <div className="text-[9px] text-muted-foreground">Configured platform funding / UTC interval</div>
           <div className="font-mono text-[10px] text-foreground">{(FUNDING_RATE_PER_INTERVAL * 100).toFixed(4)}% configured / {fundingCountdown} (8h)</div>
+          <div className="mt-1 text-left text-[9px] leading-3 text-amber-700 dark:text-amber-300">
+            Internal-ledger Futures only. Liquidation is an estimate from this platform quote, not an exchange mark price.
+          </div>
         </div>
       )}
       <div className="flex items-center justify-between px-2 py-1">
@@ -767,7 +770,7 @@ export default function TradePage() {
                           {pos.position_mode === "futures" && (
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                               <span>Margin: ${Number(pos.margin).toFixed(2)}</span>
-                              <span className="text-destructive/80">Liq: ${Number(pos.liquidation_price).toFixed(2)}</span>
+                              <span className="text-destructive/80">Est. liq: ${Number(pos.liquidation_price).toFixed(2)}</span>
                             </div>
                           )}
                           {pos.auto_close_at && (
