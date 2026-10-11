@@ -45,9 +45,6 @@ export default function TradePage() {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<any>(null)
   const [tradeMode, setTradeMode] = useState<TradeMode>("Spot")
-  const [marginEnabled, setMarginEnabled] = useState(false)
-  const [postOnly, setPostOnly] = useState(false)
-  const [reduceOnly, setReduceOnly] = useState(false)
   const [tpslEnabled, setTpslEnabled] = useState(false)
   const [takeProfit, setTakeProfit] = useState("")
   const [stopLoss, setStopLoss] = useState("")
@@ -623,27 +620,6 @@ export default function TradePage() {
         </div>
       )}
 
-      {/* Post-Only + Reduce-Only + GTC */}
-      <div className="mb-3 flex flex-col gap-1.5">
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" checked={postOnly} onChange={(e) => setPostOnly(e.target.checked)} className="h-3.5 w-3.5 rounded border-border accent-foreground" />
-          Post-Only
-        </label>
-        {isFutures && (
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input type="checkbox" checked={reduceOnly} onChange={(e) => setReduceOnly(e.target.checked)} className="h-3.5 w-3.5 rounded border-border accent-foreground" />
-            Reduce-Only
-          </label>
-        )}
-        <div className="flex items-center justify-end">
-          <select className="rounded bg-transparent text-xs text-foreground outline-none">
-            <option>GTC</option>
-            <option>IOC</option>
-            <option>FOK</option>
-          </select>
-        </div>
-      </div>
-
       {/* Feedback */}
       {feedback && (
         <div className={`mb-3 rounded-lg px-3 py-2 text-xs font-medium ${feedback.type === "success" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
@@ -969,13 +945,7 @@ export default function TradePage() {
               <button onClick={() => setSide("buy")} className={`px-6 py-2 text-sm font-semibold transition-colors ${isBuy ? "bg-success text-[#0a0e17]" : "text-muted-foreground"}`}>Buy</button>
               <button onClick={() => setSide("sell")} className={`px-6 py-2 text-sm font-semibold transition-colors ${!isBuy ? "bg-destructive text-white" : "text-muted-foreground"}`}>Sell</button>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Margin</span>
-              <button onClick={() => setMarginEnabled(!marginEnabled)}
-                className={`relative h-5 w-9 rounded-full transition-colors ${marginEnabled ? "bg-[#f7a600]" : "bg-secondary"}`}>
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-foreground transition-transform ${marginEnabled ? "left-[18px]" : "left-0.5"}`} />
-              </button>
-            </div>
+
           </div>
         )}
 
@@ -1014,13 +984,7 @@ export default function TradePage() {
                 <button onClick={() => setSide("sell")} className={`px-5 py-2 text-sm font-semibold transition-colors ${!isBuy ? "bg-destructive text-white" : "text-muted-foreground"}`}>Sell</button>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Margin</span>
-              <button onClick={() => setMarginEnabled(!marginEnabled)}
-                className={`relative h-5 w-9 rounded-full transition-colors ${marginEnabled ? "bg-[#f7a600]" : "bg-secondary"}`}>
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-foreground transition-transform ${marginEnabled ? "left-[18px]" : "left-0.5"}`} />
-              </button>
-            </div>
+
           </div>
           {OrderFormPanel}
         </div>
