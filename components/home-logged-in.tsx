@@ -34,7 +34,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
   const [activeTab, setActiveTab] = useState<MarketTab>("favorites")
   const [subTab, setSubTab] = useState<MarketSubTab>("spot")
   const [searchQuery, setSearchQuery] = useState("")
-  const [favorites, setFavorites] = useState<string[]>(["BTC", "ETH", "SOL", "XRP", "AVAX", "EUR/USD", "XAU/USD", "AAPL", "US500"])
+  const [favorites, setFavorites] = useState<string[]>([])
 
   useEffect(() => {
     try {
