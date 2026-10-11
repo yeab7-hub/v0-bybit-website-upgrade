@@ -107,7 +107,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
   }, 0), [balanceRows, crypto, forex, commodities, stocks, cfd])
   const unpricedAssetCount = useMemo(() => balanceRows.filter((balance: any) => {
     const quantity = Number(balance.available || 0) + Number(balance.in_order || 0)
-    if (quantity <= 0 || balance.asset === "USDT" || balance.asset === "USDC") return false
+    if (quantity <= 0 || balance.asset === "USDT") return false
     const quote = safeFindPrice(allPrices, balance.asset)
     return !quote || !Number.isFinite(quote.price) || quote.price <= 0
   }).length, [balanceRows, crypto, forex, commodities, stocks, cfd])
