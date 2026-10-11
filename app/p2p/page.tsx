@@ -1,9 +1,6 @@
-"use client"
-
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Shield } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
 const paymentMethods = ["All", "Bank Transfer", "PayPal", "Wise", "Zelle", "Revolut", "Cash App"]
