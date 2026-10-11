@@ -33,40 +33,7 @@ export interface PricesResponse {
 /* ================================================================
    Static sample data is not used for displayed or executable quotes.
    ================================================================ */
-const FALLBACK_CRYPTO: PriceData[] = [
-  { id: "btc", symbol: "BTC", name: "Bitcoin", price: 97842.50, change24h: 2.34, volume: 28.5e9, marketCap: 1.92e12, category: "crypto", sparkline: [96800, 97100, 96500, 97200, 97500, 97000, 97800, 97400, 97600, 97900] },
-  { id: "eth", symbol: "ETH", name: "Ethereum", price: 3456.78, change24h: 1.82, volume: 14.2e9, marketCap: 415e9, category: "crypto", sparkline: [3400, 3420, 3380, 3450, 3440, 3460, 3430, 3470, 3450, 3460] },
-  { id: "sol", symbol: "SOL", name: "Solana", price: 189.45, change24h: -0.56, volume: 3.8e9, marketCap: 82e9, category: "crypto", sparkline: [192, 191, 190, 189, 190, 188, 189, 190, 189, 189] },
-  { id: "xrp", symbol: "XRP", name: "XRP", price: 2.87, change24h: 3.12, volume: 5.1e9, marketCap: 148e9, category: "crypto", sparkline: [2.78, 2.80, 2.82, 2.84, 2.83, 2.85, 2.86, 2.84, 2.87, 2.87] },
-  { id: "bnb", symbol: "BNB", name: "BNB", price: 654.32, change24h: 0.94, volume: 1.9e9, marketCap: 97e9, category: "crypto", sparkline: [649, 651, 650, 653, 652, 654, 653, 655, 654, 654] },
-  { id: "ada", symbol: "ADA", name: "Cardano", price: 0.9876, change24h: -1.23, volume: 1.2e9, marketCap: 34e9, category: "crypto", sparkline: [1.00, 0.99, 0.995, 0.99, 0.985, 0.99, 0.988, 0.987, 0.988, 0.987] },
-  { id: "doge", symbol: "DOGE", name: "Dogecoin", price: 0.3245, change24h: 5.67, volume: 2.3e9, marketCap: 47e9, category: "crypto", sparkline: [0.307, 0.310, 0.312, 0.315, 0.318, 0.320, 0.322, 0.324, 0.323, 0.325] },
-  { id: "avax", symbol: "AVAX", name: "Avalanche", price: 35.67, change24h: -2.15, volume: 890e6, marketCap: 14e9, category: "crypto", sparkline: [36.5, 36.2, 36.0, 35.8, 35.9, 35.7, 35.8, 35.6, 35.7, 35.7] },
-  { id: "dot", symbol: "DOT", name: "Polkadot", price: 7.89, change24h: 1.45, volume: 560e6, marketCap: 10.5e9, category: "crypto", sparkline: [7.7, 7.75, 7.8, 7.82, 7.85, 7.87, 7.86, 7.88, 7.89, 7.89] },
-  { id: "link", symbol: "LINK", name: "Chainlink", price: 19.54, change24h: 0.78, volume: 780e6, marketCap: 12.3e9, category: "crypto", sparkline: [19.2, 19.3, 19.35, 19.4, 19.42, 19.45, 19.48, 19.5, 19.52, 19.54] },
-]
-const FALLBACK_FOREX: PriceData[] = [
-  { id: "eur-usd", symbol: "EUR/USD", name: "EUR/USD", price: 1.0842, change24h: 0.12, volume: 5e9, marketCap: 0, category: "forex" },
-  { id: "gbp-usd", symbol: "GBP/USD", name: "GBP/USD", price: 1.2634, change24h: -0.08, volume: 3.2e9, marketCap: 0, category: "forex" },
-  { id: "usd-jpy", symbol: "USD/JPY", name: "USD/JPY", price: 149.85, change24h: 0.34, volume: 4.1e9, marketCap: 0, category: "forex" },
-  { id: "aud-usd", symbol: "AUD/USD", name: "AUD/USD", price: 0.6543, change24h: -0.15, volume: 2.8e9, marketCap: 0, category: "forex" },
-  { id: "usd-chf", symbol: "USD/CHF", name: "USD/CHF", price: 0.8821, change24h: 0.08, volume: 2.1e9, marketCap: 0, category: "forex" },
-  { id: "usd-cad", symbol: "USD/CAD", name: "USD/CAD", price: 1.3612, change24h: 0.21, volume: 1.9e9, marketCap: 0, category: "forex" },
-  { id: "nzd-usd", symbol: "NZD/USD", name: "NZD/USD", price: 0.6102, change24h: -0.11, volume: 1.5e9, marketCap: 0, category: "forex" },
-]
-const FALLBACK_COMMODITIES: PriceData[] = [
-  { id: "xau-usd", symbol: "XAU/USD", name: "Gold", price: 2924.5, change24h: 0.45, volume: 2e9, marketCap: 0, category: "commodity" },
-  { id: "xag-usd", symbol: "XAG/USD", name: "Silver", price: 32.78, change24h: -0.32, volume: 800e6, marketCap: 0, category: "commodity" },
-]
-const FALLBACK_STOCKS: PriceData[] = [
-  { id: "aapl", symbol: "AAPL", name: "Apple Inc.", price: 232.4, change24h: 0.78, volume: 500e6, marketCap: 3.5e12, category: "stock" },
-  { id: "msft", symbol: "MSFT", name: "Microsoft", price: 412.65, change24h: 1.23, volume: 350e6, marketCap: 3.1e12, category: "stock" },
-]
-const FALLBACK_CFD: PriceData[] = [
-  { id: "us30", symbol: "US30", name: "US Wall St 30", price: 42850, change24h: 0.28, volume: 3e9, marketCap: 0, category: "cfd" },
-  { id: "us500", symbol: "US500", name: "US 500", price: 5920, change24h: 0.34, volume: 2.5e9, marketCap: 0, category: "cfd" },
-]
-
+// No hardcoded market prices are permitted as fallbacks.
 const INITIAL_DATA: PricesResponse = {
   crypto: [],
   forex: [],
@@ -275,41 +242,41 @@ export function findPrice(allPrices: PriceData[], pair: string): PriceData | nul
 /* ================================================================
    Known non-crypto symbols -- used as a GUARD to prevent
    XAU/USD, EUR/USD etc. from ever resolving to a crypto price.
-   Prices here are fallbacks only; real prices come from the API.
+   Price fields are zeroed; this map only guards symbol/category resolution.
    ================================================================ */
 export const NON_CRYPTO_BASE: Record<string, { price: number; category: string; name: string }> = {
   // Commodities (fallback -- real prices from metals.live API)
-  "XAU/USD": { price: 2924.5, category: "commodity", name: "Gold" },
-  "XAG/USD": { price: 32.78, category: "commodity", name: "Silver" },
-  "WTI": { price: 71.24, category: "commodity", name: "Crude Oil WTI" },
-  "BRENT": { price: 74.89, category: "commodity", name: "Brent Crude" },
-  "NG": { price: 3.42, category: "commodity", name: "Natural Gas" },
-  "HG": { price: 4.52, category: "commodity", name: "Copper" },
+  "XAU/USD": { price: 0, category: "commodity", name: "Gold" },
+  "XAG/USD": { price: 0, category: "commodity", name: "Silver" },
+  "WTI": { price: 0, category: "commodity", name: "Crude Oil WTI" },
+  "BRENT": { price: 0, category: "commodity", name: "Brent Crude" },
+  "NG": { price: 0, category: "commodity", name: "Natural Gas" },
+  "HG": { price: 0, category: "commodity", name: "Copper" },
   // Forex (fallback -- real prices from Frankfurter API)
-  "EUR/USD": { price: 1.0842, category: "forex", name: "EUR/USD" },
-  "GBP/USD": { price: 1.2634, category: "forex", name: "GBP/USD" },
-  "USD/JPY": { price: 149.85, category: "forex", name: "USD/JPY" },
-  "AUD/USD": { price: 0.6543, category: "forex", name: "AUD/USD" },
-  "USD/CHF": { price: 0.8821, category: "forex", name: "USD/CHF" },
-  "USD/CAD": { price: 1.3612, category: "forex", name: "USD/CAD" },
-  "NZD/USD": { price: 0.6102, category: "forex", name: "NZD/USD" },
+  "EUR/USD": { price: 0, category: "forex", name: "EUR/USD" },
+  "GBP/USD": { price: 0, category: "forex", name: "GBP/USD" },
+  "USD/JPY": { price: 0, category: "forex", name: "USD/JPY" },
+  "AUD/USD": { price: 0, category: "forex", name: "AUD/USD" },
+  "USD/CHF": { price: 0, category: "forex", name: "USD/CHF" },
+  "USD/CAD": { price: 0, category: "forex", name: "USD/CAD" },
+  "NZD/USD": { price: 0, category: "forex", name: "NZD/USD" },
   // Stocks (fallback -- real prices from Yahoo Finance)
-  "AAPL": { price: 232.4, category: "stock", name: "Apple Inc." },
-  "MSFT": { price: 412.65, category: "stock", name: "Microsoft" },
-  "GOOGL": { price: 178.2, category: "stock", name: "Alphabet" },
-  "AMZN": { price: 215.8, category: "stock", name: "Amazon" },
-  "TSLA": { price: 348.9, category: "stock", name: "Tesla" },
-  "NVDA": { price: 138.5, category: "stock", name: "NVIDIA" },
-  "META": { price: 582.3, category: "stock", name: "Meta Platforms" },
+  "AAPL": { price: 0, category: "stock", name: "Apple Inc." },
+  "MSFT": { price: 0, category: "stock", name: "Microsoft" },
+  "GOOGL": { price: 0, category: "stock", name: "Alphabet" },
+  "AMZN": { price: 0, category: "stock", name: "Amazon" },
+  "TSLA": { price: 0, category: "stock", name: "Tesla" },
+  "NVDA": { price: 0, category: "stock", name: "NVIDIA" },
+  "META": { price: 0, category: "stock", name: "Meta Platforms" },
   // CFDs / Indices (fallback -- real prices from Yahoo Finance)
-  "US30": { price: 42850, category: "cfd", name: "US Wall St 30" },
-  "US500": { price: 5920, category: "cfd", name: "US 500" },
-  "US100": { price: 21150, category: "cfd", name: "US Tech 100" },
-  "UK100": { price: 8415, category: "cfd", name: "UK 100" },
-  "DE40": { price: 22340, category: "cfd", name: "Germany 40" },
-  "JP225": { price: 38750, category: "cfd", name: "Japan 225" },
-  "HK50": { price: 22480, category: "cfd", name: "Hong Kong 50" },
-  "VIX": { price: 15.8, category: "cfd", name: "Volatility Index" },
+  "US30": { price: 0, category: "cfd", name: "US Wall St 30" },
+  "US500": { price: 0, category: "cfd", name: "US 500" },
+  "US100": { price: 0, category: "cfd", name: "US Tech 100" },
+  "UK100": { price: 0, category: "cfd", name: "UK 100" },
+  "DE40": { price: 0, category: "cfd", name: "Germany 40" },
+  "JP225": { price: 0, category: "cfd", name: "Japan 225" },
+  "HK50": { price: 0, category: "cfd", name: "Hong Kong 50" },
+  "VIX": { price: 0, category: "cfd", name: "Volatility Index" },
 }
 
 /** Safely resolve a price for any pair symbol.
