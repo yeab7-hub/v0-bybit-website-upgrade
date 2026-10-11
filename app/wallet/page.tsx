@@ -7,7 +7,7 @@ import useSWR from "swr"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import Link from "next/link"
-import { DEPOSIT_ADDRESSES as FALLBACK_ADDRESSES, type CoinDepositConfig } from "@/lib/deposit-addresses"
+import type { CoinDepositConfig } from "@/lib/deposit-addresses"
 import {
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight, RefreshCw, History,
   Copy, Check, X, AlertTriangle, Search, Eye, EyeOff,
@@ -505,8 +505,8 @@ function DepositTab({ mutTx, mutBal }: any) {
 
 /* ===== Withdraw ===== */
 function WithdrawTab({ bals, mutTx, mutBal }: any) {
-  const { data: addrData } = useSWR("/api/deposit-addresses", fetcher)
-  const WITHDRAW_ADDRESSES: CoinDepositConfig[] = addrData?.addresses ?? FALLBACK_ADDRESSES
+  const { data: addrData, error: addressError, isLoading: addressesLoading } = useSWR("/api/deposit-addresses", fetcher)
+  const WITHDRAW_ADDRESSES: CoinDepositConfig[] = Array.isArray(addrData?.addresses) ? addrData.addresses : []
   const [coin, setCoin] = useState("USDT")
   const [netIdx, setNetIdx] = useState(0)
   const [address, setAddress] = useState("")
@@ -521,6 +521,21 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
   const bal = bals.find((b: any) => b.asset === coin)
   const avail = Number(bal?.available || 0)
   // Network fees are not configured server-side; do not invent or subtract a fake fee.
+
+  if (addressesLoading) return (
+    <div role="status" className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-8 text-center">
+      <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground">Loading supported withdrawal networks…</p>
+    </div>
+  )
+
+  if (addressError || addrData?.error) return (
+    <div role="alert" className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-8 text-center">
+      <AlertTriangle className="mx-auto mb-4 h-8 w-8 text-primary" />
+      <h3 className="mb-2 text-lg font-bold text-foreground">Withdrawal networks unavailable</h3>
+      <p className="text-sm text-muted-foreground">We could not load the configured networks. Please try again later or contact support.</p>
+    </div>
+  )
 
   if (!cd || !net) return (
     <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-8 text-center">
