@@ -139,11 +139,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "This position was already closed or could not be claimed. Refresh and try again." }, { status: 409 })
   }
 
-  // Consume an override only after this request has successfully claimed the position.
-  if ((forcedResult === "win" || forcedResult === "loss") && override?.id) {
-    await adminSupabase.from("trade_overrides").update({ active: false, used_at: new Date().toISOString() }).eq("id", override.id).eq("active", true)
-  }
-
   const isFuturesPosition = position.position_mode === "futures"
 
   // Settle balances with compare-and-set updates so concurrent wallet activity
@@ -186,6 +181,11 @@ export async function POST(request: NextRequest) {
       }).eq("id", tradeId).eq("status", "closed")
       return NextResponse.json({ error: "Could not safely settle the Spot balance. The position was reopened; refresh and retry." }, { status: 409 })
     }
+  }
+
+  // Consume an override only after this request has successfully claimed the position.
+  if ((forcedResult === "win" || forcedResult === "loss") && override?.id) {
+    await adminSupabase.from("trade_overrides").update({ active: false, used_at: new Date().toISOString() }).eq("id", override.id).eq("active", true)
   }
 
   const overrideNotice = forcedResult
