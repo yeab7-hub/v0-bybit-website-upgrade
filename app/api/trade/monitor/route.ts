@@ -5,7 +5,7 @@ import { elapsedFundingIntervals, calcFundingFee } from "@/lib/futures"
 import { getLivePrice } from "@/lib/live-price"
 
 /**
- * GET /api/trade/monitor
+ * POST /api/trade/monitor
  * Scans the user's OPEN positions and auto-closes any whose live market price
  * has crossed its Take Profit or Stop Loss threshold. Closure settles at the
  * TP/SL target price (not the momentary market price) so the realized outcome
@@ -28,7 +28,7 @@ async function getPrice(pair: string, cache: { internal?: any }): Promise<number
   return price
 }
 
-export async function GET() {
+export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
