@@ -96,17 +96,17 @@ export async function POST() {
 
     // Liquidation takes priority over TP/SL -- it means the margin is gone.
     if (isFuturesPosition && liqPrice > 0) {
-      if (isShort && currentPrice >= liqPrice) { triggerPrice = liqPrice; reason = "liquidation" }
-      else if (!isShort && currentPrice <= liqPrice) { triggerPrice = liqPrice; reason = "liquidation" }
+      if (isShort && currentPrice >= liqPrice) { triggerPrice = currentPrice; reason = "liquidation" }
+      else if (!isShort && currentPrice <= liqPrice) { triggerPrice = currentPrice; reason = "liquidation" }
     }
 
     if (!reason) {
       if (isShort) {
-        if (tp > 0 && currentPrice <= tp) { triggerPrice = tp; reason = "take_profit" }
-        else if (sl > 0 && currentPrice >= sl) { triggerPrice = sl; reason = "stop_loss" }
+        if (tp > 0 && currentPrice <= tp) { triggerPrice = currentPrice; reason = "take_profit" }
+        else if (sl > 0 && currentPrice >= sl) { triggerPrice = currentPrice; reason = "stop_loss" }
       } else {
-        if (tp > 0 && currentPrice >= tp) { triggerPrice = tp; reason = "take_profit" }
-        else if (sl > 0 && currentPrice <= sl) { triggerPrice = sl; reason = "stop_loss" }
+        if (tp > 0 && currentPrice >= tp) { triggerPrice = currentPrice; reason = "take_profit" }
+        else if (sl > 0 && currentPrice <= sl) { triggerPrice = currentPrice; reason = "stop_loss" }
       }
     }
 
