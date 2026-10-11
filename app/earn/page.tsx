@@ -17,6 +17,7 @@ type ProductTab = "steady" | "topGains" | "vip"
 const earnProducts: { coin: string; name: string; products: { type: string; term: string; apr: string }[] }[] = []
 
 export default function EarnPage() {
+  const searchQuery = "" // Search is disabled until live Earn products are integrated.
   const category: EarnCategory = "easy"
   const [productTab, setProductTab] = useState<ProductTab>("steady")
   const [expandedCoin, setExpandedCoin] = useState<string | null>("BTC")
