@@ -9,8 +9,18 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const adminSupabase = await createAdminClient()
-  const body = await request.json()
-  const { tradeId, outcome } = body
+  let body: Record<string, unknown>
+  try {
+    const parsed: unknown = await request.json()
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    }
+    body = parsed as Record<string, unknown>
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
+  const tradeId = typeof body.tradeId === "string" ? body.tradeId.trim() : ""
+  const outcome = body.outcome
   if (!tradeId) return NextResponse.json({ error: "Trade ID required" }, { status: 400 })
 
   let isAdmin = false
