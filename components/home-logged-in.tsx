@@ -5,7 +5,7 @@ import Link from "next/link"
 import {
   Eye, EyeOff, ChevronRight, ChevronDown, Search, Bell,
   ArrowDownLeft, ArrowLeftRight, Gift, CreditCard,
-  Calendar, Coins, MoreHorizontal, Check,
+  Calendar, Coins, MoreHorizontal, Check, ClipboardList,
 } from "lucide-react"
 import { useLivePrices, formatPrice, safeFindPrice, type PriceData } from "@/hooks/use-live-prices"
 import { NewsSection } from "@/components/news-section"
@@ -18,12 +18,12 @@ const quickActions = [
   { label: "Deposit", href: "/deposit", icon: ArrowDownLeft, color: "bg-card" },
   { label: "Card", href: "/card", icon: CreditCard, color: "bg-card" },
   { label: "Rewards Hub", href: "/rewards", icon: Gift, color: "bg-card" },
-  { label: "Daily Delight", href: "/rewards", icon: Calendar, color: "bg-card" },
-  { label: "Bybit Earn", href: "/earn", icon: Coins, color: "bg-card" },
+  { label: "Orders", href: "/orders", icon: ClipboardList, color: "bg-card" },
+  { label: "Earn", href: "/earn", icon: Coins, color: "bg-card" },
   { label: "More", href: "/markets", icon: MoreHorizontal, color: "bg-card" },
 ]
 
-type MarketTab = "favorites" | "hot" | "new" | "gainers" | "losers" | "turnover"
+type MarketTab = "favorites" | "hot" | "all" | "gainers" | "losers" | "turnover"
 type MarketSubTab = "spot" | "derivatives" | "forex" | "stocks" | "commodities" | "cfd"
 
 export function HomeLoggedIn({ user }: { user: User }) {
@@ -106,7 +106,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
   const tabs: { key: MarketTab; label: string }[] = [
     { key: "favorites", label: "Favorites" },
     { key: "hot", label: "Hot" },
-    { key: "new", label: "All" },
+    { key: "all", label: "All" },
     { key: "gainers", label: "Gainers" },
     { key: "losers", label: "Losers" },
     { key: "turnover", label: "Turnover" },
@@ -135,7 +135,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
       case "gainers": return coins.sort((a, b) => b.change24h - a.change24h).slice(0, 10)
       case "losers": return coins.sort((a, b) => a.change24h - b.change24h).slice(0, 10)
       case "turnover": return coins.sort((a, b) => (b.volume || 0) - (a.volume || 0)).slice(0, 10)
-      case "new": return coins.slice(0, 10)
+      case "all": return coins
       default: return coins.slice(0, 10)
     }
   }
