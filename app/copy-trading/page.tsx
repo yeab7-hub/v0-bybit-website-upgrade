@@ -16,16 +16,16 @@ const masterTraders: { name: string; roi: string; pnl: string; followers: number
 const sortOptions = ["ROI", "PnL", "Followers", "Win Rate", "AUM"]
 
 const steps = [
-  { step: "01", title: "Choose a Master Trader", desc: "Browse our curated list of top-performing traders with transparent track records and verified statistics." },
-  { step: "02", title: "Set Your Budget", desc: "Decide how much capital you want to allocate. Set risk limits and maximum position sizes to protect your funds." },
-  { step: "03", title: "Auto-Copy Trades", desc: "Trades are automatically copied in real-time. Monitor performance and adjust settings anytime." },
+  { step: "01", title: "Choose a Master Trader", desc: "Verified trader profiles are unavailable until a performance data source is connected." },
+  { step: "02", title: "Set Your Budget", desc: "Copy budgets and copy-specific risk controls are not configured yet." },
+  { step: "03", title: "Auto-Copy Trades", desc: "Automatic copy execution is not connected, so trades are not copied by this page." },
 ]
 
 const features = [
-  { icon: Target, title: "Smart Copy", desc: "Proportional copy sizing based on your budget. Automatic adjustment for different account sizes." },
-  { icon: Shield, title: "Risk Management", desc: "Set max loss limits, position caps, and stop-copy triggers. Full control over your exposure." },
-  { icon: BarChart3, title: "Transparent Stats", desc: "Full trading history, win rate, drawdown, and ROI metrics for every master trader." },
-  { icon: Zap, title: "Real-Time Execution", desc: "Sub-second trade copying with no delays. Your orders execute simultaneously with the master." },
+  { icon: Target, title: "Smart Copy", desc: "Copy sizing and allocation calculations are not configured." },
+  { icon: Shield, title: "Risk Management", desc: "Copy-specific loss limits, position caps, and stop-copy controls are not configured." },
+  { icon: BarChart3, title: "Transparent Stats", desc: "Verified trading history and performance metrics are not connected." },
+  { icon: Zap, title: "Real-Time Execution", desc: "A verified copy-execution engine is not connected." },
 ]
 
 export default function CopyTradingPage() {
