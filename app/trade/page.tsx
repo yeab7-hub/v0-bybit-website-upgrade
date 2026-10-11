@@ -266,7 +266,7 @@ export default function TradePage() {
     window.setTimeout(() => setFeedback(null), 4000)
   }
 
-  const closePosition = async (tradeId: string, pair?: string) => {
+  const closePosition = async (tradeId: string) => {
     setClosingId(tradeId)
     try {
       // The server determines the settlement price from its verified market feed.
@@ -777,7 +777,7 @@ export default function TradePage() {
                           </div>
                         </div>
                         <button
-                          onClick={(e) => { e.stopPropagation(); closePosition(pos.id, pos.pair) }}
+                          onClick={(e) => { e.stopPropagation(); closePosition(pos.id) }}
                           disabled={isClosing}
                           className="rounded-md border border-destructive px-2 py-1 text-[10px] font-semibold text-destructive disabled:opacity-50"
                         >
@@ -1064,7 +1064,7 @@ export default function TradePage() {
                 <button onClick={() => { cancelOrder(selectedDetail.id); setSelectedDetail(null) }} className="flex-1 rounded-lg border border-destructive py-3 text-sm font-semibold text-destructive">Cancel Order</button>
               ) : selectedDetail.status === "open" ? (
                 <button
-                  onClick={() => { closePosition(selectedDetail.id, selectedDetail.pair); setSelectedDetail(null) }}
+                  onClick={() => { closePosition(selectedDetail.id); setSelectedDetail(null) }}
                   className="flex-1 rounded-lg bg-destructive py-3 text-sm font-semibold text-white"
                 >
                   Close Position at Market
