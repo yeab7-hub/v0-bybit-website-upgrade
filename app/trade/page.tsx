@@ -49,7 +49,6 @@ export default function TradePage() {
   const [takeProfit, setTakeProfit] = useState("")
   const [stopLoss, setStopLoss] = useState("")
   const [leverage, setLeverage] = useState("10x")
-  const [marginType, setMarginType] = useState("Cross")
   const [durationSeconds, setDurationSeconds] = useState<number | null>(null)
   const [fundingCountdown, setFundingCountdown] = useState("--:--:--")
 
@@ -409,13 +408,6 @@ export default function TradePage() {
       {/* Futures: Cross + Leverage selectors */}
       {isFutures && (
         <div className="mb-3 flex gap-2">
-          <select
-            value={marginType} onChange={(e) => setMarginType(e.target.value)}
-            className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-foreground outline-none"
-          >
-            <option>Cross</option>
-            <option>Isolated</option>
-          </select>
           <select
             value={leverage} onChange={(e) => setLeverage(e.target.value)}
             className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-foreground outline-none"
