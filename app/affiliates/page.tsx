@@ -16,7 +16,7 @@ const tiers = [
 const benefits = [
   { icon: DollarSign, title: "Up to 50% Commission", desc: "Earn industry-leading commissions on every trade your referrals make." },
   { icon: Users, title: "No Referral Limit", desc: "Invite unlimited users. The more you refer, the more you earn." },
-  { icon: BarChart3, title: "Real-Time Analytics", desc: "Track clicks, signups, deposits, and commissions in your dashboard." },
+  { icon: BarChart3, title: "Real-Time Analytics", desc: "No affiliate analytics source is connected." },
   { icon: Gift, title: "Exclusive Bonuses", desc: "Access special promotions and bonus pools for top affiliates." },
 ]
 
@@ -24,7 +24,7 @@ const steps = [
   { step: "1", title: "Apply", desc: "Submit your application with your platform or audience details." },
   { step: "2", title: "Get Approved", desc: "Our team reviews and approves qualified applicants within 24 hours." },
   { step: "3", title: "Share Your Link", desc: "Get your unique referral link and marketing materials." },
-  { step: "4", title: "Earn Commissions", desc: "Earn every time your referrals trade. Paid out daily." },
+  { step: "4", title: "Earn Commissions", desc: "Commission calculation and payouts are not connected." },
 ]
 
 const faqs = [
@@ -42,8 +42,8 @@ export default function AffiliatesPage() {
         {/* Hero */}
         <section className="border-b border-border bg-card">
           <div className="mx-auto max-w-[1200px] px-4 py-12 text-center lg:py-20">
-            <h1 className="text-3xl font-bold tracking-tight lg:text-5xl">Bybit Affiliate Program</h1>
-            <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground lg:text-base">Earn up to 50% commission by referring traders to Bybit. Join the most rewarding affiliate program in crypto.</p>
+            <h1 className="text-3xl font-bold tracking-tight lg:text-5xl">Affiliate Program</h1>
+            <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground lg:text-base">Affiliate tracking, commission rates, analytics, and payouts are not connected. No commission offer is currently available.</p>
             <div className="mt-6 flex items-center justify-center gap-3">
               <Link href="/register"><Button className="h-11 rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground">Apply Now <ArrowRight className="ml-1.5 h-4 w-4" /></Button></Link>
               <Link href="/login"><Button variant="outline" className="h-11 rounded-lg border-border px-6 text-sm font-semibold">Log In</Button></Link>
