@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
     if (user.email) {
       sendBrandedEmail({
         to: user.email,
-        subject: `Withdrawal Request Received - ${amountNum} ${asset} - Bybit`,
+        subject: `Withdrawal Request Received - ${amountNum} ${asset}`,
         html: renderWithdrawalEmail({ status: "pending", amount: String(amountNum), asset, address }),
       }).catch(() => {})
     }
