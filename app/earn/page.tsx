@@ -18,8 +18,8 @@ const earnProducts: { coin: string; name: string; products: { type: string; term
 
 export default function EarnPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [category, setCategory] = useState<EarnCategory>("easy")
-  const [productTab, setProductTab] = useState<ProductTab>("steady")
+  const [category] = useState<EarnCategory>("easy")
+  const [productTab] = useState<ProductTab>("steady")
   const [expandedCoin, setExpandedCoin] = useState<string | null>("BTC")
 
   const filteredProducts = searchQuery
@@ -197,7 +197,7 @@ export default function EarnPage() {
             {/* Category buttons */}
             <div className="flex gap-6">
               {categories.map((c) => (
-                <button key={c.id} onClick={() => setCategory(c.id)} className="flex flex-col items-center gap-2">
+                <button key={c.id} disabled title="Earn products are unavailable until the service is connected" className="flex flex-col items-center gap-2">
                   <div className={`relative flex h-16 w-16 items-center justify-center rounded-2xl ${category === c.id ? "bg-[#f7a600]/10" : "bg-secondary"}`}>
                     {c.id === "easy" && (
                       <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7 text-foreground"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" /><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
@@ -228,15 +228,15 @@ export default function EarnPage() {
               <h2 className="text-2xl font-bold text-foreground">Explore Products</h2>
             </div>
             <div className="mb-6 flex items-center gap-4">
-              <button onClick={() => setProductTab("steady")}
+              <button disabled title="Earn products are unavailable until the service is connected"
                 className={`rounded-full px-5 py-2 text-sm font-medium ${productTab === "steady" ? "bg-secondary text-foreground" : "text-muted-foreground"}`}>
                 Steady Returns
               </button>
-              <button onClick={() => setProductTab("topGains")}
+              <button disabled title="Earn products are unavailable until the service is connected"
                 className={`rounded-full px-5 py-2 text-sm font-medium ${productTab === "topGains" ? "bg-secondary text-foreground" : "text-muted-foreground"}`}>
                 Top Gains
               </button>
-              <button onClick={() => setProductTab("vip")}
+              <button disabled title="Earn products are unavailable until the service is connected"
                 className="px-5 py-2 text-sm font-medium text-[#f7a600]">
                 VIP Exclusive
               </button>
