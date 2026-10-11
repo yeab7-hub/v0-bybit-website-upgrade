@@ -87,9 +87,16 @@ export default function TradePage() {
   const allPrices = [...(commodities ?? []), ...(forex ?? []), ...(stocks ?? []), ...(cfd ?? []), ...(crypto ?? [])]
 
   const isCryptoPair = selectedPair.endsWith("USDT") && !selectedPair.includes("/")
-  const pairDisplay = isCryptoPair ? selectedPair.replace("USDT", "/USDT") : selectedPair
+  const isSingleSymbol = !selectedPair.includes("/") && !isCryptoPair
+  // Single-symbol stocks/commodities/indices are settled internally against USDT.
+  // The market lookup still uses the original symbol; only the ledger pair gets a quote asset.
+  const pairDisplay = isCryptoPair
+    ? selectedPair.replace("USDT", "/USDT")
+    : isSingleSymbol
+      ? `${selectedPair}/USDT`
+      : selectedPair
   const baseAsset = isCryptoPair ? selectedPair.replace("USDT", "") : selectedPair.split("/")[0] || selectedPair
-  const quoteAsset = isCryptoPair ? "USDT" : (selectedPair.split("/")[1] || "USD")
+  const quoteAsset = isCryptoPair || isSingleSymbol ? "USDT" : (selectedPair.split("/")[1] || "USD")
 
   // safeFindPrice guarantees non-crypto pairs never resolve to a crypto price
   const liveCoin = safeFindPrice(allPrices, selectedPair)
