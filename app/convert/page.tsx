@@ -106,7 +106,7 @@ export default function ConvertPage() {
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-foreground">Convert</h1>
-              <p className="text-xs text-muted-foreground">Zero fees. Instant conversion.</p>
+              <p className="text-xs text-muted-foreground">Indicative market quote; the server verifies the rate when you convert.</p>
             </div>
             <button onClick={() => setShowHistory(!showHistory)} className="flex items-center gap-1 rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">
               <History className="h-3.5 w-3.5" /> History
@@ -204,7 +204,7 @@ export default function ConvertPage() {
             <Button onClick={handleConvert} disabled={!canConvert} className="mt-4 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90" size="lg">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : rate <= 0 ? "Live price unavailable" : amount && parseFloat(amount) > availableFrom ? "Insufficient balance" : "Convert"}
             </Button>
-            <p className="mt-2 text-center text-[10px] text-muted-foreground">No trading fees. Price refreshes every 15s.</p>
+            <p className="mt-2 text-center text-[10px] text-muted-foreground">The estimate can change before submission. Any applicable fees are shown only when configured by the platform.</p>
           </div>
 
           {/* History */}
