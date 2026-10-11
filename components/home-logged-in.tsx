@@ -250,8 +250,13 @@ export function HomeLoggedIn({ user }: { user: User }) {
         {/* Favorites grid view */}
         {activeTab === "favorites" ? (
           <div className="px-4 pb-4">
-            <div className="grid grid-cols-2 gap-2">
-              {filteredCoins.map((coin) => (
+            {filteredCoins.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No favorites in this category yet. Open Markets and tap the star beside an asset to add it here.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {filteredCoins.map((coin) => (
                 <Link
                   key={coin.symbol}
                   href={coin.category === "crypto" ? `/trade?pair=${coin.symbol}USDT` : `/trade?pair=${encodeURIComponent(coin.symbol)}`}
@@ -271,8 +276,9 @@ export function HomeLoggedIn({ user }: { user: User }) {
                   </div>
                   <Check className="h-4 w-4 text-muted-foreground" />
                 </Link>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
             <div className="mt-3 flex justify-center">
               <Link href="/markets" className="rounded-full border border-border px-6 py-2 text-xs font-medium text-foreground transition-colors hover:bg-secondary">
                 Add to Favorites
@@ -296,7 +302,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-bold text-foreground">{coin.symbol}</span>
                       {coin.category === "crypto" && <span className="text-[11px] text-muted-foreground">/ USDT</span>}
-                      {coin.category === "crypto" && <span className="rounded bg-secondary px-1 py-0.5 text-[9px] font-medium text-muted-foreground">10x</span>}
+                      
                     </div>
                     <span className="font-mono text-[11px] text-muted-foreground">
                       {((coin.volume || 0) / 1e6).toFixed(2)}M USDT
