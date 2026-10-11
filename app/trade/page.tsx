@@ -735,11 +735,11 @@ export default function TradePage() {
                 const pairStr = pos.pair || "BTC/USDT"
                 // safeFindPrice prevents non-crypto pairs from resolving to crypto prices
                 const posCoin = safeFindPrice(allPrices, pairStr)
-                const curPrice = posCoin?.price ?? entryPrice
+                const curPrice = posCoin && Number(posCoin.price) > 0 ? Number(posCoin.price) : null
                 const isSell = pos.side === "sell"
-                const unrealizedPnl = isSell ? (entryPrice - curPrice) * qty : (curPrice - entryPrice) * qty
+                const unrealizedPnl = curPrice === null ? null : (isSell ? (entryPrice - curPrice) * qty : (curPrice - entryPrice) * qty)
                 const pnlBase = pos.position_mode === "futures" && Number(pos.margin) > 0 ? Number(pos.margin) : entryPrice * qty
-                const pnlPct = pnlBase > 0 ? (unrealizedPnl / pnlBase) * 100 : 0
+                const pnlPct = unrealizedPnl !== null && pnlBase > 0 ? (unrealizedPnl / pnlBase) * 100 : null
                 const isClosing = closingId === pos.id
                 const logoSymbol = posCoin?.symbol ?? pairStr.split("/")[0] ?? "BTC"
 
@@ -779,11 +779,11 @@ export default function TradePage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-right">
-                          <div className={`font-mono text-xs font-bold ${unrealizedPnl >= 0 ? "text-success" : "text-destructive"}`}>
-                            {unrealizedPnl >= 0 ? "+" : ""}{unrealizedPnl.toFixed(2)} USDT
+                          <div className={`font-mono text-xs font-bold ${unrealizedPnl === null ? "text-muted-foreground" : unrealizedPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                            {unrealizedPnl === null ? "—" : `${unrealizedPnl >= 0 ? "+" : ""}${unrealizedPnl.toFixed(2)} USDT` }
                           </div>
-                          <div className={`font-mono text-[10px] ${pnlPct >= 0 ? "text-success" : "text-destructive"}`}>
-                            {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+                          <div className={`font-mono text-[10px] ${pnlPct === null ? "text-muted-foreground" : pnlPct >= 0 ? "text-success" : "text-destructive"}`}>
+                            {pnlPct === null ? "—" : `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%` }
                           </div>
                         </div>
                         <button
@@ -797,7 +797,7 @@ export default function TradePage() {
                     </div>
                     {/* Live price bar */}
                     <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[9px] text-muted-foreground">
-                      <span>Mark: ${curPrice.toLocaleString()}</span>
+                      <span>Mark: {curPrice === null ? "unavailable" : `${curPrice.toLocaleString()}`}</span>
                       {Number(pos.take_profit) > 0 && (
                         <span className="text-success">TP: ${Number(pos.take_profit).toLocaleString()}</span>
                       )}
