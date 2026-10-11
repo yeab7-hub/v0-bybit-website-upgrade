@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 import { checkAccountStatus } from "@/lib/account-status"
 import { notifyAdmin } from "@/lib/notify-admin"
@@ -74,7 +74,10 @@ export async function POST(request: NextRequest) {
     if (txHash) {
       // A chain transaction hash must not be credited to multiple accounts.
       // This check is network-wide, not scoped to the submitting user.
-      const { data: existing, error: duplicateError } = await supabase
+      // The session client is row-scoped by RLS; use the server-only admin
+      // client for this cross-account duplicate check and return no other user's data.
+      const adminSupabase = await createAdminClient()
+      const { data: existing, error: duplicateError } = await adminSupabase
         .from("transactions")
         .select("id")
         .eq("type", "deposit")
