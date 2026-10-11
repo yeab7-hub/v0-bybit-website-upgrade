@@ -388,10 +388,10 @@ function DepositTab({ mutTx, mutBal }: any) {
   const [amount, setAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [error, setError] = useState("")
 
   const cd = DEPOSIT_ADDRESSES.find(c => c.symbol === coin) || DEPOSIT_ADDRESSES[0]
   const net = cd?.networks?.[netIdx] || cd?.networks?.[0]
-  const [error, setError] = useState("")
   if (addrError || !DEPOSIT_ADDRESSES.length || !cd || !net) return (
     <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-10 text-center">
       <AlertTriangle className="mx-auto mb-4 h-8 w-8 text-warning" />
