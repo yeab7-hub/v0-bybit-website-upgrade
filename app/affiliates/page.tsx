@@ -16,7 +16,7 @@ const tiers = [
 const benefits = [
   { icon: DollarSign, title: "Commission ledger unavailable", desc: "Referral commissions are not calculated or paid by this app yet." },
   { icon: Users, title: "Referral tracking unavailable", desc: "Referral attribution and tracking are not connected." },
-  { icon: BarChart3, title: "Real-Time Analytics", desc: "No affiliate analytics source is connected." },
+  { icon: BarChart3, title: "Analytics unavailable", desc: "No affiliate analytics source is connected." },
   { icon: Gift, title: "Promotions unavailable", desc: "Affiliate promotions and bonus accounting are not configured." },
 ]
 
