@@ -18,8 +18,8 @@ const navLinks = [
   {
     label: "Buy Crypto", href: "/buy-crypto",
     children: [
-      { label: "One-Click Buy", href: "/buy-crypto", icon: CircleDollarSign, desc: "Buy crypto with card or bank" },
-      { label: "P2P Trading", href: "/p2p", icon: Users, desc: "Trade directly with other users" },
+      { label: "One-Click Buy", href: "/buy-crypto", icon: CircleDollarSign, desc: "Payment provider is not configured yet" },
+      { label: "P2P Trading", href: "/p2p", icon: Users, desc: "P2P marketplace is not connected" },
       { label: "Convert", href: "/convert", icon: ArrowLeftRight, desc: "Instant crypto conversion" },
     ],
   },
@@ -27,44 +27,44 @@ const navLinks = [
   {
     label: "Trade", href: "/trade",
     children: [
-      { label: "Spot Trading", href: "/trade", icon: BarChart3, desc: "Buy and sell crypto at market price" },
-      { label: "Derivatives", href: "/derivatives", icon: TrendingUp, desc: "Futures and perpetual contracts" },
-      { label: "Copy Trading", href: "/copy-trading", icon: Copy, desc: "Follow top traders automatically" },
-      { label: "Trading Bots", href: "/trading-bots", icon: Bot, desc: "Automated trading strategies" },
+      { label: "Spot Trading", href: "/trade", icon: BarChart3, desc: "Internal-ledger orders; external exchange routing is not connected" },
+      { label: "Derivatives", href: "/derivatives", icon: TrendingUp, desc: "Derivative contracts and order routing are not configured" },
+      { label: "Copy Trading", href: "/copy-trading", icon: Copy, desc: "Verified trader data and copy execution are not connected" },
+      { label: "Trading Bots", href: "/trading-bots", icon: Bot, desc: "Trading-bot execution is not configured" },
       { label: "Convert", href: "/convert", icon: ArrowLeftRight, desc: "Instant swap between tokens" },
     ],
   },
   {
     label: "Earn", href: "/earn",
     children: [
-      { label: "Bybit Earn", href: "/earn", icon: Coins, desc: "Flexible and fixed savings" },
-      { label: "Launchpad", href: "/launchpad", icon: Rocket, desc: "Subscribe to new token launches" },
-      { label: "Launchpool", href: "/launchpool", icon: Layers, desc: "Stake to earn new tokens" },
+      { label: "Earn", href: "/earn", icon: Coins, desc: "Earn products are unavailable until a provider is integrated" },
+      { label: "Launchpad", href: "/launchpad", icon: Rocket, desc: "Launchpad participation is not available yet" },
+      { label: "Launchpool", href: "/launchpool", icon: Layers, desc: "Staking campaigns are not configured" },
     ],
   },
   {
     label: "Finance", href: "/finance",
     children: [
-      { label: "Crypto Loans", href: "/finance", icon: CircleDollarSign, desc: "Borrow against your crypto" },
-      { label: "Bybit Card", href: "/card", icon: CreditCard, desc: "Spend crypto anywhere" },
-      { label: "Institutional", href: "/institutional", icon: Building2, desc: "Solutions for institutions" },
+      { label: "Crypto Loans", href: "/finance", icon: CircleDollarSign, desc: "Loan provider and settlement are not connected" },
+      { label: "Card", href: "/card", icon: CreditCard, desc: "Card issuer and payment processing are not configured" },
+      { label: "Institutional", href: "/institutional", icon: Building2, desc: "Institutional services are not connected" },
     ],
   },
   {
     label: "Web3", href: "/web3",
     children: [
-      { label: "Web3 Wallet", href: "/web3", icon: Wallet, desc: "Non-custodial DeFi access" },
-      { label: "NFT Marketplace", href: "/nft", icon: Gem, desc: "Buy, sell, and mint NFTs" },
+      { label: "Web3 Wallet", href: "/web3", icon: Wallet, desc: "Web3 wallet connectivity is not configured" },
+      { label: "NFT Marketplace", href: "/nft", icon: Gem, desc: "NFT marketplace integration is not connected" },
     ],
   },
   {
     label: "More", href: "/about",
     children: [
-      { label: "Rewards Hub", href: "/rewards", icon: Gift, desc: "Missions, coupons, and bonuses" },
-      { label: "Referral", href: "/referral", icon: Users, desc: "Invite friends and earn" },
-      { label: "Affiliates", href: "/affiliates", icon: CircleDollarSign, desc: "Earn up to 50% commission" },
+      { label: "Rewards Hub", href: "/rewards", icon: Gift, desc: "Rewards ledger and redemption are not connected" },
+      { label: "Referral", href: "/referral", icon: Users, desc: "Referral tracking and payouts are not configured" },
+      { label: "Affiliates", href: "/affiliates", icon: CircleDollarSign, desc: "Affiliate tracking and commission payments are not configured" },
       { label: "Learn", href: "/learn", icon: BookOpen, desc: "Crypto education center" },
-      { label: "About Bybit", href: "/about", icon: Building2, desc: "Our story and mission" },
+      { label: "About ByTradeBit", href: "/about", icon: Building2, desc: "About this platform" },
     ],
   },
 ]
