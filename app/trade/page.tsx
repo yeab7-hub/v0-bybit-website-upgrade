@@ -372,14 +372,20 @@ export default function TradePage() {
           </div>
         ))}
       </div>
-      {/* Spread / Current price */}
-      <div className="flex items-center justify-between border-y border-border bg-secondary/20 px-2 py-1.5">
-        <div className="flex items-center gap-1">
-          <span className={`font-mono text-base font-bold ${change24h >= 0 ? "text-success" : "text-destructive"}`}>{fmtP(livePrice)}</span>
-          <span className="text-[9px] text-muted-foreground">{">"}</span>
+      {/* Only show a spread calculated from actual provider depth. */}
+      {asks.length > 0 && bids.length > 0 ? (
+        <div className="flex items-center justify-between border-y border-border bg-secondary/20 px-2 py-1.5">
+          <div className="flex items-center gap-1">
+            <span className={`font-mono text-base font-bold ${change24h >= 0 ? "text-success" : "text-destructive"}`}>{fmtP(livePrice)}</span>
+            <span className="text-[9px] text-muted-foreground">Live</span>
+          </div>
+          <span className="font-mono text-[10px] text-muted-foreground">Spread {fmtP(Math.max(0, asks[0].price - bids[0].price))}</span>
         </div>
-        <span className="font-mono text-[10px] text-muted-foreground">{fmtP(livePrice * 0.99999)}</span>
-      </div>
+      ) : (
+        <div role="status" className="border-y border-border bg-secondary/20 px-2 py-3 text-center text-[10px] text-muted-foreground">
+          {isCryptoPair ? "Waiting for live exchange depth…" : "Live order-book depth is not available for this instrument."}
+        </div>
+      )}
       {/* Bids (buys) */}
       <div className="flex-1 overflow-hidden">
         {bids.slice(0, 8).map((b, i) => (
@@ -390,22 +396,13 @@ export default function TradePage() {
           </div>
         ))}
       </div>
-      {/* Buy/Sell ratio bar */}
-      <div className="flex items-center overflow-hidden rounded-sm mx-1 mb-1">
-        <div className="flex items-center justify-start bg-success/15 px-1.5 py-0.5 text-[9px] font-semibold text-success" style={{ width: `${buyPct}%` }}>B {buyPct}%</div>
-        <div className="flex items-center justify-end bg-destructive/15 px-1.5 py-0.5 text-[9px] font-semibold text-destructive" style={{ width: `${sellPct}%` }}>{sellPct}% S</div>
-      </div>
-      {/* Depth grouping */}
-      <div className="flex items-center justify-end gap-1 px-2 pb-1">
-        <select className="rounded bg-secondary/40 px-1.5 py-0.5 text-[10px] text-foreground outline-none">
-          <option>0.1</option>
-          <option>1</option>
-          <option>10</option>
-        </select>
-        <button className="rounded bg-secondary/40 p-0.5">
-          <BarChart3 className="h-3 w-3 text-muted-foreground" />
-        </button>
-      </div>
+      {/* Buy/sell ratio is derived only from actual depth quantities. */}
+      {asks.length > 0 && bids.length > 0 && (
+        <div className="mx-1 mb-1 flex items-center overflow-hidden rounded-sm">
+          <div className="flex items-center justify-start bg-success/15 px-1.5 py-0.5 text-[9px] font-semibold text-success" style={{ width: `${buyPct}%` }}>B {buyPct}%</div>
+          <div className="flex items-center justify-end bg-destructive/15 px-1.5 py-0.5 text-[9px] font-semibold text-destructive" style={{ width: `${sellPct}%` }}>{sellPct}% S</div>
+        </div>
+      )}
     </div>
   )
 
