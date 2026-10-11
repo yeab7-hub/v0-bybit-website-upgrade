@@ -67,13 +67,19 @@ export async function POST(request: NextRequest) {
     if (Number(destination.min_deposit || 0) > amountNum) return NextResponse.json({ error: `Minimum deposit is ${destination.min_deposit} ${assetName}` }, { status: 400 })
 
     if (txHash) {
-      const { data: existing, error: duplicateError } = await supabase.from("transactions").select("*").eq("user_id", user.id).eq("type", "deposit").eq("asset", assetName).eq("network", networkName).eq("tx_hash", txHash).maybeSingle()
+      // A chain transaction hash must not be credited to multiple accounts.
+      // This check is network-wide, not scoped to the submitting user.
+      const { data: existing, error: duplicateError } = await supabase
+        .from("transactions")
+        .select("id")
+        .eq("type", "deposit")
+        .eq("network", networkName)
+        .eq("tx_hash", txHash)
+        .maybeSingle()
       if (duplicateError) return NextResponse.json({ error: "Could not verify transaction hash" }, { status: 503 })
       if (existing) {
         return NextResponse.json({
-          error: "A deposit request with this transaction hash already exists.",
-          existing_status: existing.status,
-          transaction_id: existing.id,
+          error: "This transaction hash is already associated with a deposit request on this network.",
         }, { status: 409 })
       }
     }
