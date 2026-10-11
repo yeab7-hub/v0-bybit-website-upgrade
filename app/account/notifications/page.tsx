@@ -95,13 +95,18 @@ export default function NotificationsPage() {
       }
     }
     void loadPreferences()
-    fetch("/api/notifications")
-      .then(r => r.json())
-      .then(d => {
-        if (d.notifications) setNotifications(d.notifications)
-        setLoadingNotifs(false)
+    fetch("/api/notifications", { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || "Could not load notifications.")
+        if (!cancelled) setNotifications(Array.isArray(data.notifications) ? data.notifications : [])
       })
-      .catch(() => setLoadingNotifs(false))
+      .catch((cause) => {
+        if (!cancelled) setNotificationError(cause instanceof Error ? cause.message : "Could not load notifications.")
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingNotifs(false)
+      })
     return () => { cancelled = true }
   }, [])
 
