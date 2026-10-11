@@ -59,3 +59,7 @@ Official reference pages:
 - Account profile no longer claims an unverified High security level or hard-codes the site as Bybit Global.
 - Email verification status now reflects the authenticated Supabase user instead of a permanent Verified badge.
 - Removed nonfunctional theme/language buttons from the account header rather than leaving dead controls.
+- Trade placement now validates TP/SL direction, rejects unsupported Futures Stop-Limit and resting orders with unpersisted TP/SL, and stores protection levels on immediately filled positions.
+- Spot inventory sales consume open Spot buy lots FIFO and remove their old TP/SL protection when fully sold; compare-and-set balance updates guard immediate settlement, pending-order reservation, and resting-order fills.
+- Trade detail P&L no longer falls back to entry price when the live quote is missing; admin-override close reasons are visible in the user's trade history and detail modal.
+- TP/SL, liquidation, and admin close paths still require end-to-end Supabase tests and a configured scheduler. Balance compensation is not a substitute for a single database transaction/RPC.
