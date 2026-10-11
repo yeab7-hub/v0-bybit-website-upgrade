@@ -98,8 +98,8 @@ export default function WalletPage() {
           >
             {userInitial}
           </Link>
-          <Link href="/dashboard" className="relative z-50 p-1 text-muted-foreground" aria-label="Add">
-            <X className="h-5 w-5 rotate-45" />
+          <Link href="/dashboard" className="relative z-50 p-1 text-muted-foreground" aria-label="Go to dashboard" title="Dashboard">
+            <Home className="h-5 w-5" />
           </Link>
         </div>
       </div>
@@ -497,7 +497,7 @@ function DepositTab({ mutTx, mutBal }: any) {
           className="w-full rounded-lg bg-[#f7a600] py-3 text-sm font-bold text-[#0a0e17] transition hover:bg-[#e09800] disabled:opacity-50">
           {submitting ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : "Submit Deposit Request"}
         </button>
-        <p className="mt-3 text-center text-[10px] text-muted-foreground">Deposits require admin approval. Usually processed within 1-24 hours.</p>
+        <p className="mt-3 text-center text-[10px] text-muted-foreground">Deposit requests require admin review. This screen does not guarantee a processing time.</p>
       </div>
     </div>
   )
