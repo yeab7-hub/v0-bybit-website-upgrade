@@ -84,7 +84,7 @@ export default function FeedPage() {
                 {/* Tags */}
                 {post.tags && post.tags.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {post.tags.map((tag, i) => (
+                    {post.tags.map((tag: any, i: number) => (
                       <span key={i} className={`text-sm font-medium ${tag.color}`}>{tag.label}</span>
                     ))}
                   </div>
@@ -122,7 +122,7 @@ export default function FeedPage() {
                 {/* Coin tags */}
                 {post.coinTags && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {post.coinTags.map((ct, i) => (
+                    {post.coinTags.map((ct: any, i: number) => (
                       <span key={i} className="rounded border border-border px-2 py-0.5 text-xs text-success">
                         {ct.symbol} {ct.change}
                       </span>
