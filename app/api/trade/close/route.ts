@@ -3,6 +3,28 @@ import { NextResponse, type NextRequest } from "next/server"
 import { getUserTakerFeeRate } from "@/lib/trading-fees"
 import { getLivePrice } from "@/lib/live-price"
 
+async function adjustAvailable(supabase: any, userId: string, asset: string, delta: number): Promise<boolean> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    let { data: balance } = await supabase.from("balances").select("*")
+      .eq("user_id", userId).eq("asset", asset).maybeSingle()
+    if (!balance) {
+      const { data: created, error } = await supabase.from("balances")
+        .insert({ user_id: userId, asset, available: 0, in_order: 0 }).select().single()
+      if (error || !created) return false
+      balance = created
+    }
+    const available = Number(balance.available) || 0
+    const next = available + delta
+    if (next < -1e-8) return false
+    const { data, error } = await supabase.from("balances").update({
+      available: Math.max(0, next), updated_at: new Date().toISOString(),
+    }).eq("user_id", userId).eq("asset", asset).eq("available", balance.available)
+      .select("asset").maybeSingle()
+    if (!error && data) return true
+  }
+  return false
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -124,72 +146,45 @@ export async function POST(request: NextRequest) {
 
   const isFuturesPosition = position.position_mode === "futures"
 
-  // Settle balances against the quote asset.
+  // Settle balances with compare-and-set updates so concurrent wallet activity
+  // cannot be overwritten by a close request.
   if (isFuturesPosition) {
-    // Futures: no base asset was ever held -- only margin (in quote asset)
-    // was locked. Credit back margin + pnl. pnl can exceed -margin only in
-    // theory; clamp at 0 as a safety net (liquidation should catch this first).
-    const margin = Number(position.margin) || 0
     // The opening fee was already debited when margin was reserved. Add it
-    // back here because pnl is net of both opening and closing fees.
+    // back because P&L is net of both opening and closing fees.
+    const margin = Number(position.margin) || 0
     const creditAmount = margin + pnl + Number(position.fee || 0)
-    const { data: qBal } = await adminSupabase
-      .from("balances").select("*")
-      .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
-    if (qBal) {
-      await adminSupabase.from("balances").update({
-        available: Math.max(0, qBal.available + creditAmount),
-        updated_at: new Date().toISOString(),
-      }).eq("user_id", position.user_id).eq("asset", quoteAsset)
-    } else {
-      await adminSupabase.from("balances").insert({
-        user_id: position.user_id, asset: quoteAsset,
-        available: Math.max(0, creditAmount), in_order: 0,
-      })
+    const credited = await adjustAvailable(adminSupabase, position.user_id, quoteAsset, creditAmount)
+    if (!credited) {
+      await adminSupabase.from("trades").update({
+        status: "open", close_price: null, closed_at: null, close_reason: null,
+        fee: Number(position.fee || 0), pnl: 0,
+      }).eq("id", tradeId).eq("status", "closed")
+      return NextResponse.json({ error: "Could not safely settle the Futures balance. The position was reopened; refresh and retry." }, { status: 409 })
     }
   } else {
-    // Spot: a LONG (buy) leg held the base asset, so release it back; a
-    // SHORT (sell) leg never applies here since spot sells settle instantly.
+    // Spot longs must still own the base asset. If another sell/withdrawal
+    // already consumed it, do not create quote funds from a duplicate close.
     if (!isShort) {
-      const { data: bBal } = await adminSupabase
-        .from("balances")
-        .select("*")
-        .eq("user_id", position.user_id)
-        .eq("asset", baseAsset)
-        .single()
-
-      if (bBal) {
-        await adminSupabase.from("balances").update({
-          available: Math.max(0, bBal.available - qty),
-          updated_at: new Date().toISOString(),
-        }).eq("user_id", position.user_id).eq("asset", baseAsset)
+      const debited = await adjustAvailable(adminSupabase, position.user_id, baseAsset, -qty)
+      if (!debited) {
+        await adminSupabase.from("trades").update({
+          close_price: null, close_reason: "position_balance_unavailable", pnl: 0,
+        }).eq("id", tradeId).eq("status", "closed")
+        return NextResponse.json({ error: "The Spot asset is no longer available to settle this position. No additional funds were credited; refresh your balances and review trade history." }, { status: 409 })
       }
     }
 
-    // Credit the quote asset with the returned margin plus realized PnL
-    // (entry notional + pnl; pnl is already direction-aware and net of fees).
-    const { data: qBal } = await adminSupabase
-      .from("balances")
-      .select("*")
-      .eq("user_id", position.user_id)
-      .eq("asset", quoteAsset)
-      .single()
-
-    // The opening fee was already charged at entry; pnl includes it for
-    // reporting, so add it back to the closing credit to avoid charging twice.
+    // Return entry notional plus realized P&L and the entry fee previously
+    // debited, so only the closing fee is deducted from proceeds.
     const creditAmount = (entryPrice * qty) + pnl + Number(position.fee || 0)
-    if (qBal) {
-      await adminSupabase.from("balances").update({
-        available: Math.max(0, qBal.available + creditAmount),
-        updated_at: new Date().toISOString(),
-      }).eq("user_id", position.user_id).eq("asset", quoteAsset)
-    } else {
-      await adminSupabase.from("balances").insert({
-        user_id: position.user_id,
-        asset: quoteAsset,
-        available: Math.max(0, creditAmount),
-        in_order: 0,
-      })
+    const credited = await adjustAvailable(adminSupabase, position.user_id, quoteAsset, creditAmount)
+    if (!credited) {
+      if (!isShort) await adjustAvailable(adminSupabase, position.user_id, baseAsset, qty)
+      await adminSupabase.from("trades").update({
+        status: "open", close_price: null, closed_at: null, close_reason: null,
+        fee: Number(position.fee || 0), pnl: 0,
+      }).eq("id", tradeId).eq("status", "closed")
+      return NextResponse.json({ error: "Could not safely settle the Spot balance. The position was reopened; refresh and retry." }, { status: 409 })
     }
   }
 
