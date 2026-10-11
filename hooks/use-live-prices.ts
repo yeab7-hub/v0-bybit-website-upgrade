@@ -94,7 +94,7 @@ export function useLivePrices(refreshInterval = 8000) {
   )
 
   // Crypto WebSocket overrides
-  const [wsOverrides, setWsOverrides] = useState<Record<string, { price: number; change24h: number; high24h?: number; low24h?: number }>>({})
+  const [wsOverrides, setWsOverrides] = useState<Record<string, { price: number; change24h: number; high24h?: number; low24h?: number; receivedAt: number }>>({})
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null)
   const mountedRef = useRef(true)
@@ -107,12 +107,13 @@ export function useLivePrices(refreshInterval = 8000) {
     }
     try {
       const streams = BINANCE_SYMBOLS.map((s) => `${s}@miniTicker`).join("/")
-      const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${streams}`)
+      const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`)
       wsRef.current = ws
 
       ws.onmessage = (event) => {
         try {
-          const msg = JSON.parse(event.data)
+          const envelope = JSON.parse(event.data)
+          const msg = envelope?.data ?? envelope
           if (msg.e !== "24hrMiniTicker") return
           const sym = msg.s?.toLowerCase()
           const mapped = SYMBOL_MAP[sym]
@@ -125,7 +126,7 @@ export function useLivePrices(refreshInterval = 8000) {
           const change24h = open > 0 ? ((price - open) / open) * 100 : 0
           setWsOverrides((prev) => ({
             ...prev,
-            [mapped]: { price, change24h, high24h: high, low24h: low },
+            [mapped]: { price, change24h, high24h: high, low24h: low, receivedAt: Date.now() },
           }))
         } catch {}
       }
@@ -155,7 +156,8 @@ export function useLivePrices(refreshInterval = 8000) {
   // Crypto: overlay WebSocket real-time prices
   const crypto = (baseData.crypto ?? []).map((coin) => {
     const override = wsOverrides[coin.symbol]
-    if (override) {
+    // Expire disconnected-stream quotes instead of displaying them indefinitely.
+    if (override && Date.now() - override.receivedAt <= 30_000) {
       return {
         ...coin,
         price: override.price,
