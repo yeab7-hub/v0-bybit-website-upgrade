@@ -3,6 +3,35 @@ import { NextResponse } from "next/server"
 import { getUserTakerFeeRate } from "@/lib/trading-fees"
 import { getLivePrice } from "@/lib/live-price"
 
+async function ensureBalance(supabase: any, userId: string, asset: string) {
+  const { data } = await supabase.from("balances").select("*").eq("user_id", userId).eq("asset", asset).maybeSingle()
+  if (data) return data
+  const { data: created } = await supabase.from("balances")
+    .insert({ user_id: userId, asset, available: 0, in_order: 0 }).select().single()
+  return created
+}
+
+async function changeBalance(supabase: any, userId: string, asset: string, availableDelta: number, inOrderDelta = 0) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const balance = await ensureBalance(supabase, userId, asset)
+    if (!balance) return false
+    const available = Number(balance.available) || 0
+    const inOrder = Number(balance.in_order) || 0
+    const nextAvailable = available + availableDelta
+    const nextInOrder = inOrder + inOrderDelta
+    if (nextAvailable < -1e-8 || nextInOrder < -1e-8) return false
+    let query = supabase.from("balances").update({
+      available: Math.max(0, nextAvailable),
+      in_order: Math.max(0, nextInOrder),
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId).eq("asset", asset).eq("available", balance.available)
+    query = balance.in_order == null ? query.is("in_order", null) : query.eq("in_order", balance.in_order)
+    const { data, error } = await query.select("asset").maybeSingle()
+    if (!error && data) return true
+  }
+  return false
+}
+
 /**
  * POST /api/trade/fill
  * Checks all open limit orders and fills them if current market price crosses the limit.
@@ -129,49 +158,47 @@ export async function POST() {
       continue
     }
 
-    // Update balances
+    // Settle both sides with compare-and-set updates so concurrent fills or
+    // wallet actions cannot overwrite newer balances.
     if (order.side === "buy") {
-      const { data: qBal } = await adminSupabase.from("balances").select("*").eq("user_id", user.id).eq("asset", quoteAsset).single()
-      if (qBal) {
-        const lockedAmount = order.price * remaining + (order.price * remaining * feeRate)
-        await adminSupabase.from("balances").update({
-          in_order: Math.max(0, (qBal.in_order || 0) - lockedAmount),
-          available: qBal.available + Math.max(0, (Number(order.price) - fillPrice) * remaining * (1 + feeRate)),
-          updated_at: new Date().toISOString()
-        }).eq("user_id", user.id).eq("asset", quoteAsset)
+      const lockedAmount = Number(order.price) * remaining * (1 + feeRate)
+      const quoteRefund = Math.max(0, (Number(order.price) - fillPrice) * remaining * (1 + feeRate))
+      const quoteUpdated = await changeBalance(adminSupabase, user.id, quoteAsset, quoteRefund, -lockedAmount)
+      if (!quoteUpdated) {
+        await adminSupabase.from("trades").delete().eq("order_id", order.id).eq("user_id", user.id).eq("price", fillPrice)
+        await adminSupabase.from("orders").update({
+          status: order.status, filled: order.filled, updated_at: new Date().toISOString(),
+        }).eq("id", order.id).eq("user_id", user.id).eq("status", "filled")
+        continue
       }
 
-      const { data: bBal } = await adminSupabase.from("balances").select("*").eq("user_id", user.id).eq("asset", baseAsset).single()
-      if (bBal) {
-        await adminSupabase.from("balances").update({
-          available: bBal.available + remaining,
-          updated_at: new Date().toISOString()
-        }).eq("user_id", user.id).eq("asset", baseAsset)
-      } else {
-        await adminSupabase.from("balances").insert({ user_id: user.id, asset: baseAsset, available: remaining, in_order: 0 })
+      const baseUpdated = await changeBalance(adminSupabase, user.id, baseAsset, remaining)
+      if (!baseUpdated) {
+        await changeBalance(adminSupabase, user.id, quoteAsset, -quoteRefund, lockedAmount)
+        await adminSupabase.from("trades").delete().eq("order_id", order.id).eq("user_id", user.id).eq("price", fillPrice)
+        await adminSupabase.from("orders").update({
+          status: order.status, filled: order.filled, updated_at: new Date().toISOString(),
+        }).eq("id", order.id).eq("user_id", user.id).eq("status", "filled")
+        continue
       }
     } else {
-      const { data: bBal } = await adminSupabase.from("balances").select("*").eq("user_id", user.id).eq("asset", baseAsset).single()
-      if (bBal) {
-        await adminSupabase.from("balances").update({
-          in_order: Math.max(0, (bBal.in_order || 0) - remaining),
-          updated_at: new Date().toISOString()
-        }).eq("user_id", user.id).eq("asset", baseAsset)
+      const baseUpdated = await changeBalance(adminSupabase, user.id, baseAsset, 0, -remaining)
+      if (!baseUpdated) {
+        await adminSupabase.from("trades").delete().eq("order_id", order.id).eq("user_id", user.id).eq("price", fillPrice)
+        await adminSupabase.from("orders").update({
+          status: order.status, filled: order.filled, updated_at: new Date().toISOString(),
+        }).eq("id", order.id).eq("user_id", user.id).eq("status", "filled")
+        continue
       }
 
-      const { data: qBal } = await adminSupabase.from("balances").select("*").eq("user_id", user.id).eq("asset", quoteAsset).single()
-      if (qBal) {
-        await adminSupabase.from("balances").update({
-          available: qBal.available + total - fee,
-          updated_at: new Date().toISOString()
-        }).eq("user_id", user.id).eq("asset", quoteAsset)
-      } else {
-        await adminSupabase.from("balances").insert({
-          user_id: user.id,
-          asset: quoteAsset,
-          available: Math.max(0, total - fee),
-          in_order: 0,
-        })
+      const quoteUpdated = await changeBalance(adminSupabase, user.id, quoteAsset, total - fee)
+      if (!quoteUpdated) {
+        await changeBalance(adminSupabase, user.id, baseAsset, 0, remaining)
+        await adminSupabase.from("trades").delete().eq("order_id", order.id).eq("user_id", user.id).eq("price", fillPrice)
+        await adminSupabase.from("orders").update({
+          status: order.status, filled: order.filled, updated_at: new Date().toISOString(),
+        }).eq("id", order.id).eq("user_id", user.id).eq("status", "filled")
+        continue
       }
     }
 
