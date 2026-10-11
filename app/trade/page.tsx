@@ -304,7 +304,7 @@ export default function TradePage() {
 
   const handleShare = async (detail: any) => {
     const pnl = Number(detail.pnl) || 0
-    const text = `${detail.pair} | ${detail.side?.toUpperCase()} | ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT\nPrice: $${Number(detail.price).toLocaleString()} | Qty: ${Number(detail.amount).toFixed(4)}\nTraded on Bybit`
+    const text = `${detail.pair} | ${detail.side?.toUpperCase()} | ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT\nPrice: $${Number(detail.price).toLocaleString()} | Qty: ${Number(detail.amount).toFixed(4)}\nTraded on this platform`
     if (navigator.share) {
       try { await navigator.share({ title: "My Trade", text }) } catch {}
     } else {
@@ -312,32 +312,30 @@ export default function TradePage() {
     }
   }
 
-  // Order book data via Binance WebSocket
+  // Only render depth received from an actual provider feed. Do not synthesize
+  // order-book quantities for asset classes without a connected depth source.
   const [asks, setAsks] = useState<{ price: number; qty: number }[]>([])
   const [bids, setBids] = useState<{ price: number; qty: number }[]>([])
 
   useEffect(() => {
-    if (!isCryptoPair) {
-      if (livePrice > 0) {
-        const a = Array.from({ length: 10 }, (_, i) => ({ price: livePrice + (i + 1) * livePrice * 0.0001, qty: Math.random() * 5 }))
-        const b = Array.from({ length: 10 }, (_, i) => ({ price: livePrice - (i + 1) * livePrice * 0.0001, qty: Math.random() * 5 }))
-        setAsks(a); setBids(b)
-      }
-      return
-    }
+    setAsks([])
+    setBids([])
+    if (!isCryptoPair) return
+
     const pair = selectedPair.toLowerCase()
     const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${pair}@depth20@1000ms`)
     ws.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data)
-        if (d.asks && d.bids) {
-          setAsks(d.asks.slice(0, 10).map((a: [string, string]) => ({ price: parseFloat(a[0]), qty: parseFloat(a[1]) })))
-          setBids(d.bids.slice(0, 10).map((b: [string, string]) => ({ price: parseFloat(b[0]), qty: parseFloat(b[1]) })))
+        if (Array.isArray(d.asks) && Array.isArray(d.bids)) {
+          setAsks(d.asks.slice(0, 10).map((a: [string, string]) => ({ price: Number(a[0]), qty: Number(a[1]) })).filter((a: {price:number;qty:number}) => Number.isFinite(a.price) && Number.isFinite(a.qty) && a.price > 0 && a.qty >= 0))
+          setBids(d.bids.slice(0, 10).map((b: [string, string]) => ({ price: Number(b[0]), qty: Number(b[1]) })).filter((b: {price:number;qty:number}) => Number.isFinite(b.price) && Number.isFinite(b.qty) && b.price > 0 && b.qty >= 0))
         }
-      } catch { /* ignore */ }
+      } catch { /* Ignore malformed provider messages. */ }
     }
+    ws.onerror = () => { setAsks([]); setBids([]) }
     return () => ws.close()
-  }, [selectedPair, isCryptoPair, livePrice])
+  }, [selectedPair, isCryptoPair])
 
   const maxQty = Math.max(...asks.map((a) => a.qty), ...bids.map((b) => b.qty), 0.01)
   const buyRatio = bids.reduce((s, b) => s + b.qty, 0)
