@@ -377,25 +377,63 @@ export async function POST(request: NextRequest) {
 
     if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 })
 
-    // Calculate P&L from the actual entry/exit prices. Administrative
-    // overrides are handled at position close and must not silently alter
-    // entry-time balances or P&L.
+    // Realized Spot P&L is calculated only from tracked, still-open Spot
+    // buy lots. Consume lots FIFO so sold inventory cannot remain protected by
+    // stale TP/SL positions. Untracked/deposited inventory has no invented cost basis.
+    type ConsumedLot = {
+      id: string; originalAmount: number; originalTotal: number; price: number
+      originalFee: number; consumedAmount: number; consumedFee: number
+      takeProfit: number | null; stopLoss: number | null
+      closePrice: number | null; closedAt: string | null; closeReason: string | null
+      pnl: number; applied: boolean
+    }
+    const consumedLots: ConsumedLot[] = []
     let pnl = 0
     if (side === "sell") {
-      const { data: prevBuys } = await adminSupabase
+      const { data: openBuys } = await adminSupabase
         .from("trades")
-        .select("price, amount")
+        .select("id, price, amount, total, fee, take_profit, stop_loss, close_price, closed_at, close_reason, pnl, position_mode")
         .eq("user_id", user.id)
         .eq("pair", pair)
         .eq("side", "buy")
-        .order("created_at", { ascending: false })
-        .limit(5)
+        .eq("status", "open")
+        .order("created_at", { ascending: true })
 
-      if (prevBuys && prevBuys.length > 0) {
-        const avgBuyPrice = prevBuys.reduce((s, b) => s + Number(b.price) * Number(b.amount), 0) /
-          prevBuys.reduce((s, b) => s + Number(b.amount), 0)
-        pnl = (execPrice - avgBuyPrice) * amount - fee
+      let remainingToMatch = amount
+      let matchedAmount = 0
+      let costBasis = 0
+      let entryFees = 0
+      for (const lot of (openBuys ?? []).filter((item: any) => item.position_mode !== "futures")) {
+        if (remainingToMatch <= 1e-10) break
+        const originalAmount = Number(lot.amount)
+        const lotPrice = Number(lot.price)
+        if (!(originalAmount > 0) || !(lotPrice > 0)) continue
+        const consumedAmount = Math.min(originalAmount, remainingToMatch)
+        const originalFee = Number(lot.fee) || 0
+        const consumedFee = originalFee * (consumedAmount / originalAmount)
+        consumedLots.push({
+          id: lot.id,
+          originalAmount,
+          originalTotal: Number(lot.total) || originalAmount * lotPrice,
+          price: lotPrice,
+          originalFee,
+          consumedAmount,
+          consumedFee,
+          takeProfit: lot.take_profit == null ? null : Number(lot.take_profit),
+          stopLoss: lot.stop_loss == null ? null : Number(lot.stop_loss),
+          closePrice: lot.close_price == null ? null : Number(lot.close_price),
+          closedAt: lot.closed_at ?? null,
+          closeReason: lot.close_reason ?? null,
+          pnl: Number(lot.pnl) || 0,
+          applied: false,
+        })
+        matchedAmount += consumedAmount
+        costBasis += consumedAmount * lotPrice
+        entryFees += consumedFee
+        remainingToMatch -= consumedAmount
       }
+      const allocatedExitFee = amount > 0 ? fee * (matchedAmount / amount) : 0
+      pnl = (execPrice * matchedAmount - costBasis) - entryFees - allocatedExitFee
     }
 
     // Persist TP/SL in the position row itself so the monitor never has
@@ -415,12 +453,68 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Could not record this trade; no balance was changed." }, { status: 500 })
     }
 
+    // Update the consumed Spot lots with compare-and-set guards. Keep enough
+    // original data to restore them if balance settlement later fails.
+    async function rollbackConsumedLots() {
+      for (const lot of consumedLots) {
+        if (!lot.applied) continue
+        await adminSupabase.from("trades").update({
+          status: "open",
+          amount: lot.originalAmount,
+          total: lot.originalTotal,
+          fee: lot.originalFee,
+          take_profit: lot.takeProfit,
+          stop_loss: lot.stopLoss,
+          close_price: lot.closePrice,
+          closed_at: lot.closedAt,
+          close_reason: lot.closeReason,
+          pnl: lot.pnl,
+        }).eq("id", lot.id).eq("user_id", user.id)
+      }
+    }
+
+    for (const lot of consumedLots) {
+      const remainingLotAmount = Math.max(0, lot.originalAmount - lot.consumedAmount)
+      const fullyConsumed = remainingLotAmount <= 1e-10
+      const update = fullyConsumed
+        ? {
+            status: "closed",
+            close_price: execPrice,
+            closed_at: new Date().toISOString(),
+            close_reason: "spot_sell",
+            take_profit: null,
+            stop_loss: null,
+            pnl: 0,
+          }
+        : {
+            amount: remainingLotAmount,
+            total: remainingLotAmount * lot.price,
+            fee: Math.max(0, lot.originalFee - lot.consumedFee),
+          }
+      const { data: updatedLot, error: lotError } = await adminSupabase.from("trades")
+        .update(update)
+        .eq("id", lot.id)
+        .eq("user_id", user.id)
+        .eq("status", "open")
+        .eq("amount", lot.originalAmount)
+        .select("id")
+        .maybeSingle()
+      if (lotError || !updatedLot) {
+        await rollbackConsumedLots()
+        await adminSupabase.from("trades").delete().eq("id", insertedTrade.id).eq("user_id", user.id)
+        await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
+        return NextResponse.json({ error: "Spot inventory changed during this sell. No funds were settled; refresh and retry." }, { status: 409 })
+      }
+      lot.applied = true
+    }
+
     // Compare-and-set debit first, then credit the other asset. If either
     // ledger update fails, compensate and remove the uncommitted records.
     const debitAsset = side === "buy" ? quoteAsset : baseAsset
     const debitAmount = side === "buy" ? total + fee : amount
     const debit = await changeBalance(adminSupabase, user.id, debitAsset, -debitAmount)
     if (!debit.ok) {
+      await rollbackConsumedLots()
       await adminSupabase.from("trades").delete().eq("id", insertedTrade.id).eq("user_id", user.id)
       await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
       return NextResponse.json({
@@ -435,6 +529,7 @@ export async function POST(request: NextRequest) {
     const credit = await changeBalance(adminSupabase, user.id, creditAsset, creditAmount)
     if (!credit.ok) {
       await changeBalance(adminSupabase, user.id, debitAsset, debitAmount)
+      await rollbackConsumedLots()
       await adminSupabase.from("trades").delete().eq("id", insertedTrade.id).eq("user_id", user.id)
       await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
       return NextResponse.json({ error: "Balance settlement failed and was rolled back. Please refresh before retrying." }, { status: 500 })
