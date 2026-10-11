@@ -111,7 +111,6 @@ export function HomeLoggedIn({ user }: { user: User }) {
     const quote = safeFindPrice(allPrices, balance.asset)
     return !quote || !Number.isFinite(quote.price) || quote.price <= 0
   }).length, [balanceRows, crypto, forex, commodities, stocks, cfd])
-  const todayPnlPercent = totalAssets > 0 && unpricedAssetCount === 0 ? (dailyTradePnl / totalAssets) * 100 : null
 
   const tabs: { key: MarketTab; label: string }[] = [
     { key: "favorites", label: "Favorites" },
@@ -200,9 +199,9 @@ export function HomeLoggedIn({ user }: { user: User }) {
               </span>
             </div>
             <div className="mt-1 flex items-center gap-1">
-              <span className="text-sm text-muted-foreground">{"Today's Trade P&L"}</span>
+              <span className="text-sm text-muted-foreground">{"Today's Realized P&L"}</span>
               <span className={`text-sm font-medium ${dailyTradePnl >= 0 ? "text-success" : "text-destructive"}`}>
-                {showBalance ? `${dailyTradePnl >= 0 ? "+" : ""}${dailyTradePnl.toFixed(2)} USD(${todayPnlPercent === null ? "—" : `${todayPnlPercent >= 0 ? "+" : ""}${todayPnlPercent.toFixed(2)}%`})` : "****"}
+                {showBalance ? `${dailyTradePnl >= 0 ? "+" : ""}${dailyTradePnl.toFixed(2)} USD` : "****"}
               </span>
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
             </div>
