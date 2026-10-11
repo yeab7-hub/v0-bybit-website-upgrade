@@ -163,7 +163,7 @@ export default function TradePage() {
     if (orders.length === 0) return
     const checkFills = async () => {
       try {
-        const res = await fetch("/api/trade/fill")
+        const res = await fetch("/api/trade/fill", { method: "POST" })
         const data = await res.json()
         if (data.filled > 0) {
           globalMutate("/api/trade?type=orders")
@@ -183,7 +183,7 @@ export default function TradePage() {
     if (positions.length === 0) return
     const checkTpSl = async () => {
       try {
-        const res = await fetch("/api/trade/monitor")
+        const res = await fetch("/api/trade/monitor", { method: "POST" })
         const data = await res.json()
         if (data.closed > 0) {
           globalMutate("/api/trade?type=positions")
