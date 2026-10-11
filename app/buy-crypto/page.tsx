@@ -67,7 +67,7 @@ export default function BuyCryptoPage() {
               {/* Left - Text */}
               <div className="flex-1 lg:py-8">
                 <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground lg:text-5xl">
-                  Buy Crypto Instantly
+                  Buy Crypto
                 </h1>
                 <p className="mt-4 max-w-lg text-pretty text-lg text-muted-foreground">
                   Preview an indicative USD-to-crypto amount when a current provider quote is available. Payment processing is not connected, so purchases cannot be completed yet.
