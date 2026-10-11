@@ -63,7 +63,11 @@ export default function MarketsPage() {
       }
     } catch { /* Keep the default list if browser storage is unavailable. */ }
     const syncFromOtherTab = (event: StorageEvent) => {
-      if (event.key !== "trading-platform-watchlist-v1" || !event.newValue) return
+      if (event.key !== "trading-platform-watchlist-v1") return
+      if (event.newValue === null) {
+        setFavorites(new Set())
+        return
+      }
       try {
         const parsed: unknown = JSON.parse(event.newValue)
         if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) setFavorites(new Set(parsed))
