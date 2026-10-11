@@ -1,6 +1,3 @@
-"use client"
-
-import { useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Shield } from "lucide-react"
@@ -13,11 +10,11 @@ const currencies = ["USD", "EUR", "GBP", "CAD", "AUD", "NGN", "INR"]
 const merchants: { name: string; orders: number; completion: number; rating: number; price: number; minMax: string; methods: string[]; available: string; online: boolean; verified: boolean }[] = []
 
 export default function P2PPage() {
-  const [tab, setTab] = useState<"buy" | "sell">("buy")
-  const [crypto, setCrypto] = useState("BTC")
-  const [fiat, setFiat] = useState("USD")
-  const [payment, setPayment] = useState("All")
-  const [amount, setAmount] = useState("")
+  const tab = "buy"
+  const crypto = "BTC"
+  const fiat = "USD"
+  const payment = "All"
+  const amount = ""
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
