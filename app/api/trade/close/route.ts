@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
   const override = overrides?.find((o: any) => o.pair === position.pair) ||
                    overrides?.find((o: any) => !o.pair) || null
   const explicitOutcome = outcome === "normal" ? null : outcome === "force_win" ? "win" : outcome === "force_loss" ? "loss" : null
-  const forcedResult = triggeredExitReason
+  const forcedResult = triggeredExitReason || outcome === "normal"
     ? null
     : explicitOutcome ?? override?.forced_result ?? null
 
