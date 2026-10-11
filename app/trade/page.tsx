@@ -835,6 +835,13 @@ export default function TradePage() {
                           {t.close_price && <span>{"=>"} ${Number(t.close_price).toLocaleString()}</span>}
                           <span>{Number(t.amount).toFixed(4)}</span>
                         </div>
+                        {t.close_reason && (
+                          <div className={`mt-0.5 text-[9px] font-medium uppercase ${String(t.close_reason).startsWith("admin_override_") ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                            {String(t.close_reason).startsWith("admin_override_")
+                              ? `Admin override: ${String(t.close_reason).replace("admin_override_", "")}`
+                              : String(t.close_reason).replace(/_/g, " ")}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
