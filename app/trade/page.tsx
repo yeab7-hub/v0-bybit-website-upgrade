@@ -269,14 +269,11 @@ export default function TradePage() {
   const closePosition = async (tradeId: string, pair?: string) => {
     setClosingId(tradeId)
     try {
-      // Use the live price currently shown on screen for this asset as the exit
-      // price, so the trade settles at the value the user sees rather than a
-      // stale server re-fetch. The backend validates this against its own feed.
-      const closePrice = pair ? safeFindPrice(allPrices, pair)?.price : undefined
+      // The server determines the settlement price from its verified market feed.
       const res = await fetch("/api/trade/close", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tradeId, closePrice }),
+        body: JSON.stringify({ tradeId }),
       })
       const data = await res.json()
       if (data.success) {
