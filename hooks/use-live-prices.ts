@@ -67,7 +67,6 @@ const restFetcher = async (url: string) => {
   if (!json || typeof json !== "object") throw new Error("Market data response was invalid")
   const collections = [json.crypto, json.forex, json.commodities, json.stocks, json.cfd]
   if (!collections.every(Array.isArray)) throw new Error("Market data response is missing an asset collection")
-  if (!collections.some((items: unknown[]) => items.length > 0)) throw new Error("No live market data is currently available")
   return json
 }
 
@@ -151,7 +150,9 @@ export function useLivePrices(refreshInterval = 8000) {
   }, [connectWebSocket])
 
   // Merge everything
-  const baseData = restData || INITIAL_DATA
+  // Do not keep rendering the last successful REST snapshot forever after a provider outage.
+  const restIsFresh = Boolean(restData?.timestamp && Date.now() - restData.timestamp <= 30_000)
+  const baseData = restData && restIsFresh ? restData : INITIAL_DATA
 
   // Crypto: overlay WebSocket real-time prices
   const crypto = (baseData.crypto ?? []).map((coin) => {
