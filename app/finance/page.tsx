@@ -13,58 +13,58 @@ const services = [
   {
     icon: CreditCard,
     title: "Crypto Loans",
-    desc: "Borrow against your crypto assets without selling. Get instant liquidity with competitive interest rates starting from 2.9% APR.",
-    stats: "From 2.9% APR",
+    desc: "Lending provider, collateral custody, interest calculation, and repayment workflows are not connected.",
+    stats: "Not configured",
     color: "text-primary bg-primary/10",
     features: ["No credit check", "Instant approval", "Flexible repayment"],
   },
   {
     icon: PiggyBank,
     title: "Dual Investment",
-    desc: "Commit to buy low or sell high on a specific date. Earn enhanced yields regardless of the market direction.",
-    stats: "Up to 200% APY",
+    desc: "Dual-investment products, settlement rules, and yield calculations are not connected.",
+    stats: "Unavailable",
     color: "text-success bg-success/10",
     features: ["Enhanced yield", "Buy low strategy", "Sell high strategy"],
   },
   {
     icon: BarChart3,
     title: "Structured Products",
-    desc: "Access sophisticated financial instruments tailored for crypto markets. Principal-protected and yield-enhanced products available.",
-    stats: "Capital protected",
+    desc: "Structured-product issuers, risk disclosures, and settlement integrations are not configured.",
+    stats: "Not configured",
     color: "text-chart-4 bg-chart-4/10",
     features: ["Principal protection", "Custom strategies", "Auto-execute"],
   },
   {
     icon: Coins,
     title: "Launchpool",
-    desc: "Stake your tokens to farm new project tokens before they are listed. Early access to the most promising projects.",
-    stats: "Free token farming",
+    desc: "Launchpool campaign data, staking custody, and reward settlement are not connected.",
+    stats: "Unavailable",
     color: "text-chart-5 bg-chart-5/10",
     features: ["Zero cost", "Early access", "Stake & earn"],
   },
   {
     icon: Building2,
     title: "OTC Trading",
-    desc: "Execute large trades privately without impacting the market. Dedicated account managers for institutions and high-net-worth individuals.",
-    stats: "From $100K",
+    desc: "OTC liquidity, broker execution, settlement, and institutional onboarding are not configured.",
+    stats: "Not configured",
     color: "text-primary bg-primary/10",
     features: ["Deep liquidity", "Competitive pricing", "24/7 desk"],
   },
   {
     icon: Globe,
     title: "Crypto Card",
-    desc: "Spend your crypto anywhere with the Bybit Visa card. Earn cashback on every purchase and manage everything from the app.",
-    stats: "Up to 5% cashback",
+    desc: "Card issuer, payment network, custody, and cashback integrations are not configured.",
+    stats: "Unavailable",
     color: "text-success bg-success/10",
     features: ["Global acceptance", "Cashback rewards", "No annual fee"],
   },
 ]
 
 const stats = [
-  { label: "Assets Under Management", value: "$12.8B" },
-  { label: "Active Financial Products", value: "45+" },
-  { label: "Institutional Clients", value: "850+" },
-  { label: "Countries Supported", value: "170+" },
+  { label: "Assets under management", value: "Not connected" },
+  { label: "Active products", value: "Not configured" },
+  { label: "Institutional clients", value: "Unavailable" },
+  { label: "Supported countries", value: "Not configured" },
 ]
 
 export default function FinancePage() {
@@ -83,8 +83,7 @@ export default function FinancePage() {
                 Crypto Financial Services
               </h1>
               <p className="mt-4 text-pretty text-lg text-muted-foreground">
-                Access a complete suite of financial products designed for the digital asset economy.
-                From lending and borrowing to structured products and OTC trading.
+                Financial product integrations are not connected. This page does not offer lending, yield, OTC, card, or launchpool services yet.
               </p>
               <div className="mt-8 flex items-center justify-center gap-3">
                 <Link href="/register">
@@ -119,7 +118,7 @@ export default function FinancePage() {
           <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6">
             <div className="mb-10 text-center">
               <h2 className="text-3xl font-bold text-foreground">Financial Products</h2>
-              <p className="mt-2 text-muted-foreground">Everything you need to grow your portfolio</p>
+              <p className="mt-2 text-muted-foreground">Products will be enabled only after provider, custody, risk, and settlement integrations are verified.</p>
             </div>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {services.map((s) => (
@@ -129,7 +128,7 @@ export default function FinancePage() {
                   </div>
                   <h3 className="text-lg font-bold text-foreground">{s.title}</h3>
                   <p className="mt-2 text-sm text-muted-foreground">{s.desc}</p>
-                  <div className="mt-4 inline-flex rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+                  <div className="mt-4 inline-flex rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
                     {s.stats}
                   </div>
                   <ul className="mt-4 space-y-2">
@@ -150,18 +149,12 @@ export default function FinancePage() {
           <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6">
             <div className="rounded-2xl border border-border bg-card p-10 text-center lg:p-16">
               <Shield className="mx-auto mb-4 h-12 w-12 text-primary" />
-              <h2 className="text-3xl font-bold text-foreground">Trusted by Institutions Worldwide</h2>
+              <h2 className="text-3xl font-bold text-foreground">Financial Services Integration Status</h2>
               <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-                Our financial products are built with institutional-grade security, regulatory compliance,
-                and transparent risk management. Assets are protected by multi-signature wallets,
-                insurance coverage, and 24/7 monitoring.
+                Institutional custody, insurance, compliance certifications, and financial product operations have not been verified or connected in this project. Do not deposit funds expecting these services.
               </p>
               <div className="mt-8 flex items-center justify-center gap-3">
-                <Link href="/register">
-                  <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                    Open Account <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
+                <Button disabled title="Financial product integrations are not configured" size="lg">Financial products unavailable</Button>
               </div>
             </div>
           </div>
