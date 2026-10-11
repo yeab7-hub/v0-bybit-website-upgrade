@@ -14,7 +14,7 @@ import {
 import { BottomNav } from "@/components/bottom-nav"
 
 type AssetClass = "crypto" | "forex" | "commodities" | "stocks" | "cfd"
-type MarketCategory = "all" | "spot" | "derivatives" | "defi" | "metaverse" | "layer1" | "layer2" | "meme"
+type MarketCategory = "all" | "defi" | "metaverse" | "layer1" | "layer2" | "meme"
 type SortKey = "name" | "price" | "change" | "volume" | "marketCap"
 type SortDir = "asc" | "desc"
 
@@ -28,8 +28,6 @@ const assetClassTabs: { id: AssetClass; label: string }[] = [
 
 const categoryFilters: { id: MarketCategory; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "spot", label: "Spot" },
-  { id: "derivatives", label: "Derivatives" },
   { id: "defi", label: "DeFi" },
   { id: "layer1", label: "Layer 1" },
   { id: "layer2", label: "Layer 2" },
@@ -47,7 +45,7 @@ const categoryMap: Record<string, MarketCategory[]> = {
 }
 
 export default function MarketsPage() {
-  const { crypto, forex, commodities, stocks, cfd, isLoading } = useLivePrices(5000)
+  const { crypto, forex, commodities, stocks, cfd, isLoading, isError, data: priceFeed } = useLivePrices(5000)
   const [search, setSearch] = useState("")
   const [assetClass, setAssetClass] = useState<AssetClass>("crypto")
   const [category, setCategory] = useState<MarketCategory>("all")
@@ -114,7 +112,7 @@ export default function MarketsPage() {
       const q = search.toLowerCase()
       list = list.filter((c) => c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q))
     }
-    if (assetClass === "crypto" && category !== "all" && category !== "spot" && category !== "derivatives") {
+    if (assetClass === "crypto" && category !== "all") {
       list = list.filter((c) => categoryMap[c.symbol]?.includes(category))
     }
     list.sort((a, b) => {
@@ -134,7 +132,7 @@ export default function MarketsPage() {
   const topGainers = useMemo(() => [...currentAssets].sort((a, b) => b.change24h - a.change24h).slice(0, 5), [currentAssets])
   const topLosers = useMemo(() => [...currentAssets].sort((a, b) => a.change24h - b.change24h).slice(0, 5), [currentAssets])
   const hotCoins = useMemo(() => [...currentAssets].sort((a, b) => (b.volume * b.price) - (a.volume * a.price)).slice(0, 5), [currentAssets])
-  const newListings = useMemo(() => [...currentAssets].slice(-5).reverse(), [currentAssets])
+  const moreMarkets = useMemo(() => [...currentAssets].sort((a, b) => a.symbol.localeCompare(b.symbol)).slice(0, 5), [currentAssets])
 
   const SortIcon = ({ field }: { field: SortKey }) => (
     <ArrowUpDown className={`h-3 w-3 ${sortKey === field ? "text-primary" : "text-muted-foreground/40"}`} />
@@ -144,6 +142,16 @@ export default function MarketsPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <MarketTicker />
+      <div className="border-b border-border bg-card/50">
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-1 px-4 py-2 text-[11px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span role="status">
+            {isLoading ? "Loading provider market data…" : isError ? "Market data provider request failed; unavailable quotes are not replaced with estimates." : `Crypto feed: ${priceFeed?.source || "provider data"}`}
+          </span>
+          <span>
+            FX uses Frankfurter daily reference rates; stocks, commodities and indices may be delayed. {priceFeed?.timestamp ? `Last API response: ${new Date(priceFeed.timestamp).toLocaleTimeString()}` : ""}
+          </span>
+        </div>
+      </div>
       <main>
         {/* Hero */}
         <section className="border-b border-border">
@@ -245,11 +253,11 @@ export default function MarketsPage() {
               <div className="rounded-xl border border-border bg-card p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-chart-4" />
-                  <span className="text-sm font-semibold text-foreground">New Listings</span>
+                  <span className="text-sm font-semibold text-foreground">More Markets</span>
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </div>
-                {newListings.length === 0 && <p className="py-2 text-xs text-muted-foreground">Live market data unavailable.</p>}
-                {newListings.slice(0, 3).map((c) => (
+                {moreMarkets.length === 0 && <p className="py-2 text-xs text-muted-foreground">Live market data unavailable.</p>}
+                {moreMarkets.slice(0, 3).map((c) => (
                   <Link key={c.symbol} href={c.category === "crypto" ? `/trade?pair=${c.symbol}USDT` : `/trade?pair=${encodeURIComponent(c.symbol)}`} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
                       <MarketAsset symbol={c.symbol} size={20} />
