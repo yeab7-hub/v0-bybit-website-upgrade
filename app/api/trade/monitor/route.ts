@@ -148,7 +148,9 @@ export async function POST() {
     // credit back margin + pnl. Spot: a LONG leg held the base asset.
     if (isFuturesPosition) {
       const margin = Number(position.margin) || 0
-      const creditAmount = margin + pnl
+      // The opening fee was already debited when margin was reserved. Add it
+    // back here because pnl is net of both opening and closing fees.
+    const creditAmount = margin + pnl + Number(position.fee || 0)
       const { data: qBal } = await adminSupabase
         .from("balances").select("*")
         .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
@@ -176,7 +178,9 @@ export async function POST() {
         }
       }
 
-      const creditAmount = (entryPrice * qty) + pnl
+      // The opening fee was already charged at entry; pnl includes it for
+    // reporting, so add it back to the closing credit to avoid charging twice.
+    const creditAmount = (entryPrice * qty) + pnl + Number(position.fee || 0)
       const { data: qBal } = await adminSupabase
         .from("balances").select("*")
         .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
