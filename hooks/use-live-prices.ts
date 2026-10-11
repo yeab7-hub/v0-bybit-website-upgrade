@@ -64,6 +64,9 @@ const restFetcher = async (url: string) => {
   if (!res.ok) throw new Error("Market data provider returned HTTP " + res.status)
   const json = await res.json()
   if (!json || typeof json !== "object") throw new Error("Market data response was invalid")
+  const collections = [json.crypto, json.forex, json.commodities, json.stocks, json.cfd]
+  if (!collections.every(Array.isArray)) throw new Error("Market data response is missing an asset collection")
+  if (!collections.some((items: unknown[]) => items.length > 0)) throw new Error("No live market data is currently available")
   return json
 }
 
@@ -245,14 +248,14 @@ export function findPrice(allPrices: PriceData[], pair: string): PriceData | nul
    Price fields are zeroed; this map only guards symbol/category resolution.
    ================================================================ */
 export const NON_CRYPTO_BASE: Record<string, { price: number; category: string; name: string }> = {
-  // Commodities (fallback -- real prices from metals.live API)
+  // Commodities symbol classification only; price is always zero until provider data arrives.
   "XAU/USD": { price: 0, category: "commodity", name: "Gold" },
   "XAG/USD": { price: 0, category: "commodity", name: "Silver" },
   "WTI": { price: 0, category: "commodity", name: "Crude Oil WTI" },
   "BRENT": { price: 0, category: "commodity", name: "Brent Crude" },
   "NG": { price: 0, category: "commodity", name: "Natural Gas" },
   "HG": { price: 0, category: "commodity", name: "Copper" },
-  // Forex (fallback -- real prices from Frankfurter API)
+  // Forex symbol classification only; price is always zero until provider data arrives.
   "EUR/USD": { price: 0, category: "forex", name: "EUR/USD" },
   "GBP/USD": { price: 0, category: "forex", name: "GBP/USD" },
   "USD/JPY": { price: 0, category: "forex", name: "USD/JPY" },
@@ -260,7 +263,7 @@ export const NON_CRYPTO_BASE: Record<string, { price: number; category: string; 
   "USD/CHF": { price: 0, category: "forex", name: "USD/CHF" },
   "USD/CAD": { price: 0, category: "forex", name: "USD/CAD" },
   "NZD/USD": { price: 0, category: "forex", name: "NZD/USD" },
-  // Stocks (fallback -- real prices from Yahoo Finance)
+  // Stock symbol classification only; price is always zero until provider data arrives.
   "AAPL": { price: 0, category: "stock", name: "Apple Inc." },
   "MSFT": { price: 0, category: "stock", name: "Microsoft" },
   "GOOGL": { price: 0, category: "stock", name: "Alphabet" },
@@ -268,7 +271,7 @@ export const NON_CRYPTO_BASE: Record<string, { price: number; category: string; 
   "TSLA": { price: 0, category: "stock", name: "Tesla" },
   "NVDA": { price: 0, category: "stock", name: "NVIDIA" },
   "META": { price: 0, category: "stock", name: "Meta Platforms" },
-  // CFDs / Indices (fallback -- real prices from Yahoo Finance)
+  // CFD symbol classification only; price is always zero until provider data arrives.
   "US30": { price: 0, category: "cfd", name: "US Wall St 30" },
   "US500": { price: 0, category: "cfd", name: "US 500" },
   "US100": { price: 0, category: "cfd", name: "US Tech 100" },
