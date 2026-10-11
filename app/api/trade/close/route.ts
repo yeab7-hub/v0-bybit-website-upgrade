@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
 
   const adminSupabase = await createAdminClient()
   const body = await request.json()
-  const { tradeId, outcome, closePrice: clientClosePrice } = body
+  const { tradeId, outcome } = body
   if (!tradeId) return NextResponse.json({ error: "Trade ID required" }, { status: 400 })
 
   let isAdmin = false
@@ -31,25 +31,11 @@ export async function POST(request: NextRequest) {
   const quoteAsset = position.pair.split("/")[1] || "USDT"
   const serverPrice = await getLivePrice(baseAsset, position.pair)
 
-  // Prefer the live price the user actually saw on screen (passed as closePrice)
-  // so a winning trade closed on an uptrend settles at the on-screen value rather
-  // than a slightly stale server re-fetch. We still validate it server-side: the
-  // client price is only trusted when it is within 5% of the server's live price
-  // (guards against spoofed payloads). If the server has no price, we trust the
-  // client value; if neither is available, we cannot close.
-  const clientPrice = Number(clientClosePrice)
-  const hasClient = Number.isFinite(clientPrice) && clientPrice > 0
-  let currentPrice = serverPrice
-  if (hasClient) {
-    if (serverPrice > 0) {
-      const deviation = Math.abs(clientPrice - serverPrice) / serverPrice
-      currentPrice = deviation <= 0.05 ? clientPrice : serverPrice
-    } else {
-      currentPrice = clientPrice
-    }
-  }
+  // Settlement prices must come from the server's verified provider quote.
+  // Never trust a client-supplied close price, especially when the feed is down.
+  const currentPrice = serverPrice
 
-  if (currentPrice <= 0) {
+  if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
     return NextResponse.json({ error: "Could not fetch market price" }, { status: 500 })
   }
 
@@ -86,20 +72,29 @@ export async function POST(request: NextRequest) {
     const forcedAmount = entryTotal * 0.05 * mult
     pnl = forcedResult === "win" ? Math.abs(forcedAmount) : -Math.abs(forcedAmount)
     pnlPercent = forcedResult === "win" ? Math.abs(5 * mult) : -Math.abs(5 * mult)
-    if (override?.id) await adminSupabase.from("trade_overrides").update({ active: false, used_at: new Date().toISOString() }).eq("id", override.id).eq("active", true)
   }
 
 
-  // Close the SINGLE existing position leg. We do NOT insert a second trade row —
-  // that caused double logging in Trade History. The original leg keeps its
-  // opening side and is stamped with the exit price and realized PnL.
-  await adminSupabase.from("trades").update({
+  // Claim the open position with a compare-and-set update so simultaneous
+  // close requests cannot settle the same position twice.
+  const { data: closedPosition, error: closeError } = await adminSupabase.from("trades").update({
     status: "closed",
     close_price: currentPrice,
     closed_at: new Date().toISOString(),
     fee: Number(position.fee || 0) + fee,
     pnl,
-  }).eq("id", tradeId)
+  }).eq("id", tradeId).eq("user_id", position.user_id).eq("status", "open").select("id").maybeSingle()
+
+  if (closeError || !closedPosition) {
+    return NextResponse.json({ error: "This position was already closed or could not be claimed. Refresh and try again." }, { status: 409 })
+  }
+
+  // Consume an override only after this request has successfully claimed the position.
+  if (forcedResult === "win" || forcedResult === "loss") {
+    if (override?.id) {
+      await adminSupabase.from("trade_overrides").update({ active: false, used_at: new Date().toISOString() }).eq("id", override.id).eq("active", true)
+    }
+  }
 
   const isFuturesPosition = position.position_mode === "futures"
 
