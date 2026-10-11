@@ -46,6 +46,15 @@ Official reference pages:
 6. Do not mutate the production Supabase schema/data or merge this branch into main without explicit authorization.
 7. Test mobile and desktop layouts, keyboard access, loading/error/empty states, authorization failures, and real backend success paths for every interactive control.
 
+## Trading execution caveats and required deployment setup
+
+- The current trade API uses the platform's internal Supabase balance/order ledger and public market quotes. It is **not an externally routed real-money broker/exchange execution adapter**. Do not describe an internal ledger fill as a live broker execution.
+- TP/SL and liquidation checks run when the trading page is open unless a trusted scheduler is configured. The monitor endpoint supports scheduler authentication with `Authorization: Bearer <CRON_SECRET>`; set a strong `CRON_SECRET` in the deployment environment and call `POST /api/trade/monitor` on a short interval using a scheduler supported by the deployment plan. Without this setup, do not claim offline protection is active.
+- The monitor settles exits at the observed market quote when a threshold is detected; stop orders can slip through the trigger during fast markets. It does not guarantee the exact TP/SL trigger price.
+- TP/SL is stored on immediately filled positions. TP/SL on resting orders is rejected rather than silently discarded. Futures Stop-Limit is also rejected until its own margin-reserving trigger/matching lifecycle is implemented.
+- Administrative forced outcomes remain available through the existing admin override path, but the close response and trade close reason disclose when an admin override changed the market-based P&L. A TP/SL threshold already crossed takes precedence over a forced outcome.
+- Before any production real-money launch, replace the internal matching/settlement path with an audited transactional ledger or database RPC, exchange/broker adapters, idempotent execution/reconciliation, risk checks, market-specific precision/fees, and sandbox/live end-to-end tests.
+
 ## Work started in this pass
 - Account profile no longer claims an unverified High security level or hard-codes the site as Bybit Global.
 - Email verification status now reflects the authenticated Supabase user instead of a permanent Verified badge.
