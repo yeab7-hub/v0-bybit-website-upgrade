@@ -8,8 +8,7 @@ import { getLivePrice } from "@/lib/live-price"
  * POST /api/trade/monitor
  * Scans the user's OPEN positions and auto-closes any whose live market price
  * has crossed its Take Profit or Stop Loss threshold. Closure settles at the
- * TP/SL target price (not the momentary market price) so the realized outcome
- * matches the user's configured level. Direction-aware:
+ * observed market quote; a fast market can gap through a trigger. Direction-aware:
  *   LONG  (side buy) : TP when price >= take_profit, SL when price <= stop_loss
  *   SHORT (side sell): TP when price <= take_profit, SL when price >= stop_loss
  *
@@ -26,6 +25,28 @@ async function getPrice(pair: string, cache: { internal?: any }): Promise<number
   const price = await getLivePrice(baseAsset, pair)
   cache.internal[pair] = price
   return price
+}
+
+async function adjustAvailable(supabase: any, userId: string, asset: string, delta: number): Promise<boolean> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    let { data: balance } = await supabase.from("balances").select("*")
+      .eq("user_id", userId).eq("asset", asset).maybeSingle()
+    if (!balance) {
+      const { data: created, error } = await supabase.from("balances")
+        .insert({ user_id: userId, asset, available: 0, in_order: 0 }).select().single()
+      if (error || !created) return false
+      balance = created
+    }
+    const available = Number(balance.available) || 0
+    const next = available + delta
+    if (next < -1e-8) return false
+    const { data, error } = await supabase.from("balances").update({
+      available: Math.max(0, next), updated_at: new Date().toISOString(),
+    }).eq("user_id", userId).eq("asset", asset).eq("available", balance.available)
+      .select("asset").maybeSingle()
+    if (!error && data) return true
+  }
+  return false
 }
 
 export async function POST(request: NextRequest) {
@@ -177,36 +198,37 @@ export async function POST(request: NextRequest) {
         })
       }
     } else {
+      // A Spot long must still own the base asset before its position can be
+      // settled. This prevents a prior manual sell from being auto-closed a
+      // second time and crediting quote funds twice.
       if (!isShort) {
-        const { data: bBal } = await adminSupabase
-          .from("balances").select("*")
-          .eq("user_id", position.user_id).eq("asset", baseAsset).single()
-        if (bBal) {
-          await adminSupabase.from("balances").update({
-            available: Math.max(0, bBal.available - qty),
-            updated_at: new Date().toISOString(),
-          }).eq("user_id", position.user_id).eq("asset", baseAsset)
+        const baseDebited = await adjustAvailable(adminSupabase, position.user_id, baseAsset, -qty)
+        if (!baseDebited) {
+          await adminSupabase.from("trades").update({
+            close_price: null,
+            close_reason: "position_balance_unavailable",
+            pnl: 0,
+          }).eq("id", position.id).eq("status", "closed")
+          closedCount++
+          continue
         }
       }
 
-      // The opening fee was already charged at entry; pnl includes it for
-    // reporting, so add it back to the closing credit to avoid charging twice.
-    const creditAmount = (entryPrice * qty) + pnl + Number(position.fee || 0)
-      const { data: qBal } = await adminSupabase
-        .from("balances").select("*")
-        .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
-      if (qBal) {
-        await adminSupabase.from("balances").update({
-          available: Math.max(0, qBal.available + creditAmount),
-          updated_at: new Date().toISOString(),
-        }).eq("user_id", position.user_id).eq("asset", quoteAsset)
-      } else {
-        await adminSupabase.from("balances").insert({
-          user_id: position.user_id,
-          asset: quoteAsset,
-          available: Math.max(0, creditAmount),
-          in_order: 0,
-        })
+      // Opening fee was charged at entry and is included in P&L reporting, so
+      // add it back to the returned entry notional to avoid charging twice.
+      const creditAmount = (entryPrice * qty) + pnl + Number(position.fee || 0)
+      const quoteCredited = await adjustAvailable(adminSupabase, position.user_id, quoteAsset, creditAmount)
+      if (!quoteCredited) {
+        if (!isShort) await adjustAvailable(adminSupabase, position.user_id, baseAsset, qty)
+        await adminSupabase.from("trades").update({
+          status: "open",
+          close_price: null,
+          closed_at: null,
+          close_reason: null,
+          fee: Number(position.fee || 0),
+          pnl: 0,
+        }).eq("id", position.id).eq("status", "closed")
+        continue
       }
     }
 
