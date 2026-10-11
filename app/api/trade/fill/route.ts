@@ -4,11 +4,11 @@ import { getUserTakerFeeRate } from "@/lib/trading-fees"
 import { getLivePrice } from "@/lib/live-price"
 
 /**
- * GET /api/trade/fill
+ * POST /api/trade/fill
  * Checks all open limit orders and fills them if current market price crosses the limit.
  * Called by the OpenOrders component every 8s to simulate a matching engine.
  */
-export async function GET() {
+export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
