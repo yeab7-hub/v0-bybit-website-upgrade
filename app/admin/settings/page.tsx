@@ -110,7 +110,7 @@ function AdminManagement() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+    <div className="rounded-xl border border-border bg-card p-6">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f7a600]/10">
           <Shield className="h-5 w-5 text-[#f7a600]" />
@@ -130,7 +130,7 @@ function AdminManagement() {
           {admins.length === 0 ? (
             <p className="text-sm text-muted-foreground">No admins found</p>
           ) : admins.map((a: any) => (
-            <div key={a.id} className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div key={a.id} className="flex items-center justify-between rounded-lg border border-border bg-secondary/20 px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7a600]/10 text-xs font-bold text-[#f7a600]">
                   {(a.full_name || a.email)?.[0]?.toUpperCase() || "A"}
@@ -155,7 +155,7 @@ function AdminManagement() {
         <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
           <UserPlus className="h-4 w-4 text-green-400" /> Promote User to Admin
         </h3>
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex gap-3">
           <div className="flex flex-1 items-center rounded-lg border border-border bg-background px-3 py-2.5 focus-within:border-[#f7a600]/50">
             <input type="email" value={promoteEmail} onChange={(e) => setPromoteEmail(e.target.value)}
               placeholder="user@example.com" className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
@@ -176,7 +176,7 @@ function AdminManagement() {
         <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
           <Lock className="h-4 w-4 text-muted-foreground" /> Change My Password
         </h3>
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex gap-3">
           <div className="flex flex-1 items-center rounded-lg border border-border bg-background px-3 py-2.5 focus-within:border-[#f7a600]/50">
             <input type={showPw ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
               placeholder="New password (min 6 characters)" className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
@@ -200,7 +200,7 @@ function AdminManagement() {
         <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
           <Mail className="h-4 w-4 text-muted-foreground" /> Change My Email
         </h3>
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex gap-3">
           <div className="flex flex-1 items-center rounded-lg border border-border bg-background px-3 py-2.5 focus-within:border-[#f7a600]/50">
             <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
               placeholder="new-admin@example.com" className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
@@ -264,7 +264,7 @@ function WalletAddressManager() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+    <div className="rounded-xl border border-border bg-card p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f7a600]/10">
@@ -393,14 +393,8 @@ function WalletAddressManager() {
 
 /* ===== Platform Settings ===== */
 function PlatformSettings() {
-  const settings = [
-    { icon: Key, title: "Require KYC for Trading", desc: "Users must complete KYC before placing orders" },
-    { icon: Bell, title: "Email Notifications", desc: "Send email alerts for new KYC submissions" },
-    { icon: Globe, title: "Maintenance Mode", desc: "Temporarily disable the platform for all users" },
-  ]
-
   return (
-    <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+    <div className="rounded-xl border border-border bg-card p-6">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Settings className="h-5 w-5 text-primary" /></div>
         <div>
@@ -408,20 +402,23 @@ function PlatformSettings() {
           <p className="text-xs text-muted-foreground">General configuration options</p>
         </div>
       </div>
-      <div role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">
-        These settings are not connected to persisted platform configuration yet. They are disabled so the interface does not imply a change has been saved when it has not.
-      </div>
-      <div className="mt-4 flex flex-col gap-3">
-        {settings.map((setting) => (
-          <div key={setting.title} className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <setting.icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">{setting.title}</p>
-                <p className="text-xs text-muted-foreground">{setting.desc}</p>
+      <div className="mt-4 flex flex-col gap-4">
+        {[
+          { icon: Key, title: "Require KYC for Trading", desc: "Users must complete KYC before placing orders", on: true },
+          { icon: Bell, title: "Email Notifications", desc: "Send email alerts for new KYC submissions", on: true },
+          { icon: Globe, title: "Maintenance Mode", desc: "Temporarily disable the platform for all users", on: false },
+        ].map((s) => (
+          <div key={s.title} className="flex items-center justify-between rounded-lg border border-border bg-secondary/20 p-4">
+            <div className="flex items-center gap-3">
+              <s.icon className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium text-foreground">{s.title}</p>
+                <p className="text-xs text-muted-foreground">{s.desc}</p>
               </div>
             </div>
-            <span className="w-fit shrink-0 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">Not configured</span>
+            <button className={`relative h-6 w-11 rounded-full transition-colors ${s.on ? "bg-primary" : "bg-secondary"}`}>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full transition-transform ${s.on ? "right-0.5 bg-primary-foreground" : "left-0.5 bg-muted-foreground"}`} />
+            </button>
           </div>
         ))}
       </div>
