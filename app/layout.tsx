@@ -16,9 +16,9 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Bybit - Crypto Exchange & Trading Platform",
+  title: "BYBIT | Crypto Trading Platform",
   description:
-    "Trade Bitcoin, Ethereum, and 500+ cryptocurrencies on the world's leading exchange. Spot, derivatives, and copy trading with institutional-grade security.",
+    "BYBIT crypto trading platform for exploring markets, spot trading, derivatives, and portfolio tools.",
 }
 
 export const viewport: Viewport = {
