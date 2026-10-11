@@ -6,25 +6,8 @@ import { Footer } from "@/components/footer"
 import { Search, Heart, Eye, Filter, Grid3X3, LayoutGrid, TrendingUp, Clock, Diamond } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-const collections = [
-  { name: "Pudgy Penguins", floor: "12.4 ETH", volume24h: "892 ETH", change: "+15.2%", items: "8,888", owners: "4,521", image: "PP" },
-  { name: "Bored Ape YC", floor: "28.5 ETH", volume24h: "1,240 ETH", change: "-2.1%", items: "10,000", owners: "6,400", image: "BA" },
-  { name: "Azuki", floor: "8.2 ETH", volume24h: "456 ETH", change: "+8.7%", items: "10,000", owners: "5,200", image: "AZ" },
-  { name: "DeGods", floor: "5.8 ETH", volume24h: "234 ETH", change: "+22.3%", items: "10,000", owners: "4,800", image: "DG" },
-  { name: "Milady Maker", floor: "4.1 ETH", volume24h: "189 ETH", change: "+5.4%", items: "10,000", owners: "3,900", image: "MM" },
-  { name: "Doodles", floor: "3.2 ETH", volume24h: "145 ETH", change: "-1.8%", items: "10,000", owners: "5,100", image: "DO" },
-]
-
-const featuredNFTs = [
-  { name: "Penguin #4521", collection: "Pudgy Penguins", price: "14.2 ETH", lastSale: "12.8 ETH", likes: 245, views: 1200, rarity: "Legendary" },
-  { name: "Ape #8832", collection: "Bored Ape YC", price: "32.0 ETH", lastSale: "29.5 ETH", likes: 890, views: 4500, rarity: "Epic" },
-  { name: "Azuki #1205", collection: "Azuki", price: "9.8 ETH", lastSale: "8.0 ETH", likes: 456, views: 2100, rarity: "Rare" },
-  { name: "DeGod #7721", collection: "DeGods", price: "6.5 ETH", lastSale: "5.2 ETH", likes: 312, views: 1800, rarity: "Uncommon" },
-  { name: "Milady #3301", collection: "Milady Maker", price: "5.0 ETH", lastSale: "4.5 ETH", likes: 198, views: 950, rarity: "Rare" },
-  { name: "Doodle #6600", collection: "Doodles", price: "3.8 ETH", lastSale: "3.5 ETH", likes: 567, views: 2800, rarity: "Epic" },
-  { name: "Penguin #2200", collection: "Pudgy Penguins", price: "15.5 ETH", lastSale: "13.0 ETH", likes: 334, views: 1600, rarity: "Legendary" },
-  { name: "Ape #1100", collection: "Bored Ape YC", price: "35.0 ETH", lastSale: "30.0 ETH", likes: 1200, views: 6000, rarity: "Legendary" },
-]
+const collections: { name: string; floor: string; volume24h: string; change: string; items: string; owners: string; image: string }[] = []
+const featuredNFTs: { name: string; collection: string; price: string; lastSale: string; likes: number; views: number; rarity: string }[] = []
 
 const categories = ["All", "Art", "PFP", "Gaming", "Photography", "Music", "Utility"]
 const rarityColors: Record<string, string> = { Legendary: "text-primary bg-primary/10", Epic: "text-purple-400 bg-purple-400/10", Rare: "text-blue-400 bg-blue-400/10", Uncommon: "text-green-400 bg-green-400/10" }
@@ -56,6 +39,10 @@ export default function NFTPage() {
           </div>
         </div>
 
+        <section role="status" className="border-b border-amber-500/20 bg-amber-500/5 px-4 py-3 text-center text-sm text-muted-foreground">
+          NFT marketplace data, wallet connectivity, listing, and purchase settlement are not integrated. No NFT prices or trading actions are available here.
+        </section>
+
         <div className="mx-auto max-w-[1400px] px-4 py-6">
           {/* Tabs */}
           <div className="mb-6 flex items-center justify-between border-b border-border">
@@ -79,7 +66,9 @@ export default function NFTPage() {
 
           {tab === "explore" && (
             <div className={`grid gap-4 ${viewMode === "grid" ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 lg:grid-cols-2"}`}>
-              {featuredNFTs.map((nft, i) => (
+              {featuredNFTs.length === 0 ? (
+                <p className="col-span-full rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No verified NFT listings are available because a marketplace data source is not connected.</p>
+              ) : featuredNFTs.map((nft, i) => (
                 <div key={i} className="group cursor-pointer overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-primary/30 hover:shadow-lg">
                   <div className="relative aspect-square bg-gradient-to-br from-secondary to-secondary/50 flex items-center justify-center">
                     <span className="text-4xl font-bold text-muted-foreground/30">{nft.collection.charAt(0)}</span>
@@ -104,7 +93,9 @@ export default function NFTPage() {
 
           {tab === "collections" && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {collections.map((c, i) => (
+              {collections.length === 0 ? (
+                <p className="col-span-full rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No verified collection data is available.</p>
+              ) : collections.map((c, i) => (
                 <div key={i} className="cursor-pointer rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/30">
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">{c.image}</div>
@@ -125,7 +116,9 @@ export default function NFTPage() {
               <table className="w-full"><thead><tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="pb-3 font-medium">#</th><th className="pb-3 font-medium">Collection</th><th className="pb-3 font-medium">Floor</th><th className="pb-3 font-medium">24h Volume</th><th className="pb-3 font-medium">24h Change</th><th className="pb-3 font-medium">Items</th><th className="pb-3 font-medium">Owners</th>
               </tr></thead><tbody>
-                {collections.map((c, i) => (
+                {collections.length === 0 ? (
+                  <tr><td colSpan={7} className="py-8 text-center text-sm text-muted-foreground">No verified NFT ranking data is available.</td></tr>
+                ) : collections.map((c, i) => (
                   <tr key={i} className="border-b border-border hover:bg-secondary/30 cursor-pointer">
                     <td className="py-3 text-sm text-muted-foreground">{i + 1}</td>
                     <td className="py-3"><div className="flex items-center gap-2"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">{c.image}</div><span className="text-sm font-medium text-foreground">{c.name}</span></div></td>
