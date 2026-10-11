@@ -105,7 +105,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
   const tabs: { key: MarketTab; label: string }[] = [
     { key: "favorites", label: "Favorites" },
     { key: "hot", label: "Hot" },
-    { key: "new", label: "New" },
+    { key: "new", label: "All" },
     { key: "gainers", label: "Gainers" },
     { key: "losers", label: "Losers" },
     { key: "turnover", label: "Turnover" },
@@ -134,7 +134,7 @@ export function HomeLoggedIn({ user }: { user: User }) {
       case "gainers": return coins.sort((a, b) => b.change24h - a.change24h).slice(0, 10)
       case "losers": return coins.sort((a, b) => a.change24h - b.change24h).slice(0, 10)
       case "turnover": return coins.sort((a, b) => (b.volume || 0) - (a.volume || 0)).slice(0, 10)
-      case "new": return coins.slice(0, 8)
+      case "new": return coins.slice(0, 10)
       default: return coins.slice(0, 10)
     }
   }
