@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
+    .limit(200)
 
   if (type) query = query.eq("type", type)
   if (status) query = query.eq("status", status)
