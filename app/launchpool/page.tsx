@@ -7,23 +7,13 @@ import { Clock, TrendingUp, Users, Coins, Lock, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
-const activeProjects = [
-  { name: "PYTH", fullName: "Pyth Network", pool: "BTC Pool", totalStaked: "1,245 BTC", apr: "12.5%", duration: "30 Days", participants: 8420, earned: "245,000 PYTH", endsIn: "15d 8h", status: "active" },
-  { name: "JTO", fullName: "Jito", pool: "ETH Pool", totalStaked: "24,500 ETH", apr: "18.2%", duration: "21 Days", participants: 12300, earned: "180,000 JTO", endsIn: "8d 12h", status: "active" },
-  { name: "WLD", fullName: "Worldcoin", pool: "USDT Pool", totalStaked: "45,000,000 USDT", apr: "25.0%", duration: "14 Days", participants: 25600, earned: "500,000 WLD", endsIn: "3d 4h", status: "active" },
-]
+type ActiveProject = { name: string; fullName: string; pool: string; totalStaked: string; apr: string; duration: string; participants: number; earned: string; endsIn: string; status: string }
+type UpcomingProject = { name: string; fullName: string; pool: string; totalRewards: string; duration: string; startsIn: string }
+type PastProject = { name: string; fullName: string; pool: string; totalStaked: string; apr: string; participants: number; status: string }
 
-const upcomingProjects = [
-  { name: "STRK", fullName: "StarkNet", pool: "BTC Pool", totalRewards: "2,000,000 STRK", duration: "30 Days", startsIn: "5 days" },
-  { name: "DYM", fullName: "Dymension", pool: "ETH Pool", totalRewards: "5,000,000 DYM", duration: "21 Days", startsIn: "12 days" },
-]
-
-const pastProjects = [
-  { name: "TIA", fullName: "Celestia", pool: "BTC Pool", totalStaked: "890 BTC", apr: "15.0%", participants: 6200, status: "ended" },
-  { name: "SEI", fullName: "Sei Network", pool: "USDT Pool", totalStaked: "32,000,000 USDT", apr: "22.0%", participants: 18900, status: "ended" },
-  { name: "MANTA", fullName: "Manta Network", pool: "ETH Pool", totalStaked: "18,000 ETH", apr: "20.5%", participants: 9800, status: "ended" },
-  { name: "ARB", fullName: "Arbitrum", pool: "BTC Pool", totalStaked: "1,500 BTC", apr: "14.0%", participants: 15400, status: "ended" },
-]
+const activeProjects: ActiveProject[] = []
+const upcomingProjects: UpcomingProject[] = []
+const pastProjects: PastProject[] = []
 
 export default function LaunchpoolPage() {
   const [tab, setTab] = useState<"active" | "upcoming" | "past">("active")
@@ -36,9 +26,9 @@ export default function LaunchpoolPage() {
         <div className="border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
           <div className="mx-auto max-w-[1400px] px-4 py-10 lg:py-14">
             <h1 className="text-2xl font-bold text-foreground lg:text-3xl">Launchpool</h1>
-            <p className="mt-2 max-w-lg text-sm text-muted-foreground">Stake BTC, ETH, or USDT to farm new tokens before they list. No impermanent loss.</p>
+            <p className="mt-2 max-w-lg text-sm text-muted-foreground">Campaign data, staking custody, reward accounting, and withdrawals are not connected. No staking campaign is currently available.</p>
             <div className="mt-6 flex gap-6">
-              {[{ label: "Active Projects", value: "3" }, { label: "Total Value Locked", value: "$2.8B" }, { label: "Tokens Distributed", value: "24" }].map(s => (
+              {[{ label: "Active Projects", value: String(activeProjects.length) }, { label: "Total Value Locked", value: "Not connected" }, { label: "Tokens Distributed", value: "Not connected" }].map(s => (
                 <div key={s.label}>
                   <div className="text-lg font-bold text-primary">{s.value}</div>
                   <div className="text-xs text-muted-foreground">{s.label}</div>
@@ -46,6 +36,10 @@ export default function LaunchpoolPage() {
               ))}
             </div>
           </div>
+        </div>
+
+        <div role="status" className="border-b border-amber-500/20 bg-amber-500/5 px-4 py-3 text-center text-sm text-muted-foreground">
+          Launchpool is unavailable until campaign data, staking custody, reward settlement, and withdrawal flows are implemented and tested.
         </div>
 
         <div className="mx-auto max-w-[1400px] px-4 py-6">
@@ -61,6 +55,7 @@ export default function LaunchpoolPage() {
           {/* Active */}
           {tab === "active" && (
             <div className="grid gap-4 lg:grid-cols-3">
+              {activeProjects.length === 0 && <p className="col-span-full rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">No verified active staking campaigns are configured.</p>}
               {activeProjects.map((p, i) => (
                 <div key={i} className="rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/30">
                   <div className="flex items-center justify-between">
@@ -104,6 +99,7 @@ export default function LaunchpoolPage() {
           {/* Upcoming */}
           {tab === "upcoming" && (
             <div className="grid gap-4 lg:grid-cols-2">
+              {upcomingProjects.length === 0 && <p className="col-span-full rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">No verified upcoming campaigns are configured.</p>}
               {upcomingProjects.map((p, i) => (
                 <div key={i} className="rounded-xl border border-dashed border-primary/30 bg-card p-5">
                   <div className="flex items-center justify-between">
@@ -144,6 +140,7 @@ export default function LaunchpoolPage() {
                       <td className="py-3 text-xs text-foreground">{p.participants.toLocaleString()}</td>
                     </tr>
                   ))}
+                  {pastProjects.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-sm text-muted-foreground">No verified past campaign records are available.</td></tr>}
                 </tbody>
               </table>
             </div>
