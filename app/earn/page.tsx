@@ -17,9 +17,9 @@ type ProductTab = "steady" | "topGains" | "vip"
 const earnProducts: { coin: string; name: string; products: { type: string; term: string; apr: string }[] }[] = []
 
 export default function EarnPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [category] = useState<EarnCategory>("easy")
-  const [productTab] = useState<ProductTab>("steady")
+  const searchQuery = ""
+  const category: EarnCategory = "easy"
+  const productTab: ProductTab = "steady"
   const [expandedCoin, setExpandedCoin] = useState<string | null>("BTC")
 
   const filteredProducts = searchQuery
@@ -49,7 +49,6 @@ export default function EarnPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
               disabled
               placeholder="Search unavailable until Earn is connected"
               className="w-full rounded-lg border border-border bg-secondary/40 py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#f7a600] focus:outline-none"
@@ -179,7 +178,6 @@ export default function EarnPage() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
                   disabled
                   placeholder="Search unavailable until Earn is connected"
                   className="rounded-lg border border-border bg-secondary/40 py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#f7a600] focus:outline-none"
