@@ -48,7 +48,7 @@ export default function BuyCryptoPage() {
   const cryptos = useMemo(() => {
     return defaultCryptos.map((c) => {
       const live = livePrices.find((p) => p.symbol === c.symbol)
-      return { ...c, price: c.symbol === "USDT" ? 1 : (live?.price ?? 0) }
+      return { ...c, price: live?.price ?? 0 }
     })
   }, [livePrices])
 
