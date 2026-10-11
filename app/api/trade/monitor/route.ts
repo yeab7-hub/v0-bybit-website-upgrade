@@ -1,5 +1,5 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { getUserTakerFeeRate } from "@/lib/trading-fees"
 import { elapsedFundingIntervals, calcFundingFee } from "@/lib/futures"
 import { getLivePrice } from "@/lib/live-price"
@@ -28,18 +28,29 @@ async function getPrice(pair: string, cache: { internal?: any }): Promise<number
   return price
 }
 
-export async function POST() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export async function POST(request: NextRequest) {
+  // The route can be called by the signed-in user's trade page, or by a
+  // trusted scheduler using CRON_SECRET. The scheduler mode is needed so
+  // protection orders can be checked even when the trader is offline.
+  const cronSecret = process.env.CRON_SECRET
+  const isCron = Boolean(cronSecret && request.headers.get("authorization") === `Bearer ${cronSecret}`)
+  let userId: string | null = null
+
+  if (!isCron) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    userId = user.id
+  }
 
   const adminSupabase = await createAdminClient()
 
-  const { data: positions, error } = await adminSupabase
+  let positionsQuery = adminSupabase
     .from("trades")
     .select("*")
-    .eq("user_id", user.id)
     .eq("status", "open")
+  if (!isCron && userId) positionsQuery = positionsQuery.eq("user_id", userId)
+  const { data: positions, error } = await positionsQuery
 
   // If the TP/SL columns are missing (not migrated), or no positions, nothing to do.
   if (error || !positions || positions.length === 0) {
