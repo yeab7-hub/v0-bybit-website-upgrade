@@ -1067,7 +1067,11 @@ export default function TradePage() {
                       valueClass={detailPnl === null ? "text-muted-foreground" : detailPnl >= 0 ? "text-success" : "text-destructive"}
                     />
                   ) : selectedDetail.pnl !== undefined ? (
-                    <DetailCell label="P&L" value={`${detailPnl >= 0 ? "+" : ""}${detailPnl.toFixed(2)} USDT`} valueClass={detailPnl >= 0 ? "text-success" : "text-destructive"} />
+                    <DetailCell
+                      label="P&L"
+                      value={`${(Number(selectedDetail.pnl) || 0) >= 0 ? "+" : ""}${(Number(selectedDetail.pnl) || 0).toFixed(2)} USDT`}
+                      valueClass={(Number(selectedDetail.pnl) || 0) >= 0 ? "text-success" : "text-destructive"}
+                    />
                   ) : null}
                 </div>
               )
