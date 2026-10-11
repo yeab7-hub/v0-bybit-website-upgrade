@@ -7,35 +7,15 @@ import { Copy, Check, Users, DollarSign, Gift, Share2, Trophy, ArrowRight, QrCod
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
-const leaderboard = [
-  { rank: 1, name: "Crypto***ter", referrals: 1248, earned: "$45,200" },
-  { rank: 2, name: "Trad***Pro", referrals: 892, earned: "$32,100" },
-  { rank: 3, name: "Moon***Boy", referrals: 756, earned: "$28,500" },
-  { rank: 4, name: "DeFi***King", referrals: 621, earned: "$22,800" },
-  { rank: 5, name: "Whal***Aler", referrals: 543, earned: "$19,400" },
-]
-
-const tiers = [
-  { level: "Bronze", referrals: "0-9", commission: "20%", bonus: "$0" },
-  { level: "Silver", referrals: "10-49", commission: "25%", bonus: "$50" },
-  { level: "Gold", referrals: "50-199", commission: "30%", bonus: "$200" },
-  { level: "Platinum", referrals: "200-999", commission: "35%", bonus: "$1,000" },
-  { level: "Diamond", referrals: "1000+", commission: "40%", bonus: "$5,000" },
-]
-
-const history = [
-  { user: "user***42", date: "Feb 15, 2024", status: "Active", traded: "Yes", commission: "$12.50" },
-  { user: "cryp***88", date: "Feb 14, 2024", status: "Active", traded: "Yes", commission: "$8.20" },
-  { user: "new_***er", date: "Feb 13, 2024", status: "Pending", traded: "No", commission: "$0.00" },
-  { user: "trad***55", date: "Feb 12, 2024", status: "Active", traded: "Yes", commission: "$25.00" },
-  { user: "hold***99", date: "Feb 10, 2024", status: "Active", traded: "Yes", commission: "$15.80" },
-]
+const leaderboard: any[] = []
+const tiers: any[] = []
+const history: any[] = []
 
 export default function ReferralPage() {
   const [copied, setCopied] = useState(false)
   const [tab, setTab] = useState<"overview" | "history" | "leaderboard">("overview")
-  const referralCode = "BYBIT-X8K2M"
-  const referralLink = "https://www.bybit.com/register?ref=X8K2M"
+  const referralCode = ""
+  const referralLink = ""
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -51,39 +31,40 @@ export default function ReferralPage() {
         <div className="border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
           <div className="mx-auto max-w-[1400px] px-4 py-10 lg:py-14">
             <h1 className="text-2xl font-bold text-foreground lg:text-3xl">Refer Friends, Earn Crypto</h1>
-            <p className="mt-2 max-w-lg text-sm text-muted-foreground">Invite friends and earn up to 40% commission on their trading fees. Unlimited referrals, unlimited earnings.</p>
+            <p className="mt-2 max-w-lg text-sm text-muted-foreground">Referral attribution, commission rules, and payout accounting are not configured. No referral code or commission is active.</p>
             <div className="mt-6 grid grid-cols-3 gap-6 lg:max-w-lg">
-              <div><div className="text-2xl font-bold text-primary">$1,245</div><div className="text-xs text-muted-foreground">Total Earned</div></div>
-              <div><div className="text-2xl font-bold text-foreground">28</div><div className="text-xs text-muted-foreground">Total Referrals</div></div>
-              <div><div className="text-2xl font-bold text-[#0ecb81]">25%</div><div className="text-xs text-muted-foreground">Commission Rate</div></div>
+              <div><div className="text-2xl font-bold text-primary">Unavailable</div><div className="text-xs text-muted-foreground">Total Earned</div></div>
+              <div><div className="text-2xl font-bold text-foreground">Not connected</div><div className="text-xs text-muted-foreground">Total Referrals</div></div>
+              <div><div className="text-2xl font-bold text-[#0ecb81]">Not configured</div><div className="text-xs text-muted-foreground">Commission Rate</div></div>
             </div>
           </div>
         </div>
 
+        <div role="status" className="mx-auto mt-4 max-w-[1400px] rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">Referral links, commissions, referral history, and payouts are disabled until a verified referral service and ledger are implemented.</div>
         <div className="mx-auto max-w-[1400px] px-4 py-6">
           {/* Referral link box */}
           <div className="mb-8 rounded-xl border border-primary/20 bg-card p-5 lg:p-6">
             <h2 className="mb-4 text-sm font-semibold text-foreground">Your Referral Link</h2>
             <div className="flex flex-col gap-3 lg:flex-row">
               <div className="flex flex-1 items-center gap-2 rounded-lg bg-secondary px-4 py-3">
-                <code className="flex-1 truncate font-mono text-sm text-foreground">{referralLink}</code>
-                <button onClick={() => handleCopy(referralLink)} className="shrink-0 text-muted-foreground hover:text-foreground">
+                <code className="flex-1 truncate font-mono text-sm text-muted-foreground">Referral link not configured</code>
+                <button disabled title="Referral tracking is not configured" className="shrink-0 text-muted-foreground hover:text-foreground">
                   {copied ? <Check className="h-4 w-4 text-[#0ecb81]" /> : <Copy className="h-4 w-4" />}
                 </button>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" className="bg-primary text-xs font-semibold text-primary-foreground hover:bg-primary/90"><Share2 className="mr-1 h-3.5 w-3.5" /> Share</Button>
-                <Button size="sm" variant="outline" className="text-xs border-border text-foreground"><QrCode className="mr-1 h-3.5 w-3.5" /> QR Code</Button>
+                <Button disabled title="Referral tracking is not configured" size="sm"><Share2 className="mr-1 h-3.5 w-3.5" /> Share unavailable</Button>
+                <Button disabled title="Referral tracking is not configured" size="sm" variant="outline" className="text-xs border-border text-foreground"><QrCode className="mr-1 h-3.5 w-3.5" /> QR unavailable</Button>
               </div>
             </div>
             <div className="mt-3 flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Referral Code:</span>
               <code className="rounded bg-secondary px-2 py-0.5 font-mono text-xs font-medium text-primary">{referralCode}</code>
-              <button onClick={() => handleCopy(referralCode)} className="text-muted-foreground hover:text-foreground"><Copy className="h-3 w-3" /></button>
+              <button disabled title="Referral tracking is not configured" className="text-muted-foreground hover:text-foreground"><Copy className="h-3 w-3" /></button>
             </div>
             <div className="mt-4 flex gap-2">
-              <button className="flex items-center gap-1.5 rounded-lg bg-[#1DA1F2]/10 px-3 py-1.5 text-xs text-[#1DA1F2] hover:bg-[#1DA1F2]/20"><Twitter className="h-3.5 w-3.5" /> Twitter</button>
-              <button className="flex items-center gap-1.5 rounded-lg bg-[#0088cc]/10 px-3 py-1.5 text-xs text-[#0088cc] hover:bg-[#0088cc]/20"><Send className="h-3.5 w-3.5" /> Telegram</button>
+              <button disabled title="Referral link is not configured" className="flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs text-muted-foreground opacity-50"><Twitter className="h-3.5 w-3.5" /> Twitter</button>
+              <button disabled title="Referral link is not configured" className="flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs text-muted-foreground opacity-50"><Send className="h-3.5 w-3.5" /> Telegram</button>
             </div>
           </div>
 
@@ -103,7 +84,7 @@ export default function ReferralPage() {
                   {[
                     { step: "1", icon: Share2, title: "Share Your Link", desc: "Share your unique referral link with friends via social media or messaging." },
                     { step: "2", icon: Users, title: "Friends Sign Up", desc: "When they register using your link and start trading, you both earn rewards." },
-                    { step: "3", icon: DollarSign, title: "Earn Commission", desc: "Receive up to 40% of their trading fees as commission, paid in real-time." },
+                    { step: "3", icon: DollarSign, title: "Earn Commission", desc: "Commission rates and payout timing will be shown after the referral program is configured." },
                   ].map((item, i) => (
                     <div key={i} className="rounded-xl border border-border bg-card p-5">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">{item.step}</div>

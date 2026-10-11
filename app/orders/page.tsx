@@ -1,240 +1,276 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Search, Filter, Download, Calendar, ChevronDown, ArrowUpDown, X, ExternalLink, Clock } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { BottomNav } from "@/components/bottom-nav"
+import { Download, RefreshCw, XCircle, Clock, Loader2, ArrowUpRight, ClipboardList } from "lucide-react"
 import Link from "next/link"
 
-const tabs = ["Open Orders", "Order History", "Trade History", "Positions", "PnL Analysis"]
-const markets = ["All", "Spot", "Futures", "Options"]
-const pairs = ["All Pairs", "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT"]
-const sides = ["All", "Buy", "Sell"]
-const statuses = ["All", "Filled", "Partially Filled", "Cancelled", "Expired"]
+type Tab = "Open Orders" | "Order History" | "Trade History" | "Positions" | "PnL Analysis"
+type RecordRow = {
+  id: string
+  pair?: string
+  side?: string
+  order_type?: string
+  type?: string
+  price?: number | string
+  amount?: number | string
+  filled?: number | string
+  total?: number | string
+  status?: string
+  fee?: number | string
+  pnl?: number | string
+  created_at?: string
+  leverage?: number | string
+  entry_price?: number | string
+  mark_price?: number | string
+  margin?: number | string
+  liquidation_price?: number | string
+}
 
-const openOrders = [
-  { pair: "BTC/USDT", side: "Buy", type: "Limit", price: "62,500.00", amount: "0.15", filled: "0.00", total: "9,375.00", time: "2024-02-15 14:32:10", status: "Open" },
-  { pair: "ETH/USDT", side: "Buy", type: "Limit", price: "2,280.00", amount: "5.00", filled: "2.50", total: "11,400.00", time: "2024-02-15 13:10:45", status: "Partial" },
-  { pair: "SOL/USDT", side: "Sell", type: "Stop Limit", price: "125.00", amount: "40", filled: "0.00", total: "5,000.00", time: "2024-02-15 11:05:30", status: "Open" },
-]
-
-const orderHistory = [
-  { pair: "BTC/USDT", side: "Buy", type: "Market", price: "64,850.00", amount: "0.10", filled: "0.10", total: "6,485.00", time: "2024-02-15 10:22:18", status: "Filled", fee: "6.49 USDT" },
-  { pair: "ETH/USDT", side: "Sell", type: "Limit", price: "2,420.00", amount: "3.00", filled: "3.00", total: "7,260.00", time: "2024-02-14 22:15:40", status: "Filled", fee: "7.26 USDT" },
-  { pair: "SOL/USDT", side: "Buy", type: "Market", price: "135.50", amount: "20", filled: "20", total: "2,710.00", time: "2024-02-14 18:30:05", status: "Filled", fee: "2.71 USDT" },
-  { pair: "DOGE/USDT", side: "Sell", type: "Limit", price: "0.0920", amount: "10,000", filled: "0", total: "920.00", time: "2024-02-14 15:00:00", status: "Cancelled", fee: "0.00 USDT" },
-  { pair: "XRP/USDT", side: "Buy", type: "Limit", price: "0.5200", amount: "5,000", filled: "5,000", total: "2,600.00", time: "2024-02-13 09:45:20", status: "Filled", fee: "2.60 USDT" },
-  { pair: "BTC/USDT", side: "Sell", type: "Market", price: "65,100.00", amount: "0.05", filled: "0.05", total: "3,255.00", time: "2024-02-12 20:10:55", status: "Filled", fee: "3.26 USDT" },
-]
-
-const positions = [
-  { pair: "BTCUSDT", side: "Long", size: "0.5 BTC", entry: "63,200.00", mark: "64,900.00", pnl: "+$850.00", pnlPct: "+2.69%", margin: "6,320.00", liq: "57,880.00", leverage: "10x" },
-  { pair: "ETHUSDT", side: "Short", size: "10 ETH", entry: "2,450.00", mark: "2,400.00", pnl: "+$500.00", pnlPct: "+2.04%", margin: "2,450.00", liq: "2,695.00", leverage: "10x" },
-  { pair: "SOLUSDT", side: "Long", size: "100 SOL", entry: "130.00", mark: "135.00", pnl: "+$500.00", pnlPct: "+3.85%", margin: "1,300.00", liq: "117.00", leverage: "10x" },
-]
-
-const pnlData = [
-  { date: "Feb 15", pnl: "+$1,245.00", trades: 8, winRate: "75%", volume: "$45,200" },
-  { date: "Feb 14", pnl: "-$320.00", trades: 12, winRate: "50%", volume: "$62,800" },
-  { date: "Feb 13", pnl: "+$890.00", trades: 6, winRate: "83%", volume: "$28,500" },
-  { date: "Feb 12", pnl: "+$2,100.00", trades: 15, winRate: "67%", volume: "$95,300" },
-  { date: "Feb 11", pnl: "-$450.00", trades: 9, winRate: "44%", volume: "$38,700" },
-  { date: "Feb 10", pnl: "+$1,680.00", trades: 11, winRate: "73%", volume: "$71,200" },
-  { date: "Feb 9", pnl: "+$560.00", trades: 7, winRate: "71%", volume: "$32,100" },
-]
+const tabs: Tab[] = ["Open Orders", "Order History", "Trade History", "Positions", "PnL Analysis"]
+const num = (value: unknown) => {
+  const parsed = Number(value ?? 0)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+const money = (value: unknown) => num(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })
+const dateTime = (value?: string) => value ? new Date(value).toLocaleString() : "—"
+const statusText = (value?: string) => (value ?? "unknown").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+const isOpen = (row: RecordRow) => ["open", "partially_filled", "partial"].includes((row.status ?? "").toLowerCase())
 
 export default function OrdersPage() {
-  const [activeTab, setActiveTab] = useState("Open Orders")
-  const [market, setMarket] = useState("All")
+  const [activeTab, setActiveTab] = useState<Tab>("Open Orders")
   const [pair, setPair] = useState("All Pairs")
   const [side, setSide] = useState("All")
-  const [showFilters, setShowFilters] = useState(false)
+  const [orders, setOrders] = useState<RecordRow[]>([])
+  const [trades, setTrades] = useState<RecordRow[]>([])
+  const [positions, setPositions] = useState<RecordRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setError("")
+    try {
+      const [ordersResponse, tradesResponse, positionsResponse] = await Promise.all([
+        fetch("/api/trade?type=order_history", { cache: "no-store" }),
+        fetch("/api/trade?type=trades", { cache: "no-store" }),
+        fetch("/api/trade?type=positions", { cache: "no-store" }),
+      ])
+      if ([ordersResponse, tradesResponse, positionsResponse].some((response) => response.status === 401)) {
+        setError("Please log in to view your orders and trading history.")
+        setOrders([])
+        setTrades([])
+        setPositions([])
+        return
+      }
+      const [ordersData, tradesData, positionsData] = await Promise.all([
+        ordersResponse.json(), tradesResponse.json(), positionsResponse.json(),
+      ])
+      if (!ordersResponse.ok || !tradesResponse.ok || !positionsResponse.ok) {
+        throw new Error(ordersData.error || tradesData.error || positionsData.error || "Unable to load trading activity.")
+      }
+      setOrders(Array.isArray(ordersData.orders) ? ordersData.orders : [])
+      setTrades(Array.isArray(tradesData.trades) ? tradesData.trades : [])
+      setPositions(Array.isArray(positionsData.positions) ? positionsData.positions : [])
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to load trading activity.")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void loadData() }, [loadData])
+
+  const filteredOrders = useMemo(() => orders.filter((row) => {
+    if (activeTab === "Open Orders" && !isOpen(row)) return false
+    if (activeTab === "Order History" && isOpen(row)) return false
+    if (pair !== "All Pairs" && (row.pair ?? "").replace("-", "/").toUpperCase() !== pair) return false
+    if (side !== "All" && (row.side ?? "").toLowerCase() !== side.toLowerCase()) return false
+    return true
+  }), [orders, activeTab, pair, side])
+
+  const filteredTrades = useMemo(() => trades.filter((row) => {
+    if (pair !== "All Pairs" && (row.pair ?? "").replace("-", "/").toUpperCase() !== pair) return false
+    if (side !== "All" && (row.side ?? "").toLowerCase() !== side.toLowerCase()) return false
+    return true
+  }), [trades, pair, side])
+
+  const cancelOrder = async (id: string) => {
+    setBusyId(id)
+    setNotice("")
+    setError("")
+    try {
+      const response = await fetch(`/api/trade?id=${encodeURIComponent(id)}`, { method: "DELETE" })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Could not cancel this order.")
+      setNotice("Order cancelled successfully.")
+      await loadData()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not cancel this order.")
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const cancelAll = async () => {
+    const cancellable = filteredOrders.filter(isOpen)
+    if (!cancellable.length) return
+    if (!window.confirm(`Cancel all ${cancellable.length} open order(s)?`)) return
+    setBusyId("all")
+    setNotice("")
+    setError("")
+    try {
+      const results = await Promise.all(cancellable.map((row) =>
+        fetch(`/api/trade?id=${encodeURIComponent(row.id)}`, { method: "DELETE" })
+      ))
+      const failed = results.filter((response) => !response.ok).length
+      await loadData()
+      setNotice(failed ? `Cancelled available orders. ${failed} order(s) could not be cancelled.` : "All selected orders were cancelled.")
+    } catch {
+      setError("Some orders could not be cancelled. Refresh and check their current status.")
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const exportCsv = () => {
+    const rows = activeTab === "Trade History" || activeTab === "PnL Analysis" ? filteredTrades : activeTab === "Positions" ? positions : filteredOrders
+    const columns = ["pair", "side", "order_type", "price", "amount", "filled", "total", "status", "fee", "pnl", "created_at"]
+    const escape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`
+    const csv = [columns.join(","), ...rows.map((row) => columns.map((column) => escape((row as unknown as Record<string, unknown>)[column])).join(","))].join("\r\n")
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }))
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `trading-${activeTab.toLowerCase().replaceAll(" ", "-")}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const pnlTotal = trades.reduce((sum, trade) => sum + num(trade.pnl), 0)
+  const volumeTotal = trades.reduce((sum, trade) => sum + num(trade.total || (num(trade.price) * num(trade.amount))), 0)
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
-      <main className="flex-1">
-        <div className="mx-auto max-w-[1400px] px-4 py-6">
-          <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-xl font-bold text-foreground">Orders</h1>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" className="h-8 text-xs border-border text-foreground"><Download className="mr-1 h-3 w-3" /> Export</Button>
-            </div>
+      <main className="mx-auto w-full max-w-[1400px] flex-1 px-3 py-5 sm:px-4 sm:py-6 lg:px-8">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">Orders & Trading Activity</h1>
+            <p className="mt-1 text-sm text-muted-foreground">View and manage your real account activity.</p>
           </div>
-
-          {/* Tabs */}
-          <div className="mb-4 flex gap-1 overflow-x-auto border-b border-border">
-            {tabs.map(t => (
-              <button key={t} onClick={() => setActiveTab(t)} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-                {t} {t === "Open Orders" && openOrders.length > 0 && <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{openOrders.length}</span>}
-                {t === "Positions" && positions.length > 0 && <span className="ml-1 rounded-full bg-[#0ecb81]/10 px-1.5 py-0.5 text-[10px] text-[#0ecb81]">{positions.length}</span>}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => void loadData()} disabled={loading} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-foreground hover:bg-secondary disabled:opacity-50">
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </button>
+            <button onClick={exportCsv} disabled={loading} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
           </div>
-
-          {/* Filters */}
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <div className="flex gap-1 rounded-lg bg-secondary p-0.5">
-              {markets.map(m => (
-                <button key={m} onClick={() => setMarket(m)} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${market === m ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{m}</button>
-              ))}
-            </div>
-            <select value={pair} onChange={(e) => setPair(e.target.value)} className="rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none">
-              {pairs.map(p => <option key={p} value={p} className="bg-card">{p}</option>)}
-            </select>
-            <select value={side} onChange={(e) => setSide(e.target.value)} className="rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none">
-              {sides.map(s => <option key={s} value={s} className="bg-card">{s}</option>)}
-            </select>
-            <button className="flex items-center gap-1 rounded-lg bg-secondary px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"><Calendar className="h-3 w-3" /> Date Range</button>
-          </div>
-
-          {/* Open Orders */}
-          {activeTab === "Open Orders" && (
-            <div className="rounded-xl border border-border bg-card">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead><tr className="border-b border-border text-left text-[11px] text-muted-foreground">
-                    <th className="px-4 py-3 font-medium">Pair</th><th className="px-4 py-3 font-medium">Side</th><th className="px-4 py-3 font-medium">Type</th><th className="px-4 py-3 font-medium">Price</th><th className="px-4 py-3 font-medium">Amount</th><th className="px-4 py-3 font-medium">Filled</th><th className="px-4 py-3 font-medium">Total</th><th className="px-4 py-3 font-medium">Time</th><th className="px-4 py-3 font-medium">Action</th>
-                  </tr></thead>
-                  <tbody>
-                    {openOrders.map((o, i) => (
-                      <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary/30">
-                        <td className="px-4 py-3 text-xs font-medium text-foreground">{o.pair}</td>
-                        <td className={`px-4 py-3 text-xs font-medium ${o.side === "Buy" ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>{o.side}</td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">{o.type}</td>
-                        <td className="px-4 py-3 text-xs text-foreground">{o.price}</td>
-                        <td className="px-4 py-3 text-xs text-foreground">{o.amount}</td>
-                        <td className="px-4 py-3 text-xs text-foreground">{o.filled}</td>
-                        <td className="px-4 py-3 text-xs text-foreground">{o.total}</td>
-                        <td className="px-4 py-3 text-[10px] text-muted-foreground">{o.time}</td>
-                        <td className="px-4 py-3"><button className="text-xs text-[#f6465d] hover:underline">Cancel</button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {openOrders.length > 0 && (
-                <div className="border-t border-border px-4 py-3"><button className="text-xs text-[#f6465d] hover:underline">Cancel All Orders</button></div>
-              )}
-            </div>
-          )}
-
-          {/* Order History */}
-          {activeTab === "Order History" && (
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
-              <table className="w-full">
-                <thead><tr className="border-b border-border text-left text-[11px] text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Pair</th><th className="px-4 py-3 font-medium">Side</th><th className="px-4 py-3 font-medium">Type</th><th className="px-4 py-3 font-medium">Price</th><th className="px-4 py-3 font-medium">Amount</th><th className="px-4 py-3 font-medium">Filled</th><th className="px-4 py-3 font-medium">Fee</th><th className="px-4 py-3 font-medium">Time</th><th className="px-4 py-3 font-medium">Status</th>
-                </tr></thead>
-                <tbody>
-                  {orderHistory.map((o, i) => (
-                    <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary/30">
-                      <td className="px-4 py-3 text-xs font-medium text-foreground">{o.pair}</td>
-                      <td className={`px-4 py-3 text-xs font-medium ${o.side === "Buy" ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>{o.side}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{o.type}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{o.price}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{o.amount}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{o.filled}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{o.fee}</td>
-                      <td className="px-4 py-3 text-[10px] text-muted-foreground">{o.time}</td>
-                      <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${o.status === "Filled" ? "bg-[#0ecb81]/10 text-[#0ecb81]" : o.status === "Cancelled" ? "bg-secondary text-muted-foreground" : "bg-primary/10 text-primary"}`}>{o.status}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Trade History */}
-          {activeTab === "Trade History" && (
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
-              <table className="w-full">
-                <thead><tr className="border-b border-border text-left text-[11px] text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Pair</th><th className="px-4 py-3 font-medium">Side</th><th className="px-4 py-3 font-medium">Price</th><th className="px-4 py-3 font-medium">Quantity</th><th className="px-4 py-3 font-medium">Fee</th><th className="px-4 py-3 font-medium">Total</th><th className="px-4 py-3 font-medium">Time</th>
-                </tr></thead>
-                <tbody>
-                  {orderHistory.filter(o => o.status === "Filled").map((o, i) => (
-                    <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary/30">
-                      <td className="px-4 py-3 text-xs font-medium text-foreground">{o.pair}</td>
-                      <td className={`px-4 py-3 text-xs font-medium ${o.side === "Buy" ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>{o.side}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{o.price}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{o.filled}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{o.fee}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{o.total}</td>
-                      <td className="px-4 py-3 text-[10px] text-muted-foreground">{o.time}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Positions */}
-          {activeTab === "Positions" && (
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
-              <table className="w-full">
-                <thead><tr className="border-b border-border text-left text-[11px] text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Symbol</th><th className="px-4 py-3 font-medium">Side</th><th className="px-4 py-3 font-medium">Size</th><th className="px-4 py-3 font-medium">Entry</th><th className="px-4 py-3 font-medium">Mark</th><th className="px-4 py-3 font-medium">PnL</th><th className="px-4 py-3 font-medium">Margin</th><th className="px-4 py-3 font-medium">Liq. Price</th><th className="px-4 py-3 font-medium">Action</th>
-                </tr></thead>
-                <tbody>
-                  {positions.map((p, i) => (
-                    <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary/30">
-                      <td className="px-4 py-3"><div className="text-xs font-medium text-foreground">{p.pair}</div><div className="text-[10px] text-muted-foreground">{p.leverage}</div></td>
-                      <td className={`px-4 py-3 text-xs font-medium ${p.side === "Long" ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>{p.side}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{p.size}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{p.entry}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{p.mark}</td>
-                      <td className="px-4 py-3"><div className={`text-xs font-medium ${p.pnl.startsWith("+") ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>{p.pnl}</div><div className={`text-[10px] ${p.pnlPct.startsWith("+") ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>{p.pnlPct}</div></td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{p.margin}</td>
-                      <td className="px-4 py-3 text-xs text-[#f6465d]">{p.liq}</td>
-                      <td className="px-4 py-3"><div className="flex gap-1"><button className="rounded bg-secondary px-2 py-1 text-[10px] text-foreground hover:bg-secondary/80">TP/SL</button><button className="rounded bg-[#f6465d]/10 px-2 py-1 text-[10px] text-[#f6465d] hover:bg-[#f6465d]/20">Close</button></div></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* PnL Analysis */}
-          {activeTab === "PnL Analysis" && (
-            <div className="space-y-6">
-              {/* Summary */}
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {[
-                  { label: "Total PnL (7D)", value: "+$5,705.00", color: "text-[#0ecb81]" },
-                  { label: "Total Trades", value: "68", color: "text-foreground" },
-                  { label: "Win Rate", value: "66.2%", color: "text-primary" },
-                  { label: "Total Volume", value: "$373,800", color: "text-foreground" },
-                ].map((s, i) => (
-                  <div key={i} className="rounded-xl border border-border bg-card p-4">
-                    <div className="text-xs text-muted-foreground">{s.label}</div>
-                    <div className={`mt-1 text-lg font-bold ${s.color}`}>{s.value}</div>
-                  </div>
-                ))}
-              </div>
-              {/* Daily breakdown */}
-              <div className="rounded-xl border border-border bg-card">
-                <div className="border-b border-border px-4 py-3"><h3 className="text-sm font-semibold text-foreground">Daily PnL Breakdown</h3></div>
-                <table className="w-full"><thead><tr className="border-b border-border text-left text-[11px] text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Date</th><th className="px-4 py-3 font-medium">PnL</th><th className="px-4 py-3 font-medium">Trades</th><th className="px-4 py-3 font-medium">Win Rate</th><th className="px-4 py-3 font-medium">Volume</th>
-                </tr></thead><tbody>
-                  {pnlData.map((d, i) => (
-                    <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary/30">
-                      <td className="px-4 py-3 text-xs text-foreground">{d.date}</td>
-                      <td className={`px-4 py-3 text-xs font-medium ${d.pnl.startsWith("+") ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>{d.pnl}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{d.trades}</td>
-                      <td className="px-4 py-3 text-xs text-foreground">{d.winRate}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{d.volume}</td>
-                    </tr>
-                  ))}
-                </tbody></table>
-              </div>
-            </div>
-          )}
         </div>
+
+        {error && <div role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-foreground">{error}{error.includes("log in") && <Link href="/login?redirect=/orders" className="ml-2 font-semibold text-primary underline">Log in</Link>}</div>}
+        {notice && <div role="status" className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-foreground">{notice}</div>}
+
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <SummaryCard label="Open Orders" value={String(orders.filter(isOpen).length)} hint="Currently active" />
+          <SummaryCard label="Recorded Trades" value={String(trades.length)} hint="Your recent trade records" />
+          <SummaryCard label="Realized PnL" value={`${pnlTotal >= 0 ? "+" : ""}${money(pnlTotal)}`} hint={`Trade volume ${money(volumeTotal)}`} positive={pnlTotal >= 0} />
+        </div>
+
+        <div className="mb-4 flex gap-1 overflow-x-auto border-b border-border" role="tablist" aria-label="Trading activity">
+          {tabs.map((tab) => (
+            <button key={tab} role="tab" aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)}
+              className={`min-h-11 shrink-0 border-b-2 px-3 text-sm font-medium sm:px-4 ${activeTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+              {tab}{tab === "Open Orders" && orders.filter(isOpen).length > 0 && <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{orders.filter(isOpen).length}</span>}
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <select aria-label="Filter by pair" value={pair} onChange={(event) => setPair(event.target.value)} className="min-h-10 rounded-lg border border-border bg-secondary px-3 text-sm text-foreground sm:w-auto">
+            {["All Pairs", "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <select aria-label="Filter by side" value={side} onChange={(event) => setSide(event.target.value)} className="min-h-10 rounded-lg border border-border bg-secondary px-3 text-sm text-foreground sm:w-auto">
+            {["All", "Buy", "Sell"].map((item) => <option key={item} value={item}>{item} Side</option>)}
+          </select>
+          {activeTab === "Open Orders" && <button onClick={() => void cancelAll()} disabled={busyId !== null || !filteredOrders.some(isOpen)} className="min-h-10 rounded-lg border border-destructive/40 px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">{busyId === "all" ? "Cancelling…" : "Cancel filtered orders"}</button>}
+        </div>
+
+        {loading ? (
+          <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> Loading your activity…</div>
+        ) : activeTab === "PnL Analysis" ? (
+          <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+            <h2 className="text-base font-semibold text-foreground">Trading performance</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Calculated from the trade records currently returned by your account.</p>
+            {trades.length ? <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <SummaryCard label="Recorded PnL" value={`${pnlTotal >= 0 ? "+" : ""}${money(pnlTotal)}`} positive={pnlTotal >= 0} />
+              <SummaryCard label="Trade Records" value={String(trades.length)} />
+              <SummaryCard label="Recorded Volume" value={money(volumeTotal)} />
+            </div> : <EmptyState message="No trade records yet. Your performance summary will appear here after trades are recorded." />}
+          </div>
+        ) : activeTab === "Positions" ? (
+          <div className="space-y-3">
+            {positions.length ? positions.map((row) => <div key={row.id} className="rounded-xl border border-border bg-card p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div><p className="font-semibold text-foreground">{row.pair || "Trading position"}</p><p className="mt-1 text-xs text-muted-foreground">{statusText(row.status)}{row.leverage ? ` · ${row.leverage}x` : ""}</p></div>
+                <span className={`rounded-full px-2 py-1 text-xs ${(row.side ?? "").toLowerCase() === "buy" ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"}`}>{statusText(row.side)}</span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <DataCell label="Size" value={money(row.amount)} />
+                <DataCell label="Entry price" value={money(row.entry_price ?? row.price)} />
+                <DataCell label="Mark price" value={money(row.mark_price)} />
+                <DataCell label="PnL" value={money(row.pnl)} />
+              </div>
+            </div>) : <EmptyState message="No open positions were found for your account." />}
+          </div>
+        ) : activeTab === "Trade History" ? (
+          <RecordTable rows={filteredTrades} kind="trades" />
+        ) : (
+          <>
+            {activeTab === "Open Orders" && filteredOrders.some(isOpen) && <p className="mb-2 text-xs text-muted-foreground">Cancelling an order releases its remaining locked balance through the trading API.</p>}
+            <RecordTable rows={filteredOrders} kind={activeTab === "Open Orders" ? "open" : "history"} onCancel={cancelOrder} busyId={busyId} />
+          </>
+        )}
       </main>
-      <Footer />
+      <div className="hidden lg:block"><Footer /></div>
+      <BottomNav />
     </div>
   )
+}
+
+function SummaryCard({ label, value, hint, positive }: { label: string; value: string; hint?: string; positive?: boolean }) {
+  return <div className="min-w-0 rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className={`mt-2 break-words text-xl font-bold tabular-nums ${positive === undefined ? "text-foreground" : positive ? "text-emerald-500" : "text-rose-500"}`}>{value}</p>{hint && <p className="mt-1 break-words text-xs text-muted-foreground">{hint}</p>}</div>
+}
+
+function DataCell({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0 rounded-lg bg-secondary/40 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 break-words font-mono text-sm text-foreground">{value}</p></div>
+}
+
+function EmptyState({ message }: { message: string }) {
+  return <div className="flex flex-col items-center justify-center px-4 py-14 text-center"><ClipboardList className="h-9 w-9 text-muted-foreground" /><p className="mt-3 max-w-md text-sm text-muted-foreground">{message}</p><Link href="/trade" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">Go to trading <ArrowUpRight className="h-4 w-4" /></Link></div>
+}
+
+function RecordTable({ rows, kind, onCancel, busyId }: { rows: RecordRow[]; kind: "open" | "history" | "trades"; onCancel?: (id: string) => void; busyId?: string | null }) {
+  if (!rows.length) return <div className="rounded-xl border border-border bg-card"><EmptyState message={kind === "open" ? "You have no open orders matching these filters." : kind === "history" ? "No completed or cancelled orders match these filters." : "No trade records match these filters yet."} /></div>
+  return <div className="space-y-3">
+    {rows.map((row) => <article key={row.id} className="rounded-xl border border-border bg-card p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-foreground">{row.pair || "—"}</h3><span className={`rounded px-2 py-0.5 text-xs ${(row.side ?? "").toLowerCase() === "buy" ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"}`}>{statusText(row.side)}</span></div><p className="mt-1 text-xs text-muted-foreground">{statusText(row.order_type || row.type)} · {dateTime(row.created_at)}</p></div>
+        <span className="rounded-full bg-secondary px-2.5 py-1 text-xs text-foreground">{statusText(row.status)}</span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <DataCell label="Price" value={money(row.price)} />
+        <DataCell label="Amount" value={money(row.amount)} />
+        <DataCell label="Filled" value={money(row.filled)} />
+        <DataCell label="Total" value={money(row.total || (num(row.price) * num(row.amount)))} />
+        <DataCell label="Fee" value={row.fee == null ? "—" : money(row.fee)} />
+        <DataCell label="PnL" value={row.pnl == null ? "—" : money(row.pnl)} />
+      </div>
+      {kind === "open" && onCancel && isOpen(row) && <div className="mt-3 flex justify-end"><button onClick={() => void onCancel(row.id)} disabled={busyId !== null && busyId !== undefined} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-destructive/40 px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">{busyId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />} Cancel order</button></div>}
+    </article>)}
+  </div>
 }

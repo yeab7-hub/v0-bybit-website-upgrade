@@ -19,28 +19,37 @@ async function ensureBalance(supabase: any, userId: string, asset: string) {
   return created
 }
 
-async function getActiveOverride(supabase: any, userId: string, pair: string) {
-  // Check for pair-specific override first
-  const { data: specific } = await supabase
-    .from("trade_overrides")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("pair", pair)
-    .eq("active", true)
-    .limit(1)
-    .single()
-  if (specific) return specific
+/** Apply a balance delta with compare-and-set retries to prevent concurrent
+ * requests from spending the same observed balance or overwriting a newer one. */
+async function changeBalance(
+  supabase: any,
+  userId: string,
+  asset: string,
+  availableDelta: number,
+  inOrderDelta = 0,
+  retries = 4,
+): Promise<{ ok: boolean; insufficient?: boolean; conflict?: boolean; available?: number }> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const balance = await ensureBalance(supabase, userId, asset)
+    if (!balance) return { ok: false, conflict: true }
+    const available = Number(balance.available) || 0
+    const inOrder = Number(balance.in_order) || 0
+    const nextAvailable = available + availableDelta
+    const nextInOrder = inOrder + inOrderDelta
+    if (nextAvailable < -1e-8 || nextInOrder < -1e-8) {
+      return { ok: false, insufficient: true, available }
+    }
 
-  // Check for global override (null pair)
-  const { data: global } = await supabase
-    .from("trade_overrides")
-    .select("*")
-    .eq("user_id", userId)
-    .is("pair", null)
-    .eq("active", true)
-    .limit(1)
-    .single()
-  return global || null
+    let query = supabase.from("balances").update({
+      available: Math.max(0, nextAvailable),
+      in_order: Math.max(0, nextInOrder),
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId).eq("asset", asset).eq("available", balance.available)
+    query = balance.in_order == null ? query.is("in_order", null) : query.eq("in_order", balance.in_order)
+    const { data, error } = await query.select("asset").maybeSingle()
+    if (!error && data) return { ok: true, available: nextAvailable }
+  }
+  return { ok: false, conflict: true }
 }
 
 /* ---------- GET ---------- */
@@ -51,6 +60,17 @@ export async function GET(request: NextRequest) {
 
   const adminSupabase = await createAdminClient()
   const type = request.nextUrl.searchParams.get("type") ?? "orders"
+
+  if (type === "order_history") {
+    const { data, error } = await adminSupabase
+      .from("orders")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(200)
+    if (error) return NextResponse.json({ error: "Could not load order history" }, { status: 500 })
+    return NextResponse.json({ orders: data ?? [] })
+  }
 
   if (type === "balances") {
     const { data } = await adminSupabase.from("balances").select("*").eq("user_id", user.id)
@@ -142,7 +162,7 @@ async function handleFuturesOrder(params: {
   }).select().single()
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 })
 
-  const { error: tradeErr } = await adminSupabase.from("trades").insert({
+  const { data: insertedTrade, error: tradeErr } = await adminSupabase.from("trades").insert({
     user_id: userId, order_id: order.id, pair, side,
     price: execPrice, amount, total: notional, fee,
     status: "open", pnl: 0,
@@ -151,14 +171,24 @@ async function handleFuturesOrder(params: {
     last_funding_at: new Date().toISOString(),
     take_profit: takeProfit, stop_loss: stopLoss,
     auto_close_at: autoCloseAt,
-  })
-  if (tradeErr) return NextResponse.json({ error: tradeErr.message }, { status: 500 })
+  }).select("id").single()
+  if (tradeErr || !insertedTrade) {
+    await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", userId)
+    return NextResponse.json({ error: "Could not create the position; no funds were reserved." }, { status: 500 })
+  }
 
-  // Only the margin (not the full notional) is deducted -- that's the point of leverage.
-  await adminSupabase.from("balances").update({
-    available: Math.max(0, qBal.available - requiredBalance),
+  // Compare-and-set the balance so simultaneous orders cannot both spend the
+  // same observed balance. Roll back the uncommitted order/trade if it changed.
+  const { data: debitedBalance, error: balanceError } = await adminSupabase.from("balances").update({
+    available: Math.max(0, Number(qBal.available) - requiredBalance),
     updated_at: new Date().toISOString(),
-  }).eq("user_id", userId).eq("asset", quoteAsset)
+  }).eq("user_id", userId).eq("asset", quoteAsset).eq("available", qBal.available).select("asset").maybeSingle()
+
+  if (balanceError || !debitedBalance) {
+    await adminSupabase.from("trades").delete().eq("id", insertedTrade.id).eq("user_id", userId)
+    await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", userId)
+    return NextResponse.json({ error: "Your balance changed while placing this order. Refresh your balance and try again." }, { status: 409 })
+  }
 
   const message = `${isShort ? "Short" : "Long"} opened: ${amount} ${baseAsset} @ $${execPrice.toLocaleString()} | ${leverage}x | Margin: $${margin.toFixed(2)} | Liq: $${liquidationPrice.toFixed(2)}${durationSeconds ? ` | Auto-closes in ${durationSeconds}s at real market price` : ""}`
 
@@ -187,18 +217,44 @@ export async function POST(request: NextRequest) {
   // Use admin client for DB operations to bypass RLS constraints
   const adminSupabase = await createAdminClient()
 
-  const body = await request.json()
-  const { pair, side, order_type, price, stop_price, amount, take_profit, stop_loss, is_futures, leverage, duration_seconds } = body
+  let body: Record<string, unknown>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
 
-  if (!pair || !side || !order_type || !amount || amount <= 0) {
+  const pair = typeof body.pair === "string" ? body.pair.trim().toUpperCase() : ""
+  const side = typeof body.side === "string" ? body.side.trim().toLowerCase() : ""
+  const order_type = typeof body.order_type === "string" ? body.order_type.trim().toLowerCase() : ""
+  const amount = Number(body.amount)
+  const price = body.price == null || body.price === "" ? 0 : Number(body.price)
+  const stop_price = body.stop_price == null || body.stop_price === "" ? 0 : Number(body.stop_price)
+  const take_profit = body.take_profit
+  const stop_loss = body.stop_loss
+  const is_futures = body.is_futures === true
+  const leverage = body.leverage
+  const duration_seconds = body.duration_seconds
+
+  if (!/^[A-Z0-9]{2,12}\/[A-Z0-9]{2,12}$/.test(pair) ||
+      (side !== "buy" && side !== "sell") ||
+      !["market", "limit", "stop_limit"].includes(order_type) ||
+      !Number.isFinite(amount) || amount <= 0 ||
+      (body.price != null && body.price !== "" && (!Number.isFinite(price) || price < 0)) ||
+      (body.stop_price != null && body.stop_price !== "" && (!Number.isFinite(stop_price) || stop_price < 0))) {
     return NextResponse.json({ error: "Invalid order parameters" }, { status: 400 })
   }
 
-  const takeProfit = Number(take_profit) > 0 ? Number(take_profit) : null
-  const stopLoss = Number(stop_loss) > 0 ? Number(stop_loss) : null
+  const takeProfit = Number(take_profit) > 0 && Number.isFinite(Number(take_profit)) ? Number(take_profit) : null
+  const stopLoss = Number(stop_loss) > 0 && Number.isFinite(Number(stop_loss)) ? Number(stop_loss) : null
+
+  if ((take_profit != null && take_profit !== "" && takeProfit === null) ||
+      (stop_loss != null && stop_loss !== "" && stopLoss === null)) {
+    return NextResponse.json({ error: "Take-profit and stop-loss must be positive prices." }, { status: 400 })
+  }
 
   const baseAsset = pair.split("/")[0]
-  const quoteAsset = pair.split("/")[1] || "USDT"
+  const quoteAsset = pair.split("/")[1]
   const marketPrice = await getLivePrice(baseAsset, pair)
 
   if (marketPrice <= 0) {
@@ -212,11 +268,35 @@ export async function POST(request: NextRequest) {
   // Leveraged Futures orders are handled in a completely separate path (real
   // margin, liquidation price, and funding) so the Spot logic below is never
   // touched or put at risk by this.
+  if (takeProfit !== null || stopLoss !== null) {
+    // TP/SL must be on the correct side of the current market and match the
+    // position direction. Reject invalid levels rather than storing orders
+    // that can trigger immediately or on the wrong side.
+    const isShortPosition = is_futures && side === "sell"
+    if (is_futures || side === "buy") {
+      if (takeProfit !== null && (isShortPosition ? takeProfit >= marketPrice : takeProfit <= marketPrice)) {
+        return NextResponse.json({ error: isShortPosition ? "Short take-profit must be below the current market price." : "Take-profit must be above the current market price." }, { status: 400 })
+      }
+      if (stopLoss !== null && (isShortPosition ? stopLoss <= marketPrice : stopLoss >= marketPrice)) {
+        return NextResponse.json({ error: isShortPosition ? "Short stop-loss must be above the current market price." : "Stop-loss must be below the current market price." }, { status: 400 })
+      }
+    } else {
+      return NextResponse.json({ error: "Spot TP/SL is supported for buy positions only. Use Futures for short-position TP/SL." }, { status: 400 })
+    }
+  }
+
   if (is_futures) {
+    const leverageValue = Number(leverage)
+    if (!Number.isFinite(leverageValue) || leverageValue < 1 || leverageValue > 125) {
+      return NextResponse.json({ error: "Leverage must be between 1x and 125x." }, { status: 400 })
+    }
+    if (order_type === "stop_limit") {
+      return NextResponse.json({ error: "Futures stop-limit orders are not supported yet. Use Market or a marketable Limit order." }, { status: 400 })
+    }
     return handleFuturesOrder({
       adminSupabase, userId: user.id, userEmail: user.email || "unknown",
       pair, side, order_type, price, amount, marketPrice,
-      leverage: Math.max(1, Math.min(125, Number(leverage) || 1)),
+      leverage: leverageValue,
       takeProfit, stopLoss, baseAsset, quoteAsset, durationSeconds,
     })
   }
@@ -258,6 +338,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid order type" }, { status: 400 })
   }
 
+  if (!shouldFillNow && (takeProfit !== null || stopLoss !== null)) {
+    return NextResponse.json({
+      error: "TP/SL cannot be attached to a resting order yet. Use a Market or immediately marketable Limit order so protection is saved with the filled position.",
+    }, { status: 400 })
+  }
+
   const total = execPrice * amount
   const feeRate = await getUserTakerFeeRate(adminSupabase, user.id)
   const fee = total * feeRate
@@ -291,100 +377,166 @@ export async function POST(request: NextRequest) {
 
     if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 })
 
-    // Check for admin override
-    const override = await getActiveOverride(adminSupabase, user.id, pair)
-
-    // Calculate P&L for sells (or any trade with override)
+    // Realized Spot P&L is calculated only from tracked, still-open Spot
+    // buy lots. Consume lots FIFO so sold inventory cannot remain protected by
+    // stale TP/SL positions. Untracked/deposited inventory has no invented cost basis.
+    type ConsumedLot = {
+      id: string; originalAmount: number; originalTotal: number; price: number
+      originalFee: number; consumedAmount: number; consumedFee: number
+      takeProfit: number | null; stopLoss: number | null
+      closePrice: number | null; closedAt: string | null; closeReason: string | null
+      pnl: number; applied: boolean
+    }
+    const consumedLots: ConsumedLot[] = []
     let pnl = 0
     if (side === "sell") {
-      const { data: prevBuys } = await adminSupabase
+      const { data: openBuys } = await adminSupabase
         .from("trades")
-        .select("price, amount")
+        .select("id, price, amount, total, fee, take_profit, stop_loss, close_price, closed_at, close_reason, pnl, position_mode")
         .eq("user_id", user.id)
         .eq("pair", pair)
         .eq("side", "buy")
-        .order("created_at", { ascending: false })
-        .limit(5)
+        .eq("status", "open")
+        .order("created_at", { ascending: true })
 
-      if (prevBuys && prevBuys.length > 0) {
-        const avgBuyPrice = prevBuys.reduce((s, b) => s + Number(b.price) * Number(b.amount), 0) /
-          prevBuys.reduce((s, b) => s + Number(b.amount), 0)
-        pnl = (execPrice - avgBuyPrice) * amount - fee
+      let remainingToMatch = amount
+      let matchedAmount = 0
+      let costBasis = 0
+      let entryFees = 0
+      for (const lot of (openBuys ?? []).filter((item: any) => item.position_mode !== "futures")) {
+        if (remainingToMatch <= 1e-10) break
+        const originalAmount = Number(lot.amount)
+        const lotPrice = Number(lot.price)
+        if (!(originalAmount > 0) || !(lotPrice > 0)) continue
+        const consumedAmount = Math.min(originalAmount, remainingToMatch)
+        const originalFee = Number(lot.fee) || 0
+        const consumedFee = originalFee * (consumedAmount / originalAmount)
+        consumedLots.push({
+          id: lot.id,
+          originalAmount,
+          originalTotal: Number(lot.total) || originalAmount * lotPrice,
+          price: lotPrice,
+          originalFee,
+          consumedAmount,
+          consumedFee,
+          takeProfit: lot.take_profit == null ? null : Number(lot.take_profit),
+          stopLoss: lot.stop_loss == null ? null : Number(lot.stop_loss),
+          closePrice: lot.close_price == null ? null : Number(lot.close_price),
+          closedAt: lot.closed_at ?? null,
+          closeReason: lot.close_reason ?? null,
+          pnl: Number(lot.pnl) || 0,
+          applied: false,
+        })
+        matchedAmount += consumedAmount
+        costBasis += consumedAmount * lotPrice
+        entryFees += consumedFee
+        remainingToMatch -= consumedAmount
       }
+      const allocatedExitFee = amount > 0 ? fee * (matchedAmount / amount) : 0
+      pnl = (execPrice * matchedAmount - costBasis) - entryFees - allocatedExitFee
     }
 
-    // Apply override to P&L and settlement
-    let overrideApplied = false
-    let settlementAdjustment = 0
-    if (override) {
-      overrideApplied = true
-      const mult = override.multiplier ?? 1.0
-      if (override.forced_result === "loss") {
-        // Force a loss: user loses a percentage of their trade total
-        const lossAmount = total * mult * 0.1 // 10% * multiplier of trade value
-        pnl = -Math.abs(lossAmount)
-        settlementAdjustment = -Math.abs(lossAmount)
-      } else if (override.forced_result === "win") {
-        // Force a win: user gains a percentage of their trade total
-        const winAmount = total * mult * 0.05 // 5% * multiplier of trade value
-        pnl = Math.abs(winAmount)
-        settlementAdjustment = Math.abs(winAmount)
-      }
-    }
-
-    // Insert trade record -- buy = open position, sell = closed position
-    const { data: insertedTrade } = await adminSupabase.from("trades").insert({
+    // Persist TP/SL in the position row itself so the monitor never has
+    // to rely on a best-effort follow-up write.
+    const { data: insertedTrade, error: tradeInsertError } = await adminSupabase.from("trades").insert({
       user_id: user.id, order_id: order.id, pair, side,
       price: execPrice, amount, total, fee, pnl,
       status: side === "buy" ? "open" : "closed",
       close_price: side === "sell" ? execPrice : null,
       closed_at: side === "sell" ? new Date().toISOString() : null,
+      take_profit: side === "buy" ? takeProfit : null,
+      stop_loss: side === "buy" ? stopLoss : null,
     }).select("id").single()
 
-    // Attach TP/SL to the freshly opened long position. Done as a best-effort
-    // separate update so that, if the take_profit/stop_loss columns have not
-    // been migrated yet, the core trade still succeeds instead of erroring out.
-    if (side === "buy" && insertedTrade?.id && (takeProfit || stopLoss)) {
-      try {
+    if (tradeInsertError || !insertedTrade) {
+      await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
+      return NextResponse.json({ error: "Could not record this trade; no balance was changed." }, { status: 500 })
+    }
+
+    // Update the consumed Spot lots with compare-and-set guards. Keep enough
+    // original data to restore them if balance settlement later fails.
+    const authenticatedUserId = user.id
+    async function rollbackConsumedLots() {
+      for (const lot of consumedLots) {
+        if (!lot.applied) continue
         await adminSupabase.from("trades").update({
-          take_profit: takeProfit,
-          stop_loss: stopLoss,
-        }).eq("id", insertedTrade.id)
-      } catch { /* columns not migrated yet -- ignore */ }
+          status: "open",
+          amount: lot.originalAmount,
+          total: lot.originalTotal,
+          fee: lot.originalFee,
+          take_profit: lot.takeProfit,
+          stop_loss: lot.stopLoss,
+          close_price: lot.closePrice,
+          closed_at: lot.closedAt,
+          close_reason: lot.closeReason,
+          pnl: lot.pnl,
+        }).eq("id", lot.id).eq("user_id", authenticatedUserId)
+      }
     }
 
-    // Update balances
-    if (side === "buy") {
-      // Deduct quote
-      const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
-      await adminSupabase.from("balances").update({
-        available: Math.max(0, qBal.available - total - fee + settlementAdjustment),
-        updated_at: new Date().toISOString()
-      }).eq("user_id", user.id).eq("asset", quoteAsset)
-
-      // Credit base
-      const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
-      await adminSupabase.from("balances").update({
-        available: bBal.available + amount,
-        updated_at: new Date().toISOString()
-      }).eq("user_id", user.id).eq("asset", baseAsset)
-    } else {
-      // Deduct base
-      const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
-      await adminSupabase.from("balances").update({
-        available: Math.max(0, bBal.available - amount),
-        updated_at: new Date().toISOString()
-      }).eq("user_id", user.id).eq("asset", baseAsset)
-
-      // Credit quote (with settlement adjustment from override)
-      const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
-      await adminSupabase.from("balances").update({
-        available: Math.max(0, qBal.available + total - fee + settlementAdjustment),
-        updated_at: new Date().toISOString()
-      }).eq("user_id", user.id).eq("asset", quoteAsset)
+    for (const lot of consumedLots) {
+      const remainingLotAmount = Math.max(0, lot.originalAmount - lot.consumedAmount)
+      const fullyConsumed = remainingLotAmount <= 1e-10
+      const update = fullyConsumed
+        ? {
+            status: "closed",
+            close_price: execPrice,
+            closed_at: new Date().toISOString(),
+            close_reason: "spot_sell",
+            take_profit: null,
+            stop_loss: null,
+            pnl: 0,
+          }
+        : {
+            amount: remainingLotAmount,
+            total: remainingLotAmount * lot.price,
+            fee: Math.max(0, lot.originalFee - lot.consumedFee),
+          }
+      const { data: updatedLot, error: lotError } = await adminSupabase.from("trades")
+        .update(update)
+        .eq("id", lot.id)
+        .eq("user_id", user.id)
+        .eq("status", "open")
+        .eq("amount", lot.originalAmount)
+        .select("id")
+        .maybeSingle()
+      if (lotError || !updatedLot) {
+        await rollbackConsumedLots()
+        await adminSupabase.from("trades").delete().eq("id", insertedTrade.id).eq("user_id", user.id)
+        await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
+        return NextResponse.json({ error: "Spot inventory changed during this sell. No funds were settled; refresh and retry." }, { status: 409 })
+      }
+      lot.applied = true
     }
 
-    const tradeMsg = `${side === "buy" ? "Bought" : "Sold"} ${amount} ${baseAsset} @ $${Number(execPrice).toLocaleString()} | Fee: $${fee.toFixed(2)}${pnl !== 0 ? ` | P&L: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : ""}${overrideApplied ? " [Override Applied]" : ""}`
+    // Compare-and-set debit first, then credit the other asset. If either
+    // ledger update fails, compensate and remove the uncommitted records.
+    const debitAsset = side === "buy" ? quoteAsset : baseAsset
+    const debitAmount = side === "buy" ? total + fee : amount
+    const debit = await changeBalance(adminSupabase, user.id, debitAsset, -debitAmount)
+    if (!debit.ok) {
+      await rollbackConsumedLots()
+      await adminSupabase.from("trades").delete().eq("id", insertedTrade.id).eq("user_id", user.id)
+      await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
+      return NextResponse.json({
+        error: debit.insufficient
+          ? `Insufficient ${debitAsset} balance after concurrent activity. Refresh and try again.`
+          : "Your balance changed while placing this order. Refresh and try again.",
+      }, { status: debit.insufficient ? 400 : 409 })
+    }
+
+    const creditAsset = side === "buy" ? baseAsset : quoteAsset
+    const creditAmount = side === "buy" ? amount : total - fee
+    const credit = await changeBalance(adminSupabase, user.id, creditAsset, creditAmount)
+    if (!credit.ok) {
+      await changeBalance(adminSupabase, user.id, debitAsset, debitAmount)
+      await rollbackConsumedLots()
+      await adminSupabase.from("trades").delete().eq("id", insertedTrade.id).eq("user_id", user.id)
+      await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
+      return NextResponse.json({ error: "Balance settlement failed and was rolled back. Please refresh before retrying." }, { status: 500 })
+    }
+
+    const tradeMsg = `${side === "buy" ? "Bought" : "Sold"} ${amount} ${baseAsset} @ $${Number(execPrice).toLocaleString()} | Fee: $${fee.toFixed(2)}${pnl !== 0 ? ` | P&L: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : ""}`
 
     notifyAdmin({
       subject: `Trade - ${side.toUpperCase()} ${amount} ${baseAsset}`,
@@ -406,21 +558,18 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Lock balance
-  if (side === "buy") {
-    const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
-    await adminSupabase.from("balances").update({
-      available: Math.max(0, qBal.available - lockTotal - (lockTotal * feeRate)),
-      in_order: (qBal.in_order || 0) + lockTotal + (lockTotal * feeRate),
-      updated_at: new Date().toISOString()
-    }).eq("user_id", user.id).eq("asset", quoteAsset)
-  } else {
-    const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
-    await adminSupabase.from("balances").update({
-      available: Math.max(0, bBal.available - amount),
-      in_order: (bBal.in_order || 0) + amount,
-      updated_at: new Date().toISOString()
-    }).eq("user_id", user.id).eq("asset", baseAsset)
+  // Reserve funds atomically enough to prevent concurrent orders from
+  // spending the same available balance. Remove the order if reservation fails.
+  const reserveAsset = side === "buy" ? quoteAsset : baseAsset
+  const reserveAmount = side === "buy" ? lockTotal * (1 + feeRate) : amount
+  const reserved = await changeBalance(adminSupabase, user.id, reserveAsset, -reserveAmount, reserveAmount)
+  if (!reserved.ok) {
+    await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
+    return NextResponse.json({
+      error: reserved.insufficient
+        ? `Insufficient ${reserveAsset} balance to reserve this order.`
+        : "Your balance changed while reserving this order. Refresh and try again.",
+    }, { status: reserved.insufficient ? 400 : 409 })
   }
 
   return NextResponse.json({
@@ -447,30 +596,79 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Cannot cancel this order" }, { status: 400 })
   }
 
-  await adminSupabase.from("orders").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", orderId)
+  // Claim cancellation before touching balances. This races safely against the
+  // fill worker: only one request can transition an open order out of its active state.
+  const { data: cancelledOrder, error: cancelError } = await adminSupabase
+    .from("orders")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("id", orderId)
+    .eq("user_id", user.id)
+    .in("status", ["open", "partially_filled"])
+    .select("id")
+    .maybeSingle()
+
+  if (cancelError || !cancelledOrder) {
+    return NextResponse.json({ error: "This order was filled, cancelled, or changed. Refresh and try again." }, { status: 409 })
+  }
 
   const baseAsset = order.pair.split("/")[0]
   const quoteAsset = order.pair.split("/")[1] || "USDT"
-  const remaining = order.amount - order.filled
+  const remaining = Number(order.amount) - Number(order.filled || 0)
+  let unlockError: string | null = null
 
-  // Unlock balance
-  if (order.side === "buy") {
+  // Unlock only the remaining reserved funds and compare-and-set the observed
+  // balance so a concurrent wallet operation cannot overwrite a newer balance.
+  if (remaining > 0 && order.side === "buy") {
     const cancelFeeRate = await getUserTakerFeeRate(adminSupabase, user.id)
-    const locked = order.price * remaining + (order.price * remaining * cancelFeeRate)
-    const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
-    await adminSupabase.from("balances").update({
-      available: qBal.available + locked,
-      in_order: Math.max(0, (qBal.in_order || 0) - locked),
-      updated_at: new Date().toISOString()
-    }).eq("user_id", user.id).eq("asset", quoteAsset)
-  } else {
-    const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
-    await adminSupabase.from("balances").update({
-      available: bBal.available + remaining,
-      in_order: Math.max(0, (bBal.in_order || 0) - remaining),
-      updated_at: new Date().toISOString()
-    }).eq("user_id", user.id).eq("asset", baseAsset)
+    const locked = Number(order.price) * remaining * (1 + cancelFeeRate)
+    const { data: qBal, error: readBalanceError } = await adminSupabase.from("balances")
+      .select("*").eq("user_id", user.id).eq("asset", quoteAsset).maybeSingle()
+    if (readBalanceError || !qBal) {
+      unlockError = "Could not load the reserved quote balance."
+    } else {
+      const oldAvailable = Number(qBal.available)
+      const oldInOrder = Number(qBal.in_order || 0)
+      const { data: unlocked, error: balanceError } = await adminSupabase.from("balances").update({
+        available: oldAvailable + locked,
+        in_order: Math.max(0, oldInOrder - locked),
+        updated_at: new Date().toISOString()
+      }).eq("user_id", user.id).eq("asset", quoteAsset)
+        .eq("available", qBal.available).eq("in_order", qBal.in_order)
+        .select("asset").maybeSingle()
+      if (balanceError || !unlocked) unlockError = "The quote balance changed before funds could be released."
+    }
+  } else if (remaining > 0) {
+    const { data: bBal, error: readBalanceError } = await adminSupabase.from("balances")
+      .select("*").eq("user_id", user.id).eq("asset", baseAsset).maybeSingle()
+    if (readBalanceError || !bBal) {
+      unlockError = "Could not load the reserved base balance."
+    } else {
+      const oldAvailable = Number(bBal.available)
+      const oldInOrder = Number(bBal.in_order || 0)
+      const { data: unlocked, error: balanceError } = await adminSupabase.from("balances").update({
+        available: oldAvailable + remaining,
+        in_order: Math.max(0, oldInOrder - remaining),
+        updated_at: new Date().toISOString()
+      }).eq("user_id", user.id).eq("asset", baseAsset)
+        .eq("available", bBal.available).eq("in_order", bBal.in_order)
+        .select("asset").maybeSingle()
+      if (balanceError || !unlocked) unlockError = "The base balance changed before funds could be released."
+    }
   }
 
-  return NextResponse.json({ success: true, message: "Order cancelled" })
+  if (unlockError) {
+    // Reopen only if the cancellation still owns the order state. If this fails,
+    // report the condition explicitly instead of claiming the funds were released.
+    const { data: restored } = await adminSupabase.from("orders")
+      .update({ status: order.status, updated_at: new Date().toISOString() })
+      .eq("id", orderId).eq("user_id", user.id).eq("status", "cancelled")
+      .select("id").maybeSingle()
+    return NextResponse.json({
+      error: restored
+        ? `${unlockError} The order was reopened; refresh and try again.`
+        : `${unlockError} The order state could not be restored automatically. Contact support before retrying.`,
+    }, { status: 409 })
+  }
+
+  return NextResponse.json({ success: true, message: "Order cancelled and remaining funds released." })
 }

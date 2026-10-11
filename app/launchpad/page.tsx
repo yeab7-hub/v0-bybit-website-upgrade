@@ -6,25 +6,17 @@ import { Footer } from "@/components/footer"
 import { ArrowRight, Rocket, Clock, Users, Shield, Star, CheckCircle, Timer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-const activeProjects = [
-  { name: "NexGen Protocol", token: "NXG", raise: "$2,500,000", price: "$0.045", supply: "55,555,556 NXG", start: "Feb 28, 2026", end: "Mar 03, 2026", progress: 72, participants: 14832, status: "active" as const },
-  { name: "ChainVault Finance", token: "CVF", raise: "$1,800,000", price: "$0.12", supply: "15,000,000 CVF", start: "Mar 05, 2026", end: "Mar 08, 2026", progress: 0, participants: 0, status: "upcoming" as const },
-]
+type ActiveLaunchProject = { name: string; token: string; raise: string; price: string; supply: string; start: string; end: string; progress: number; participants: number; status: "active" | "upcoming" }
+type PastLaunchProject = { name: string; token: string; raise: string; roi: string; participants: number }
 
-const pastProjects = [
-  { name: "MetaWorld", token: "MWD", raise: "$3,000,000", roi: "+1,240%", participants: 22104 },
-  { name: "DefiPulse", token: "DFP", raise: "$1,500,000", roi: "+856%", participants: 18543 },
-  { name: "ZeroLayer", token: "ZLR", raise: "$2,000,000", roi: "+534%", participants: 25678 },
-  { name: "QuantumSwap", token: "QSW", raise: "$1,200,000", roi: "+423%", participants: 12987 },
-  { name: "SolarChain", token: "SLC", raise: "$2,500,000", roi: "+312%", participants: 31204 },
-  { name: "NeonDEX", token: "NDX", raise: "$800,000", roi: "+289%", participants: 9876 },
-]
+const activeProjects: ActiveLaunchProject[] = []
+const pastProjects: PastLaunchProject[] = []
 
 const stats = [
-  { label: "Projects Launched", value: "85+" },
-  { label: "Avg. ATH ROI", value: "+720%" },
-  { label: "Total Raised", value: "$180M+" },
-  { label: "Unique Participants", value: "2.5M+" },
+  { label: "Project records", value: "Unavailable" },
+  { label: "Performance history", value: "Not connected" },
+  { label: "Subscription ledger", value: "Not configured" },
+  { label: "Participant records", value: "Unavailable" },
 ]
 
 export default function LaunchpadPage() {
@@ -38,12 +30,18 @@ export default function LaunchpadPage() {
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary">
                 <Rocket className="h-4 w-4" /> Token Launch Platform
               </div>
-              <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground lg:text-5xl">Bybit Launchpad</h1>
-              <p className="mt-4 text-pretty text-lg text-muted-foreground">Get early access to the most promising crypto projects. Subscribe with BIT or USDT to earn new token allocations.</p>
+              <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground lg:text-5xl">Token Launchpad</h1>
+              <p className="mt-4 text-pretty text-lg text-muted-foreground">Project listings, eligibility checks, subscriptions, token allocation, and settlement are not connected. No launchpad participation is currently available.</p>
               <div className="mt-8 flex items-center justify-center gap-3">
-                <Link href="/register"><Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">Participate Now <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+                <Button disabled title="Launchpad subscriptions are not connected" size="lg">Participation unavailable</Button>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="border-b border-amber-500/20 bg-amber-500/5">
+          <div role="status" className="mx-auto max-w-[1400px] px-4 py-3 text-center text-sm text-muted-foreground">
+            Do not send funds for a launchpad project through this app. Live campaign data and token settlement are not integrated.
           </div>
         </section>
 
@@ -64,6 +62,7 @@ export default function LaunchpadPage() {
           <div className="mx-auto max-w-[1400px] px-4 py-8">
             <h2 className="mb-6 text-2xl font-bold text-foreground">Active & Upcoming</h2>
             <div className="grid gap-6 md:grid-cols-2">
+              {activeProjects.length === 0 && <p className="col-span-full rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">No verified active or upcoming projects are configured.</p>}
               {activeProjects.map((p) => (
                 <div key={p.name} className="rounded-xl border border-border bg-card p-6">
                   <div className="mb-4 flex items-center justify-between">
@@ -112,6 +111,7 @@ export default function LaunchpadPage() {
                   <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Participants</th>
                 </tr></thead>
                 <tbody>
+                  {pastProjects.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">No verified past launchpad records are available.</td></tr>}
                   {pastProjects.map((p) => (
                     <tr key={p.name} className="border-b border-border/50 hover:bg-card/30">
                       <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">{p.token.charAt(0)}</div><div><span className="text-sm font-semibold text-foreground">{p.name}</span><span className="ml-2 text-xs text-muted-foreground">{p.token}</span></div></div></td>

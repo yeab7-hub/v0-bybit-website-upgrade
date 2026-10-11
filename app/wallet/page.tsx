@@ -7,7 +7,7 @@ import useSWR from "swr"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import Link from "next/link"
-import { DEPOSIT_ADDRESSES as FALLBACK_ADDRESSES, type CoinDepositConfig } from "@/lib/deposit-addresses"
+import type { CoinDepositConfig } from "@/lib/deposit-addresses"
 import {
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight, RefreshCw, History,
   Copy, Check, X, AlertTriangle, Search, Eye, EyeOff,
@@ -30,13 +30,14 @@ const COIN_NAMES: Record<string, string> = {
 
 export default function WalletPage() {
   const searchParams = useSearchParams()
-  const initialTab = (searchParams.get("tab") as Tab) || "overview"
+  const requestedTab = searchParams.get("tab")
+  const validTabs: Tab[] = ["overview", "deposit", "withdraw", "transfer", "history"]
+  const initialTab: Tab = validTabs.includes(requestedTab as Tab) ? requestedTab as Tab : "overview"
   const [tab, setTab] = useState<Tab>(initialTab)
   const [hideSmall, setHideSmall] = useState(false)
   const [hideZero, setHideZero] = useState(false)
   const [search, setSearch] = useState("")
   const [showBal, setShowBal] = useState(true)
-  const [assetView, setAssetView] = useState<"asset" | "account">("asset")
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
@@ -58,16 +59,17 @@ export default function WalletPage() {
 
   const balArr: any[] = Array.isArray(balances) ? balances : (balances?.balances ?? [])
   const txArr: any[] = Array.isArray(transactions) ? transactions : []
-  const pm: Record<string, number> = { USDT: 1 }
+  const pm: Record<string, number> = { USDT: 1, USDC: 1 }
   if (prices && !prices.error && prices.crypto) {
     for (const c of prices.crypto) {
       if (c.symbol && c.price) pm[c.symbol] = c.price
     }
   }
 
-  const totalUsd = balArr.reduce((s: number, b: any) => s + (Number(b.available) + Number(b.in_order || 0)) * (pm[b.asset] || 0), 0)
+  const totalUsd = balArr.reduce((s: number, b: any) => s + (Number(b.available || 0) + Number(b.in_order || 0)) * (pm[b.asset] || 0), 0)
+  const availableUsd = balArr.reduce((s: number, b: any) => s + Number(b.available || 0) * (pm[b.asset] || 0), 0)
+  const inUseUsd = balArr.reduce((s: number, b: any) => s + Number(b.in_order || 0) * (pm[b.asset] || 0), 0)
   const btcVal = pm["BTC"] > 0 ? totalUsd / pm["BTC"] : 0
-  const todayPnl = 0 // Placeholder for real P&L
 
   const filteredBal = balArr.filter((b: any) => {
     const total = Number(b.available) + Number(b.in_order || 0)
@@ -97,8 +99,8 @@ export default function WalletPage() {
           >
             {userInitial}
           </Link>
-          <Link href="/dashboard" className="relative z-50 p-1 text-muted-foreground" aria-label="Add">
-            <X className="h-5 w-5 rotate-45" />
+          <Link href="/dashboard" className="relative z-50 p-1 text-muted-foreground" aria-label="Go to dashboard" title="Dashboard">
+            <Home className="h-5 w-5" />
           </Link>
         </div>
       </div>
@@ -125,54 +127,37 @@ export default function WalletPage() {
                       {showBal ? `~ ${btcVal.toFixed(8)} BTC` : "******"}
                     </p>
                   </div>
-                  {/* Mini chart placeholder */}
-                  <div className="h-10 w-20">
-                    <svg viewBox="0 0 80 40" className="h-full w-full text-[#f7a600]">
-                      <polyline fill="none" stroke="currentColor" strokeWidth="1.5" points="0,30 10,25 20,28 30,20 40,22 50,15 60,18 70,12 80,16" />
-                    </svg>
-                  </div>
+
                 </div>
               </div>
 
-              {/* Today's P&L */}
-              <button className="mb-5 flex items-center gap-1">
+              <div className="mb-5 flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">{"Today's P&L"}</span>
-                <span className={`text-sm font-medium ${todayPnl >= 0 ? "text-success" : "text-destructive"}`}>
-                  {showBal ? `${todayPnl >= 0 ? "+" : ""}${todayPnl.toFixed(2)}` : "******"}
-                </span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
+                <span className="text-sm text-muted-foreground">Not available</span>
+              </div>
 
               {/* Available / In Use */}
               <div className="mb-6 flex gap-8">
                 <div>
                   <p className="text-xs text-muted-foreground">Available balance</p>
                   <p className="font-mono text-sm font-semibold text-foreground">
-                    {showBal ? totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "******"}
+                    {showBal ? availableUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "******"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">In Use</p>
                   <p className="font-mono text-sm font-semibold text-foreground">
-                    {showBal ? balArr.reduce((s: number, b: any) => s + Number(b.in_order || 0) * (pm[b.asset] || 0), 0).toFixed(2) : "******"}
+                    {showBal ? inUseUsd.toFixed(2) : "******"}
                   </p>
                 </div>
               </div>
 
-              {/* My Card */}
-              <Link href="/card" className="mb-6 block rounded-xl bg-gradient-to-r from-[#e8e8e8] to-[#d0d0d0] p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-semibold text-[#1a1a1a]">My Card</span>
-                    <ChevronRight className="h-3.5 w-3.5 text-[#1a1a1a]/60" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs tracking-wider text-[#1a1a1a]/60">**** **** **** 4774</span>
-                    <div className="flex h-6 w-8 items-center justify-center rounded bg-[#eb001b]/80">
-                      <div className="h-4 w-4 rounded-full bg-[#f79e1b]/80" />
-                    </div>
-                  </div>
+              <Link href="/card" className="mb-6 flex items-center justify-between rounded-xl border border-border bg-card p-4">
+                <div>
+                  <span className="text-sm font-semibold text-foreground">Card services</span>
+                  <p className="mt-1 text-xs text-muted-foreground">Explore available card features</p>
                 </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </Link>
 
               {/* Action Buttons - circular icons like Bybit */}
@@ -209,8 +194,8 @@ export default function WalletPage() {
               {/* Asset / Account tabs */}
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <button onClick={() => setAssetView("asset")} className={`text-base font-semibold ${assetView === "asset" ? "text-foreground" : "text-muted-foreground"}`}>Asset</button>
-                  <button onClick={() => setAssetView("account")} className={`text-base font-semibold ${assetView === "account" ? "text-foreground" : "text-muted-foreground"}`}>Account</button>
+                  <button className="text-base font-semibold text-foreground" aria-current="page">Asset</button>
+                  <button disabled title="Separate account balances are not configured yet" className="cursor-not-allowed text-base font-semibold text-muted-foreground/60">Account (unavailable)</button>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setTab("history")} className="p-1.5 text-muted-foreground"><History className="h-4 w-4" /></button>
@@ -228,16 +213,13 @@ export default function WalletPage() {
                   const inOrder = Number(b.in_order || 0)
                   const total = Number(b.available) + inOrder
                   const usd = total * (pm[b.asset] || 0)
-                  const change = ((pm[b.asset] || 0) - (pm[b.asset] || 0)) // placeholder
                   return (
                     <div key={b.asset} className="flex items-center justify-between py-4">
                       <div className="flex items-center gap-3">
                         <MarketAsset symbol={b.asset} size={36} />
                         <div>
                           <p className="text-sm font-bold text-foreground">{b.asset}</p>
-                          <p className={`text-xs ${change >= 0 ? "text-muted-foreground" : "text-destructive"}`}>
-                            {COIN_NAMES[b.asset] || b.asset}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{COIN_NAMES[b.asset] || b.asset}</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -288,12 +270,12 @@ export default function WalletPage() {
                 <div className="mt-4 flex gap-6">
                   <div>
                     <p className="text-xs text-muted-foreground">Available balance</p>
-                    <p className="font-mono text-lg font-semibold text-foreground">{showBal ? `$${totalUsd.toFixed(2)}` : "****"}</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">{showBal ? `${availableUsd.toFixed(2)}` : "****"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">In Use</p>
                     <p className="font-mono text-lg font-semibold text-foreground">
-                      {showBal ? `$${balArr.reduce((s: number, b: any) => s + Number(b.in_order || 0) * (pm[b.asset] || 0), 0).toFixed(2)}` : "****"}
+                      {showBal ? `${inUseUsd.toFixed(2)}` : "****"}
                     </p>
                   </div>
                 </div>
@@ -406,10 +388,10 @@ function DepositTab({ mutTx, mutBal }: any) {
   const [amount, setAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [error, setError] = useState("")
 
   const cd = DEPOSIT_ADDRESSES.find(c => c.symbol === coin) || DEPOSIT_ADDRESSES[0]
   const net = cd?.networks?.[netIdx] || cd?.networks?.[0]
-  const [error, setError] = useState("")
   if (addrError || !DEPOSIT_ADDRESSES.length || !cd || !net) return (
     <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-10 text-center">
       <AlertTriangle className="mx-auto mb-4 h-8 w-8 text-warning" />
@@ -420,12 +402,27 @@ function DepositTab({ mutTx, mutBal }: any) {
   const copy = () => { if (!net) return; navigator.clipboard.writeText(net.address); setCopied(true); setTimeout(() => setCopied(false), 2000) }
 
   const submit = async () => {
-    if (!amount || parseFloat(amount) <= 0 || !net) return
-    setSubmitting(true); setError("")
-    const response = await fetch("/api/transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deposit", asset: coin, network: net.network, amount, tx_hash: txHash }) })
-    const result = await response.json()
-    if (!response.ok) { setError(result.error || "Could not submit deposit"); setSubmitting(false); return }
-    mutTx(); mutBal(); setDone(true); setSubmitting(false)
+    if (!amount || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || !net) return
+    setSubmitting(true)
+    setError("")
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deposit", asset: coin, network: net.network, amount: Number(amount), tx_hash: txHash }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setError(result.error || "Could not submit deposit")
+        return
+      }
+      await Promise.all([mutTx(), mutBal()])
+      setDone(true)
+    } catch {
+      setError("Network error. Please check your connection and try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (done) return (
@@ -501,7 +498,7 @@ function DepositTab({ mutTx, mutBal }: any) {
           className="w-full rounded-lg bg-[#f7a600] py-3 text-sm font-bold text-[#0a0e17] transition hover:bg-[#e09800] disabled:opacity-50">
           {submitting ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : "Submit Deposit Request"}
         </button>
-        <p className="mt-3 text-center text-[10px] text-muted-foreground">Deposits require admin approval. Usually processed within 1-24 hours.</p>
+        <p className="mt-3 text-center text-[10px] text-muted-foreground">Deposit requests require admin review. This screen does not guarantee a processing time.</p>
       </div>
     </div>
   )
@@ -509,8 +506,8 @@ function DepositTab({ mutTx, mutBal }: any) {
 
 /* ===== Withdraw ===== */
 function WithdrawTab({ bals, mutTx, mutBal }: any) {
-  const { data: addrData } = useSWR("/api/deposit-addresses", fetcher)
-  const WITHDRAW_ADDRESSES: CoinDepositConfig[] = addrData?.addresses ?? FALLBACK_ADDRESSES
+  const { data: addrData, error: addressError, isLoading: addressesLoading } = useSWR("/api/deposit-addresses", fetcher)
+  const WITHDRAW_ADDRESSES: CoinDepositConfig[] = Array.isArray(addrData?.addresses) ? addrData.addresses : []
   const [coin, setCoin] = useState("USDT")
   const [netIdx, setNetIdx] = useState(0)
   const [address, setAddress] = useState("")
@@ -521,18 +518,56 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
   const [error, setError] = useState("")
 
   const cd = WITHDRAW_ADDRESSES.find(c => c.symbol === coin) || WITHDRAW_ADDRESSES[0]
-  const net = cd.networks[netIdx] || cd.networks[0]
+  const net = cd?.networks?.[netIdx] || cd?.networks?.[0]
   const bal = bals.find((b: any) => b.asset === coin)
   const avail = Number(bal?.available || 0)
-  const fee = coin === "USDT" ? 1 : coin === "BTC" ? 0.0005 : coin === "ETH" ? 0.005 : coin === "SOL" ? 0.01 : 0.001
+  // Network fees are not configured server-side; do not invent or subtract a fake fee.
+
+  if (addressesLoading) return (
+    <div role="status" className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-8 text-center">
+      <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground">Loading supported withdrawal networks…</p>
+    </div>
+  )
+
+  if (addressError || addrData?.error) return (
+    <div role="alert" className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-8 text-center">
+      <AlertTriangle className="mx-auto mb-4 h-8 w-8 text-primary" />
+      <h3 className="mb-2 text-lg font-bold text-foreground">Withdrawal networks unavailable</h3>
+      <p className="text-sm text-muted-foreground">We could not load the configured networks. Please try again later or contact support.</p>
+    </div>
+  )
+
+  if (!cd || !net) return (
+    <div className="mx-auto max-w-lg rounded-2xl border border-border bg-card p-8 text-center">
+      <AlertTriangle className="mx-auto mb-4 h-8 w-8 text-primary" />
+      <h3 className="mb-2 text-lg font-bold text-foreground">Withdrawals unavailable</h3>
+      <p className="text-sm text-muted-foreground">No supported withdrawal networks are configured. Please contact support before requesting a withdrawal.</p>
+    </div>
+  )
 
   const submit = async () => {
-    if (!amount || !address) return
-    setSubmitting(true); setError("")
-    const res = await fetch("/api/transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "withdraw", asset: coin, network: net.network, amount, address, memo }) })
-    const d = await res.json()
-    if (d.error) { setError(d.error); setSubmitting(false); return }
-    mutTx(); mutBal(); setDone(true); setSubmitting(false)
+    if (!amount || !address || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || Number(amount) > avail) return
+    setSubmitting(true)
+    setError("")
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "withdraw", asset: coin, network: net.network, amount: Number(amount), address, memo }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setError(result.error || "Could not submit withdrawal")
+        return
+      }
+      await Promise.all([mutTx(), mutBal()])
+      setDone(true)
+    } catch {
+      setError("Network error. Please check your connection and try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (done) return (
@@ -583,17 +618,17 @@ function WithdrawTab({ bals, mutTx, mutBal }: any) {
         <div className="flex items-center rounded-lg border border-border bg-background">
           <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00"
             className="flex-1 bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none" />
-          <button onClick={() => setAmount(String(Math.max(0, avail - fee)))} className="px-2 text-xs font-bold text-[#f7a600]">MAX</button>
+          <button onClick={() => setAmount(String(avail))} className="px-2 text-xs font-bold text-[#f7a600]">MAX</button>
           <span className="px-4 text-sm font-semibold text-muted-foreground">{coin}</span>
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">Available: {avail.toFixed(coin === "USDT" ? 2 : 6)} {coin}</p>
       </div>
       <div className="mb-6 rounded-lg bg-secondary/50 p-3 text-xs">
-        <div className="flex justify-between"><span className="text-muted-foreground">Network Fee</span><span className="text-foreground">{fee} {coin}</span></div>
-        <div className="mt-1 flex justify-between"><span className="text-muted-foreground">You Receive</span><span className="font-semibold text-foreground">{amount ? Math.max(0, parseFloat(amount) - fee).toFixed(coin === "USDT" ? 2 : 6) : "0"} {coin}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">Network Fee</span><span className="text-foreground">Confirmed during review</span></div>
+        <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Requested Amount</span><span className="font-semibold text-foreground">{amount && Number.isFinite(Number(amount)) ? Number(amount).toFixed(coin === "USDT" ? 2 : 6) : "0"} {coin}</span></div>
       </div>
       {error && <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">{error}</div>}
-      <button onClick={submit} disabled={submitting || !amount || !address || parseFloat(amount) <= fee}
+      <button onClick={submit} disabled={submitting || !amount || !address || !Number.isFinite(Number(amount)) || parseFloat(amount) <= 0 || parseFloat(amount) > avail}
         className="w-full rounded-lg bg-[#f7a600] py-3 text-sm font-bold text-[#0a0e17] transition hover:bg-[#e09800] disabled:opacity-50">
         {submitting ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : "Submit Withdrawal Request"}
       </button>
@@ -609,6 +644,7 @@ function TransferTab({ bals, mutTx, mutBal }: any) {
   const [amount, setAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [error, setError] = useState("")
 
   const accounts = ["Spot", "Funding", "Derivatives", "Earn"]
   const bal = bals.find((b: any) => b.asset === coin)
@@ -616,10 +652,27 @@ function TransferTab({ bals, mutTx, mutBal }: any) {
   const swap = () => { setFrom(to); setTo(from) }
 
   const submit = async () => {
-    if (!amount || parseFloat(amount) <= 0) return
+    if (!amount || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || from === to) return
     setSubmitting(true)
-    await fetch("/api/transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "transfer", asset: coin, amount, from_account: from, to_account: to }) })
-    mutTx(); mutBal(); setDone(true); setSubmitting(false)
+    setError("")
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "transfer", asset: coin, amount, from_account: from, to_account: to }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setError(result.error || "Transfer could not be completed.")
+        return
+      }
+      await Promise.all([mutTx(), mutBal()])
+      setDone(true)
+    } catch {
+      setError("Network error. No transfer confirmation was received.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (done) return (
@@ -666,7 +719,8 @@ function TransferTab({ bals, mutTx, mutBal }: any) {
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">Available: {avail.toFixed(coin === "USDT" ? 2 : 6)} {coin}</p>
       </div>
-      <button onClick={submit} disabled={submitting || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > avail}
+      {error && <p role="alert" className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+      <button onClick={submit} disabled={submitting || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > avail || from === to}
         className="w-full rounded-lg bg-[#f7a600] py-3 text-sm font-bold text-[#0a0e17] transition hover:bg-[#e09800] disabled:opacity-50">
         {submitting ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : "Transfer"}
       </button>

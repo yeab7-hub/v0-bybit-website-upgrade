@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 import { checkAccountStatus } from "@/lib/account-status"
+import { getLivePrice } from "@/lib/live-price"
 
 const STABLE = new Set(["USDT", "USDC"])
 
@@ -30,46 +31,44 @@ export async function POST(request: NextRequest) {
   const status = await checkAccountStatus(supabase, user.id)
   if (status.blocked) return NextResponse.json({ error: status.reason }, { status: 403 })
 
-  const body = await request.json()
-  const { from_asset, to_asset, amount } = body
+  let body: { from_asset?: unknown; to_asset?: unknown; amount?: unknown }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
+  const from_asset = typeof body.from_asset === "string" ? body.from_asset.trim().toUpperCase() : ""
+  const to_asset = typeof body.to_asset === "string" ? body.to_asset.trim().toUpperCase() : ""
+  const amount = Number(body.amount)
 
-  if (!from_asset || !to_asset || !amount || amount <= 0) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 })
+  if (!/^[A-Z0-9]{2,12}$/.test(from_asset) || !/^[A-Z0-9]{2,12}$/.test(to_asset) || !Number.isFinite(amount) || amount <= 0) {
+    return NextResponse.json({ error: "Enter valid assets and a positive conversion amount" }, { status: 400 })
   }
   if (from_asset === to_asset) {
     return NextResponse.json({ error: "Cannot convert an asset to itself" }, { status: 400 })
   }
 
-  // Fetch authoritative live prices server-side -- never trust a rate
-  // sent from the client, since it could be tampered with.
-  const origin = request.nextUrl.origin
-  let fromPrice = STABLE.has(from_asset) ? 1 : null
-  let toPrice = STABLE.has(to_asset) ? 1 : null
+  // Resolve current prices directly from external market sources. The dashboard
+  // endpoint may display cached/demo fallback values and must not be used to
+  // settle a conversion.
+  const fromPrice = STABLE.has(from_asset) ? 1 : await getLivePrice(from_asset, `${from_asset}/USDT`)
+  const toPrice = STABLE.has(to_asset) ? 1 : await getLivePrice(to_asset, `${to_asset}/USDT`)
 
-  if (fromPrice === null || toPrice === null) {
-    try {
-      const priceRes = await fetch(`${origin}/api/prices`, { cache: "no-store" })
-      const priceData = await priceRes.json()
-      const all = [...(priceData.crypto ?? [])]
-      if (fromPrice === null) fromPrice = all.find((c: any) => c.symbol === from_asset)?.price ?? null
-      if (toPrice === null) toPrice = all.find((c: any) => c.symbol === to_asset)?.price ?? null
-    } catch {
-      return NextResponse.json({ error: "Could not fetch live prices, try again" }, { status: 502 })
-    }
+  if (!Number.isFinite(fromPrice) || !Number.isFinite(toPrice) || Number(fromPrice) <= 0 || Number(toPrice) <= 0) {
+    return NextResponse.json({ error: "A valid live price is unavailable for one of the selected assets" }, { status: 400 })
   }
 
-  if (!fromPrice || !toPrice) {
-    return NextResponse.json({ error: "Price unavailable for one of the selected assets" }, { status: 400 })
+  const rate = Number(fromPrice) / Number(toPrice)
+  const toAmount = amount * rate
+  if (!Number.isFinite(toAmount) || toAmount <= 0) {
+    return NextResponse.json({ error: "Could not calculate a valid conversion amount" }, { status: 400 })
   }
-
-  const rate = fromPrice / toPrice
-  const toAmount = Number(amount) * rate
 
   const { error } = await supabase.rpc("perform_conversion", {
     p_user_id: user.id,
     p_from_asset: from_asset,
     p_to_asset: to_asset,
-    p_from_amount: Number(amount),
+    p_from_amount: amount,
     p_to_amount: toAmount,
     p_rate: rate,
   })

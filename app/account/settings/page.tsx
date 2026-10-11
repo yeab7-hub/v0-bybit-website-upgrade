@@ -32,6 +32,7 @@ export default function AccountSettingsPage() {
   const [nickname, setNickname] = useState("")
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [profileMessage, setProfileMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -43,13 +44,23 @@ export default function AccountSettingsPage() {
   }, [])
 
   const handleSaveNickname = async () => {
+    const nextNickname = nickname.trim()
+    if (!nextNickname || nextNickname.length > 60) {
+      setProfileMessage({ type: "error", text: "Nickname must be between 1 and 60 characters." })
+      return
+    }
+    setProfileMessage(null)
     try {
       const supabase = createClient()
-      await supabase.auth.updateUser({ data: { full_name: nickname } })
-      setEditing(null)
-      const { data } = await supabase.auth.getUser()
+      const { data, error } = await supabase.auth.updateUser({ data: { full_name: nextNickname } })
+      if (error) throw error
       setUser(data.user)
-    } catch {}
+      setNickname(nextNickname)
+      setEditing(null)
+      setProfileMessage({ type: "success", text: "Nickname updated." })
+    } catch (cause) {
+      setProfileMessage({ type: "error", text: cause instanceof Error ? cause.message : "Could not update your nickname." })
+    }
   }
 
   const handleSignOut = async () => {
@@ -72,25 +83,19 @@ export default function AccountSettingsPage() {
   const uid = user?.id?.slice(0, 8)?.toUpperCase() || "00000000"
 
   const myInfoItems = [
-    { icon: User, label: "Profile Picture", right: <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">{initials}</div>, href: "#" },
-    { icon: Pencil, label: "Nickname", right: <span className="text-sm text-muted-foreground">{maskedEmail}</span>, action: () => setEditing("nickname") },
+     
+    { icon: Pencil, label: "Nickname", right: <span className="text-sm text-muted-foreground">{nickname || "Set nickname"}</span>, action: () => { setProfileMessage(null); setEditing("nickname") } },
     { icon: Key, label: "UID", right: <button onClick={copyUID} className="flex items-center gap-1 text-sm text-muted-foreground">{uid} {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}</button> },
-    { icon: Shield, label: "Identity Verification", right: <span className="text-sm text-muted-foreground">Lv.1 Verified</span>, href: "/kyc" },
+    { icon: Shield, label: "Identity Verification", right: null, href: "/kyc" },
     { icon: Shield, label: "Security", right: null, href: "/account/security" },
-    { icon: Diamond, label: "VIP level", right: <span className="text-sm text-muted-foreground">Non-VIP</span>, href: "/fee-schedule" },
+    { icon: Diamond, label: "VIP level", right: null, href: "/fee-schedule" },
     { icon: Percent, label: "My Fee Rates", right: null, href: "/fee-schedule" },
-    { icon: Users, label: "Subaccount", right: null, href: "#" },
-    { icon: Link2, label: "Link Account", right: <Send className="h-4 w-4 text-primary" />, href: "#" },
-  ]
+   ]
 
   const preferenceItems = [
-    { icon: Clock, label: "Benchmark Time Zone", right: <span className="text-sm text-muted-foreground">Last 24 hours</span>, href: "#" },
-    { icon: Wallet, label: "Withdrawal Address", right: null, href: "#" },
-    { icon: Shield, label: "Manage Crypto Withdrawal Limits", right: null, href: "#" },
-    { icon: ArrowLeftRight, label: "Switch routing", right: null, href: "#" },
-    { icon: Route, label: "Route Deposits To", right: <span className="text-sm text-muted-foreground">Funding Account</span>, href: "#" },
+    { icon: Wallet, label: "Wallet & Withdrawal", right: null, href: "/wallet" },
     { icon: BellRing, label: "Notification Settings", right: null, href: "/account/notifications" },
-    { icon: MailOpen, label: "Email Subscriptions", right: null, href: "#" },
+    { icon: Shield, label: "Security Settings", right: null, href: "/account/security" },
   ]
 
   return (
@@ -118,35 +123,20 @@ export default function AccountSettingsPage() {
                 <ChevronRight className="h-5 w-5 rotate-180" />
               </button>
               <h1 className="text-base font-semibold text-foreground">User Center</h1>
-              <div className="flex items-center gap-2">
-                <button className="p-1 text-muted-foreground"><Moon className="h-5 w-5" /></button>
-                <button className="p-1 text-muted-foreground"><Globe className="h-5 w-5" /></button>
-              </div>
+              <span className="text-xs text-muted-foreground">Account settings</span>
             </div>
 
             {/* Profile Header */}
             <div className="mb-6 flex items-center gap-4">
-              <div className="relative">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#87ceeb]/30 text-xl font-bold text-primary">
-                  {initials}
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-success text-success-foreground">
-                  <Check className="h-3 w-3" />
-                </div>
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-xl font-bold text-primary">
+                {initials}
               </div>
               <div>
                 <h2 className="text-lg font-bold text-foreground">{maskedEmail}</h2>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm text-muted-foreground">Security level</span>
-                  <span className="text-sm font-medium text-success">High</span>
-                  <div className="flex gap-0.5">
-                    <div className="h-1.5 w-3 rounded-full bg-success" />
-                    <div className="h-1.5 w-3 rounded-full bg-success" />
-                    <div className="h-1.5 w-3 rounded-full bg-success" />
-                  </div>
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-                <span className="mt-0.5 inline-block rounded bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">Site: Bybit Global</span>
+                <Link href="/account/security" className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+                  Review account security <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+                <span className="mt-1 inline-block rounded bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">Trading Platform Account</span>
               </div>
             </div>
 
@@ -178,6 +168,7 @@ export default function AccountSettingsPage() {
                 {/* MY INFO TAB */}
                 {tab === "info" && (
                   <div className="flex flex-col">
+                    {profileMessage && <p role={profileMessage.type === "error" ? "alert" : "status"} className={`mb-3 rounded-lg p-3 text-sm ${profileMessage.type === "error" ? "bg-destructive/10 text-destructive" : "bg-emerald-500/10 text-emerald-500"}`}>{profileMessage.text}</p>}
                     {myInfoItems.map((item, i) => (
                       <div key={i}>
                         {editing === "nickname" && item.label === "Nickname" ? (
@@ -255,13 +246,8 @@ export default function AccountSettingsPage() {
                     <div className="rounded-xl bg-card p-5">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#87ceeb]/30 text-lg font-bold text-primary">
-                              {initials}
-                            </div>
-                            <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-success text-success-foreground">
-                              <Check className="h-2.5 w-2.5" />
-                            </div>
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-lg font-bold text-primary">
+                            {initials}
                           </div>
                           <div>
                             <h3 className="text-lg font-bold text-foreground">{maskedEmail}</h3>
@@ -270,16 +256,13 @@ export default function AccountSettingsPage() {
                               <button onClick={copyUID}>
                                 {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
                               </button>
-                              <span>|</span>
-                              <span>Site: Bybit Gl...</span>
                             </div>
                             <div className="mt-1 flex items-center gap-2">
-                              <span className="flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] text-foreground">
-                                <Check className="h-2.5 w-2.5" /> Verified
+                              <span className={`flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] ${user?.email_confirmed_at ? "text-success" : "text-muted-foreground"}`}>
+                                {user?.email_confirmed_at ? <Check className="h-2.5 w-2.5" /> : <Mail className="h-2.5 w-2.5" />}
+                                {user?.email_confirmed_at ? "Email verified" : "Email not verified"}
                               </span>
-                              <span className="flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                                Non-VIP <ChevronRight className="h-2.5 w-2.5" />
-                              </span>
+                              <span className="rounded bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">Standard account</span>
                             </div>
                           </div>
                         </div>
@@ -305,7 +288,7 @@ export default function AccountSettingsPage() {
                       <Link href="/card" className="flex items-center gap-3 rounded-xl bg-card p-4 transition-colors hover:bg-secondary/30">
                         <CreditCard className="h-6 w-6 text-muted-foreground" />
                         <div>
-                          <span className="text-sm font-medium text-foreground">Bybit Card</span>
+                          <span className="text-sm font-medium text-foreground">Card</span>
                           <p className="text-[11px] text-muted-foreground">Check Now</p>
                         </div>
                       </Link>
@@ -348,7 +331,7 @@ export default function AccountSettingsPage() {
                     {/* Bottom links */}
                     <div className="mt-8 flex items-center justify-center gap-8 border-t border-border pt-4">
                       <Link href="/about" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-                        Bybit Lite <ArrowLeftRight className="h-3.5 w-3.5" />
+                        About ByTradeBit <ArrowLeftRight className="h-3.5 w-3.5" />
                       </Link>
                       <div className="h-4 w-px bg-border" />
                       <Link href="/about" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">

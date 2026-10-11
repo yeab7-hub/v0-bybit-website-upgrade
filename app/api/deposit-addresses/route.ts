@@ -16,16 +16,18 @@ export async function GET() {
   // Group by symbol
   const grouped: Record<string, { symbol: string; name: string; minDeposit: number; confirmations: number; networks: { network: string; address: string; memo?: string }[] }> = {}
   for (const row of data ?? []) {
-    if (!grouped[row.symbol]) {
-      grouped[row.symbol] = {
-        symbol: row.symbol,
-        name: row.name,
+    // The legacy database contains "Ethereum" while balances/trades use "ETH".
+    const symbol = String(row.symbol).trim().toUpperCase() === "ETHEREUM" ? "ETH" : String(row.symbol).trim().toUpperCase()
+    if (!grouped[symbol]) {
+      grouped[symbol] = {
+        symbol,
+        name: symbol === "ETH" ? "Ethereum" : row.name,
         minDeposit: row.min_deposit,
         confirmations: row.confirmations,
         networks: [],
       }
     }
-    grouped[row.symbol].networks.push({
+    grouped[symbol].networks.push({
       network: row.network,
       address: row.address,
       ...(row.memo ? { memo: row.memo } : {}),

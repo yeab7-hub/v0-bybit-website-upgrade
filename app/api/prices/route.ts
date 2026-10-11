@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 
 /*
  * Price sources:
- *   Crypto:  CoinCap v2 -> Binance -> CoinGecko -> hardcoded
+ *   Crypto:  Bybit/Binance/CoinGecko live market data; no fabricated fallback prices
  *   Forex:   Frankfurter API (free, no key)
  *   Commodities / Stocks / CFDs: Multiple free sources tried in order
  */
@@ -24,18 +24,39 @@ const BYBIT_SYMBOLS = [
 
 async function fetchBybit(): Promise<any[] | null> {
   try {
-    const res = await fetch(BYBIT_TICKER, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(6000), cache: "no-store" })
+    const res = await fetch(BYBIT_TICKER, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(6000),
+      cache: "no-store",
+    })
     if (!res.ok) return null
     const json = await res.json()
     const rows = json?.result?.list
     if (!Array.isArray(rows)) return null
-    return rows.map((ticker: any) => {
-      const info = BYBIT_SYMBOLS.find((item) => item.symbol === ticker.symbol)
-      const price = Number(ticker.lastPrice)
-      const prev = Number(ticker.prevPrice24h)
-      return { id: info?.base?.toLowerCase() || ticker.symbol, symbol: info?.base || ticker.symbol.replace("USDT", ""), name: info?.name || ticker.symbol, price, change24h: Number(ticker.price24hPcnt || 0) * 100, volume: Number(ticker.turnover24h || 0), marketCap: 0, high24h: Number(ticker.highPrice24h || 0), low24h: Number(ticker.lowPrice24h || 0), sparkline: [], category: "crypto" }
-    }).filter((coin: any) => coin.price > 0)
-  } catch { return null }
+
+    return rows
+      .filter((ticker: any) => BYBIT_SYMBOLS.some((item) => item.symbol === ticker.symbol))
+      .map((ticker: any) => {
+        const info = BYBIT_SYMBOLS.find((item) => item.symbol === ticker.symbol)!
+        const price = Number(ticker.lastPrice)
+        return {
+          id: info.base.toLowerCase(),
+          symbol: info.base,
+          name: info.name,
+          price,
+          change24h: Number(ticker.price24hPcnt || 0) * 100,
+          volume: Number(ticker.turnover24h || 0),
+          marketCap: 0,
+          high24h: Number(ticker.highPrice24h || 0),
+          low24h: Number(ticker.lowPrice24h || 0),
+          sparkline: [],
+          category: "crypto",
+        }
+      })
+      .filter((coin: any) => Number.isFinite(coin.price) && coin.price > 0)
+  } catch {
+    return null
+  }
 }
 
 // ─── Source 2: CoinCap v2 ───
@@ -164,13 +185,13 @@ async function fetchCoinGecko(): Promise<any[] | null> {
 
 // ─── Forex: Frankfurter API (free, no key) ───
 const FOREX_BASE_PAIRS = [
-  { symbol: "EUR/USD", name: "EUR/USD", fallback: 1.0842, currency: "EUR", isInverse: true },
-  { symbol: "GBP/USD", name: "GBP/USD", fallback: 1.2634, currency: "GBP", isInverse: true },
-  { symbol: "USD/JPY", name: "USD/JPY", fallback: 149.85, currency: "JPY", isInverse: false },
-  { symbol: "AUD/USD", name: "AUD/USD", fallback: 0.6543, currency: "AUD", isInverse: true },
-  { symbol: "USD/CHF", name: "USD/CHF", fallback: 0.8821, currency: "CHF", isInverse: false },
-  { symbol: "USD/CAD", name: "USD/CAD", fallback: 1.3612, currency: "CAD", isInverse: false },
-  { symbol: "NZD/USD", name: "NZD/USD", fallback: 0.6102, currency: "NZD", isInverse: true },
+  { symbol: "EUR/USD", name: "EUR/USD", currency: "EUR", isInverse: true },
+  { symbol: "GBP/USD", name: "GBP/USD", currency: "GBP", isInverse: true },
+  { symbol: "USD/JPY", name: "USD/JPY", currency: "JPY", isInverse: false },
+  { symbol: "AUD/USD", name: "AUD/USD", currency: "AUD", isInverse: true },
+  { symbol: "USD/CHF", name: "USD/CHF", currency: "CHF", isInverse: false },
+  { symbol: "USD/CAD", name: "USD/CAD", currency: "CAD", isInverse: false },
+  { symbol: "NZD/USD", name: "NZD/USD", currency: "NZD", isInverse: true },
 ]
 
 let cachedForexRates: Record<string, number> | null = null
@@ -185,49 +206,49 @@ async function fetchForexRates(): Promise<Record<string, number> | null> {
     const res = await fetch(`https://api.frankfurter.dev/v1/latest?base=USD&symbols=${currencies}`, {
       signal: AbortSignal.timeout(5000),
     })
-    if (!res.ok) return cachedForexRates
+    if (!res.ok) return null
     const json = await res.json()
     if (json.rates) {
       cachedForexRates = json.rates
       forexCacheTime = now
       return json.rates
     }
-    return cachedForexRates
+    return null
   } catch {
-    return cachedForexRates
+    return null
   }
 }
 
 // ─── Commodities: fetched via Yahoo Finance futures (GC=F, SI=F, CL=F, etc.) ───
 const COMMODITIES_META = [
-  { symbol: "XAU/USD", name: "Gold", fallback: 2924.5, yahooSymbol: "GC=F" },
-  { symbol: "XAG/USD", name: "Silver", fallback: 32.78, yahooSymbol: "SI=F" },
-  { symbol: "WTI", name: "Crude Oil WTI", fallback: 71.24, yahooSymbol: "CL=F" },
-  { symbol: "BRENT", name: "Brent Crude", fallback: 74.89, yahooSymbol: "BZ=F" },
-  { symbol: "NG", name: "Natural Gas", fallback: 3.42, yahooSymbol: "NG=F" },
-  { symbol: "HG", name: "Copper", fallback: 4.52, yahooSymbol: "HG=F" },
+  { symbol: "XAU/USD", name: "Gold", yahooSymbol: "GC=F" },
+  { symbol: "XAG/USD", name: "Silver", yahooSymbol: "SI=F" },
+  { symbol: "WTI", name: "Crude Oil WTI", yahooSymbol: "CL=F" },
+  { symbol: "BRENT", name: "Brent Crude", yahooSymbol: "BZ=F" },
+  { symbol: "NG", name: "Natural Gas", yahooSymbol: "NG=F" },
+  { symbol: "HG", name: "Copper", yahooSymbol: "HG=F" },
 ]
 
 // ─── Stocks & CFDs: Yahoo Finance v8 (free, no key) ───
 const STOCKS_META = [
-  { symbol: "AAPL", name: "Apple Inc.", fallback: 232.4, yahooSymbol: "AAPL" },
-  { symbol: "MSFT", name: "Microsoft", fallback: 412.65, yahooSymbol: "MSFT" },
-  { symbol: "GOOGL", name: "Alphabet", fallback: 178.2, yahooSymbol: "GOOGL" },
-  { symbol: "AMZN", name: "Amazon", fallback: 215.8, yahooSymbol: "AMZN" },
-  { symbol: "TSLA", name: "Tesla", fallback: 348.9, yahooSymbol: "TSLA" },
-  { symbol: "NVDA", name: "NVIDIA", fallback: 138.5, yahooSymbol: "NVDA" },
-  { symbol: "META", name: "Meta Platforms", fallback: 582.3, yahooSymbol: "META" },
+  { symbol: "AAPL", name: "Apple Inc.", yahooSymbol: "AAPL" },
+  { symbol: "MSFT", name: "Microsoft", yahooSymbol: "MSFT" },
+  { symbol: "GOOGL", name: "Alphabet", yahooSymbol: "GOOGL" },
+  { symbol: "AMZN", name: "Amazon", yahooSymbol: "AMZN" },
+  { symbol: "TSLA", name: "Tesla", yahooSymbol: "TSLA" },
+  { symbol: "NVDA", name: "NVIDIA", yahooSymbol: "NVDA" },
+  { symbol: "META", name: "Meta Platforms", yahooSymbol: "META" },
 ]
 
 const CFDS_META = [
-  { symbol: "US30", name: "US Wall St 30", fallback: 42850, yahooSymbol: "^DJI" },
-  { symbol: "US500", name: "US 500", fallback: 5920, yahooSymbol: "^GSPC" },
-  { symbol: "US100", name: "US Tech 100", fallback: 21150, yahooSymbol: "^NDX" },
-  { symbol: "UK100", name: "UK 100", fallback: 8415, yahooSymbol: "^FTSE" },
-  { symbol: "DE40", name: "Germany 40", fallback: 22340, yahooSymbol: "^GDAXI" },
-  { symbol: "JP225", name: "Japan 225", fallback: 38750, yahooSymbol: "^N225" },
-  { symbol: "HK50", name: "Hong Kong 50", fallback: 22480, yahooSymbol: "^HSI" },
-  { symbol: "VIX", name: "Volatility Index", fallback: 15.8, yahooSymbol: "^VIX" },
+  { symbol: "US30", name: "US Wall St 30", yahooSymbol: "^DJI" },
+  { symbol: "US500", name: "US 500", yahooSymbol: "^GSPC" },
+  { symbol: "US100", name: "US Tech 100", yahooSymbol: "^NDX" },
+  { symbol: "UK100", name: "UK 100", yahooSymbol: "^FTSE" },
+  { symbol: "DE40", name: "Germany 40", yahooSymbol: "^GDAXI" },
+  { symbol: "JP225", name: "Japan 225", yahooSymbol: "^N225" },
+  { symbol: "HK50", name: "Hong Kong 50", yahooSymbol: "^HSI" },
+  { symbol: "VIX", name: "Volatility Index", yahooSymbol: "^VIX" },
 ]
 
 let cachedYahooData: Record<string, { price: number; change: number; high: number; low: number; volume: number }> = {}
@@ -308,23 +329,8 @@ async function fetchYahooQuotes(symbols: string[]): Promise<Record<string, { pri
     yahooCacheTime = now
     return prices
   }
-  return Object.keys(cachedYahooData).length > 0 ? cachedYahooData : null
-}
-
-// ─── Drift for when APIs are unavailable ───
-const driftState = new Map<string, number>()
-function getDriftPrice(symbol: string, base: number) {
-  const existing = driftState.get(symbol)
-  const maxDrift = base * 0.015
-  const step = base * 0.0004
-  let current: number
-  if (existing !== undefined) {
-    current = Math.max(base - maxDrift, Math.min(base + maxDrift, existing + (Math.random() - 0.48) * step * 2))
-  } else {
-    current = base + (Math.random() - 0.5) * base * 0.004
-  }
-  driftState.set(symbol, current)
-  return { price: current, change: ((current - base) / base) * 100 }
+  // Never serve an expired quote cache as a current market price.
+  return null
 }
 
 // ─── Cache ───
@@ -367,9 +373,11 @@ export async function GET() {
       if (cryptoData && cryptoData.length > 0) {
         cachedCrypto = cryptoData
         cacheTime = now
-      } else if (cachedCrypto) {
-        cryptoData = cachedCrypto
-        lastSource = "stale-cache"
+      } else {
+        // An expired cache is not a current quote. Fail closed instead of
+        // presenting stale prices as though they were live.
+        cryptoData = null
+        lastSource = "unavailable"
       }
     }
 

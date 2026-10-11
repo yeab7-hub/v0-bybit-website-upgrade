@@ -6,39 +6,10 @@ import { Footer } from "@/components/footer"
 import { Gift, Trophy, Star, Zap, Clock, Check, Lock, ChevronRight, Target, Flame } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-const missions = [
-  { title: "First Trade", desc: "Complete your first spot trade", reward: "5 USDT", progress: 100, status: "claimed" },
-  { title: "Deposit $100+", desc: "Make a deposit of $100 or more", reward: "10 USDT", progress: 100, status: "claimable" },
-  { title: "Trade 5 Days", desc: "Trade on 5 different days", reward: "15 USDT", progress: 60, status: "active", current: 3, total: 5 },
-  { title: "Refer a Friend", desc: "Invite a friend who signs up", reward: "20 USDT", progress: 0, status: "locked" },
-  { title: "KYC Verification", desc: "Complete identity verification", reward: "10 USDT", progress: 0, status: "locked" },
-  { title: "Trade $10,000 Volume", desc: "Reach $10,000 in trading volume", reward: "50 USDT", progress: 35, status: "active", current: 3500, total: 10000 },
-]
-
-const dailyCheckins = [
-  { day: 1, reward: "1 USDT", claimed: true },
-  { day: 2, reward: "1 USDT", claimed: true },
-  { day: 3, reward: "2 USDT", claimed: true },
-  { day: 4, reward: "2 USDT", claimed: false },
-  { day: 5, reward: "3 USDT", claimed: false },
-  { day: 6, reward: "3 USDT", claimed: false },
-  { day: 7, reward: "5 USDT", claimed: false },
-]
-
-const coupons = [
-  { type: "Trading Fee", value: "20% Off", expiry: "Mar 15, 2024", status: "active" },
-  { type: "Deposit Bonus", value: "$50 Bonus", expiry: "Feb 28, 2024", status: "active" },
-  { type: "Futures Trial", value: "100 USDT", expiry: "Apr 1, 2024", status: "active" },
-  { type: "VIP Upgrade", value: "7-Day VIP", expiry: "Feb 20, 2024", status: "expired" },
-]
-
-const vipLevels = [
-  { level: "Regular", volume: "$0", fee: "0.10%", benefits: 1 },
-  { level: "VIP 1", volume: "$1M", fee: "0.08%", benefits: 3, current: true },
-  { level: "VIP 2", volume: "$5M", fee: "0.06%", benefits: 5 },
-  { level: "VIP 3", volume: "$25M", fee: "0.04%", benefits: 8 },
-  { level: "VVIP", volume: "$100M", fee: "0.02%", benefits: 12 },
-]
+const missions: any[] = []
+const dailyCheckins: any[] = []
+const coupons: any[] = []
+const vipLevels: any[] = []
 
 export default function RewardsPage() {
   const [tab, setTab] = useState<"missions" | "coupons" | "vip">("missions")
@@ -51,22 +22,23 @@ export default function RewardsPage() {
         <div className="border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
           <div className="mx-auto max-w-[1400px] px-4 py-10 lg:py-14">
             <div className="flex items-center gap-2 text-primary"><Gift className="h-5 w-5" /><span className="text-xs font-semibold uppercase tracking-wider">Rewards Hub</span></div>
-            <h1 className="mt-2 text-2xl font-bold text-foreground lg:text-3xl">Earn Rewards Every Day</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Complete missions, check in daily, and unlock exclusive bonuses.</p>
+            <h1 className="mt-2 text-2xl font-bold text-foreground lg:text-3xl">Rewards and VIP status</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Reward campaigns, coupon issuance, check-ins, and VIP volume calculations are not connected. No reward balance or eligibility is available to claim.</p>
             <div className="mt-6 flex gap-6">
-              <div><div className="text-xl font-bold text-primary">$85.00</div><div className="text-xs text-muted-foreground">Total Earned</div></div>
-              <div><div className="text-xl font-bold text-foreground">3</div><div className="text-xs text-muted-foreground">Active Coupons</div></div>
-              <div><div className="text-xl font-bold text-[#0ecb81]">VIP 1</div><div className="text-xs text-muted-foreground">Current Tier</div></div>
+              <div><div className="text-xl font-bold text-primary">Unavailable</div><div className="text-xs text-muted-foreground">Total Earned</div></div>
+              <div><div className="text-xl font-bold text-foreground">Not connected</div><div className="text-xs text-muted-foreground">Active Coupons</div></div>
+              <div><div className="text-xl font-bold text-[#0ecb81]">Not configured</div><div className="text-xs text-muted-foreground">Current Tier</div></div>
             </div>
           </div>
         </div>
 
+        <div role="status" className="mx-auto mt-4 max-w-[1400px] rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">Rewards are not configured. Claims, check-ins, coupons, and VIP tiers are disabled until backed by verified account data and a reward ledger.</div>
         <div className="mx-auto max-w-[1400px] px-4 py-6">
           {/* Daily Check-in */}
           <div className="mb-8 rounded-xl border border-border bg-card p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-sm font-bold text-foreground"><Flame className="h-4 w-4 text-primary" /> Daily Check-in</h2>
-              <span className="text-xs text-muted-foreground">Day 3 of 7</span>
+              <span className="text-xs text-muted-foreground">Not configured</span>
             </div>
             <div className="grid grid-cols-7 gap-2">
               {dailyCheckins.map((d, i) => (
@@ -77,7 +49,7 @@ export default function RewardsPage() {
                 </div>
               ))}
             </div>
-            <Button className="mt-4 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90" size="sm">Check In Today</Button>
+            <Button disabled title="Daily check-in rewards are not connected" className="mt-4 w-full" size="sm">Check-in unavailable</Button>
           </div>
 
           {/* Tabs */}
@@ -115,6 +87,7 @@ export default function RewardsPage() {
                   )}
                 </div>
               ))}
+              {missions.length === 0 && <p className="rounded-lg border border-border p-6 text-center text-sm text-muted-foreground">No verified reward missions are configured.</p>}
             </div>
           )}
 
@@ -132,6 +105,7 @@ export default function RewardsPage() {
                   </Button>
                 </div>
               ))}
+              {coupons.length === 0 && <p className="col-span-full rounded-lg border border-border p-6 text-center text-sm text-muted-foreground">No verified coupons are available.</p>}
             </div>
           )}
 
@@ -139,11 +113,11 @@ export default function RewardsPage() {
             <div>
               <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-5">
                 <div className="flex items-center justify-between">
-                  <div><div className="text-xs text-muted-foreground">Current Level</div><div className="text-xl font-bold text-primary">VIP 1</div></div>
-                  <div className="text-right"><div className="text-xs text-muted-foreground">30D Volume</div><div className="text-lg font-bold text-foreground">$1,245,000</div></div>
+                  <div><div className="text-xs text-muted-foreground">Current Level</div><div className="text-xl font-bold text-primary">Not configured</div></div>
+                  <div className="text-right"><div className="text-xs text-muted-foreground">30D Volume</div><div className="text-lg font-bold text-foreground">Not connected</div></div>
                 </div>
-                <div className="mt-3"><div className="mb-1 flex justify-between text-[10px] text-muted-foreground"><span>$1.2M / $5M to VIP 2</span><span>24%</span></div>
-                  <div className="h-2 w-full rounded-full bg-border"><div className="h-full rounded-full bg-primary" style={{ width: "24%" }} /></div>
+                <div className="mt-3"><div className="mb-1 flex justify-between text-[10px] text-muted-foreground"><span>Volume calculation unavailable</span><span>—</span></div>
+                  <div className="h-2 w-full rounded-full bg-border"><div className="h-full rounded-full bg-primary" style={{ width: "0%" }} /></div>
                 </div>
               </div>
               <div className="overflow-x-auto rounded-xl border border-border bg-card">

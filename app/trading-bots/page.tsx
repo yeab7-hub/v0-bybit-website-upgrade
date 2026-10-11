@@ -12,42 +12,42 @@ import { Button } from "@/components/ui/button"
 
 const bots = [
   {
-    icon: BarChart3, title: "Grid Bot", desc: "Automatically buy low and sell high within a price range. Ideal for sideways markets.",
-    stats: "Avg. +12.5% monthly", tag: "Most Popular", color: "text-primary bg-primary/10",
-    features: ["Set price range", "Auto grid orders", "Profit per grid"],
+    icon: BarChart3, title: "Grid Bot", desc: "Grid strategy information only. The bot engine is not connected, so no orders will be placed.",
+    stats: "Execution not connected", tag: "Unavailable", color: "text-primary bg-primary/10",
+    features: ["Price range UI not connected", "Order execution not connected", "Profit tracking not connected"],
   },
   {
-    icon: TrendingUp, title: "DCA Bot", desc: "Dollar-cost average into positions over time. Reduce the impact of volatility on your portfolio.",
-    stats: "Consistent returns", tag: "Beginner Friendly", color: "text-success bg-success/10",
-    features: ["Time-based entry", "Custom intervals", "Auto-reinvest"],
+    icon: TrendingUp, title: "DCA Bot", desc: "DCA strategy information only. Scheduled purchases and execution are not configured.",
+    stats: "Execution not connected", tag: "Unavailable", color: "text-success bg-success/10",
+    features: ["Scheduling not configured", "Intervals not configured", "Reinvestment not configured"],
   },
   {
-    icon: RefreshCw, title: "Arbitrage Bot", desc: "Exploit price differences across markets. Capture risk-free profits from market inefficiencies.",
-    stats: "Low risk", tag: "Advanced", color: "text-chart-4 bg-chart-4/10",
-    features: ["Cross-exchange", "Real-time detection", "Auto-execution"],
+    icon: RefreshCw, title: "Arbitrage Bot", desc: "A strategy concept that seeks price differences across markets; it is not risk-free and is not executable in this app yet.",
+    stats: "Execution not connected", tag: "Advanced", color: "text-chart-4 bg-chart-4/10",
+    features: ["Exchange connections not configured", "Market monitoring not configured", "Execution not configured"],
   },
   {
-    icon: Target, title: "Smart Trade Bot", desc: "Advanced order types with trailing stop-loss and take-profit. Maximize gains, minimize losses.",
-    stats: "Risk managed", tag: "Pro Trader", color: "text-chart-5 bg-chart-5/10",
-    features: ["Trailing stop", "Multiple targets", "Break-even stop"],
+    icon: Target, title: "Smart Trade Bot", desc: "Smart-order strategy information only. Trailing stops and automated risk controls are not connected.",
+    stats: "Risk controls not connected", tag: "Unavailable", color: "text-chart-5 bg-chart-5/10",
+    features: ["Trailing stops not configured", "Targets not configured", "Break-even logic not configured"],
   },
   {
-    icon: LineChart, title: "Futures Grid Bot", desc: "Grid trading with leverage on perpetual contracts. Amplify returns with controlled risk.",
-    stats: "Up to 50x leverage", tag: "High Yield", color: "text-primary bg-primary/10",
-    features: ["Long/Short grid", "Leverage support", "Auto-deleverage"],
+    icon: LineChart, title: "Futures Grid Bot", desc: "Futures-grid strategy information only. Derivatives, leverage, and bot execution are not configured.",
+    stats: "Execution not connected", tag: "Unavailable", color: "text-primary bg-primary/10",
+    features: ["Position logic not configured", "Leverage not enabled", "Risk engine not configured"],
   },
   {
-    icon: DollarSign, title: "Spot-Futures Arbitrage", desc: "Earn funding rates by hedging spot positions with futures. Market-neutral strategy.",
-    stats: "~15-40% APY", tag: "Stable Returns", color: "text-success bg-success/10",
-    features: ["Delta neutral", "Funding yield", "Auto-rebalance"],
+    icon: DollarSign, title: "Spot-Futures Arbitrage", desc: "Spot-futures arbitrage information only. Derivatives, funding data, and automated hedging are not connected.",
+    stats: "Yield data not available", tag: "Unavailable", color: "text-success bg-success/10",
+    features: ["Hedging logic not configured", "Funding data not connected", "Rebalancing not configured"],
   },
 ]
 
 const stats = [
-  { label: "Active Bots", value: "120,000+" },
-  { label: "Total Bot Volume", value: "$8.5B+" },
-  { label: "Avg. Bot ROI", value: "+28.6%" },
-  { label: "Bot Strategies", value: "6" },
+  { label: "Bot execution", value: "Unavailable" },
+  { label: "Live performance", value: "Not connected" },
+  { label: "Exchange API", value: "Not configured" },
+  { label: "Strategy concepts", value: "6" },
 ]
 
 export default function TradingBotsPage() {
@@ -66,21 +66,24 @@ export default function TradingBotsPage() {
                 Trading Bots
               </h1>
               <p className="mt-4 text-pretty text-lg text-muted-foreground">
-                Automate your trading strategy 24/7 with powerful trading bots.
-                No coding required -- set up in minutes and let the bot do the work.
+                Explore strategy concepts. Automated execution, exchange connectivity, risk controls, and performance tracking are not connected yet; no bot can be created or run from this page.
               </p>
               <div className="mt-8 flex items-center justify-center gap-3">
-                <Link href="/register">
-                  <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                    Create a Bot <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
+                <Button disabled title="Bot execution is not integrated" size="lg">
+                  Bot creation unavailable
+                </Button>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Stats */}
+        <section className="border-b border-amber-500/20 bg-amber-500/5">
+          <div className="mx-auto max-w-[1400px] px-4 py-3 text-center text-sm text-muted-foreground" role="status">
+            Automated orders are not sent to an exchange from this app. No returns, APY, or bot performance are being promised.
+          </div>
+        </section>
+
+        {/* Integration status, not fabricated live statistics */}
         <section className="border-b border-border">
           <div className="mx-auto max-w-[1400px] px-4 py-8">
             <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
@@ -119,11 +122,9 @@ export default function TradingBotsPage() {
                       </li>
                     ))}
                   </ul>
-                  <Link href="/register" className="mt-5 block">
-                    <Button className="w-full" variant="outline" size="sm">
-                      Create Bot <ArrowRight className="ml-2 h-3.5 w-3.5" />
-                    </Button>
-                  </Link>
+                  <Button disabled title="Bot execution is not integrated" className="mt-5 w-full" variant="outline" size="sm">
+                    Bot unavailable
+                  </Button>
                 </div>
               ))}
             </div>
@@ -136,9 +137,9 @@ export default function TradingBotsPage() {
             <h2 className="mb-8 text-center text-3xl font-bold text-foreground">How It Works</h2>
             <div className="grid gap-8 md:grid-cols-3">
               {[
-                { step: "01", title: "Choose a Strategy", desc: "Pick from Grid, DCA, Arbitrage, or Smart Trade bots based on your goals and risk tolerance." },
-                { step: "02", title: "Configure Parameters", desc: "Set your price range, investment amount, and risk parameters. Use AI-recommended settings for easy setup." },
-                { step: "03", title: "Activate & Monitor", desc: "Start your bot and track performance in real-time. Adjust settings or stop anytime with full control." },
+                { step: "01", title: "Choose a Strategy", desc: "Strategy examples are shown for reference; no trading bot is currently available to activate." },
+                { step: "02", title: "Configure Parameters", desc: "Bot configuration and AI recommendations are not connected." },
+                { step: "03", title: "Activate & Monitor", desc: "Bot activation and performance tracking are not available until the execution engine is integrated." },
               ].map((s) => (
                 <div key={s.step} className="rounded-xl border border-border bg-card p-6">
                   <div className="mb-4 font-mono text-4xl font-bold text-primary/20">{s.step}</div>

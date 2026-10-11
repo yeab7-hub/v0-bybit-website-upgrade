@@ -14,11 +14,7 @@ const sidebarItems = [
   { label: "API Management", href: "/account/api-management", icon: Key, active: true },
 ]
 
-const existingKeys = [
-  { name: "Trading Bot #1", apiKey: "xk8f...9d2a", created: "2024-01-15", lastUsed: "2 min ago", permissions: ["Read", "Spot Trade"], ipRestriction: "192.168.1.100", status: "active" },
-  { name: "Portfolio Tracker", apiKey: "m3j7...1b4c", created: "2024-02-20", lastUsed: "1 hour ago", permissions: ["Read"], ipRestriction: "Any", status: "active" },
-  { name: "Old Bot Key", apiKey: "p9w2...7e5f", created: "2023-08-10", lastUsed: "30 days ago", permissions: ["Read", "Spot Trade", "Futures Trade"], ipRestriction: "10.0.0.1", status: "expired" },
-]
+const existingKeys: { name: string; apiKey: string; created: string; lastUsed: string; permissions: string[]; ipRestriction: string; status: string }[] = []
 
 export default function APIManagementPage() {
   const [showCreate, setShowCreate] = useState(false)
@@ -69,9 +65,14 @@ export default function APIManagementPage() {
                 <h1 className="text-xl font-bold text-foreground">API Management</h1>
                 <p className="text-xs text-muted-foreground">Create and manage API keys for programmatic access</p>
               </div>
-              <Button onClick={() => setShowCreate(!showCreate)} size="sm" className="bg-primary text-xs font-semibold text-primary-foreground hover:bg-primary/90">
-                <Plus className="mr-1 h-3.5 w-3.5" /> Create API Key
+              <Button disabled title="API key storage and authentication are not implemented yet" size="sm" className="bg-secondary text-xs font-semibold text-muted-foreground">
+                <Plus className="mr-1 h-3.5 w-3.5" /> API keys unavailable
               </Button>
+            </div>
+
+            <div role="status" className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+              <p className="text-sm font-semibold text-foreground">API key management is not connected</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">This app does not yet have a secure API-key store, secret rotation, or API-key authentication middleware. No API keys are active here; create and revoke controls are disabled rather than showing demo keys.</p>
             </div>
 
             {/* Warning */}
@@ -79,7 +80,7 @@ export default function APIManagementPage() {
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <div>
                 <p className="text-xs font-medium text-foreground">Keep your API keys secure</p>
-                <p className="text-[10px] text-muted-foreground">Never share your Secret Key. Use IP restrictions for added security. You can create up to 30 API keys.</p>
+                <p className="text-[10px] text-muted-foreground">When API-key creation is implemented, use IP restrictions and keep secrets private. API keys cannot currently be created or used from this app.</p>
               </div>
             </div>
 
@@ -120,6 +121,7 @@ export default function APIManagementPage() {
 
             {/* Existing keys */}
             <div className="space-y-3">
+              {existingKeys.length === 0 && <p className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No configured API keys.</p>}
               {existingKeys.map((key, i) => (
                 <div key={i} className="rounded-xl border border-border bg-card p-5">
                   <div className="flex items-center justify-between">

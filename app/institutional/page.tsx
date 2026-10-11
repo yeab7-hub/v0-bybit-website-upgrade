@@ -7,26 +7,26 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 const features = [
-  { icon: Zap, title: "Ultra-Low Latency", desc: "Co-located servers with sub-millisecond execution for high-frequency strategies." },
-  { icon: BarChart3, title: "Deep Liquidity", desc: "Access aggregated order books with institutional-grade depth across all markets." },
-  { icon: Shield, title: "Enterprise Security", desc: "Multi-signature cold storage, SOC 2 compliance, and dedicated security team." },
-  { icon: Lock, title: "Segregated Accounts", desc: "Fully segregated client funds with proof of reserves published monthly." },
-  { icon: Server, title: "Dedicated Infrastructure", desc: "Private API endpoints, custom rate limits, and dedicated matching engines." },
-  { icon: HeadphonesIcon, title: "24/7 VIP Support", desc: "Dedicated account manager and priority support with direct escalation." },
+  { icon: Zap, title: "Ultra-Low Latency", desc: "Institutional matching infrastructure and execution latency are not configured or independently measured." },
+  { icon: BarChart3, title: "Deep Liquidity", desc: "Aggregated institutional liquidity feeds are not connected." },
+  { icon: Shield, title: "Enterprise Security", desc: "Custody arrangements, certifications, and dedicated institutional security operations are not verified here." },
+  { icon: Lock, title: "Segregated Accounts", desc: "Segregated accounts and audited proof-of-reserves reporting are not implemented in this application." },
+  { icon: Server, title: "Dedicated Infrastructure", desc: "Institutional API endpoints, custom rate limits, and dedicated matching engines are not configured." },
+  { icon: HeadphonesIcon, title: "24/7 VIP Support", desc: "Institutional account management and service-level commitments are not configured." },
 ]
 
 const solutions = [
-  { title: "OTC Trading", desc: "Execute large block trades with minimal market impact through our OTC desk. Competitive pricing and instant settlement.", benefits: ["$100K+ minimum", "Competitive spreads", "T+0 settlement", "150+ tokens"] },
-  { title: "Sub-Account Management", desc: "Manage multiple strategies and portfolios with sub-accounts, each with independent risk parameters.", benefits: ["Up to 50 sub-accounts", "Individual risk limits", "Cross-collateral", "Unified reporting"] },
-  { title: "Custody Solutions", desc: "Institutional-grade custody with multi-party computation (MPC) technology and insurance coverage.", benefits: ["MPC technology", "Insurance coverage", "$500M+ secured", "SOC 2 Type II"] },
-  { title: "API Trading Suite", desc: "Enterprise APIs with WebSocket feeds, FIX protocol support, and dedicated connectivity options.", benefits: ["REST & WebSocket", "FIX protocol", "Co-location available", "99.99% uptime"] },
+  { title: "OTC Trading", desc: "OTC liquidity, broker execution, and settlement are not connected.", benefits: ["Liquidity provider not configured", "Spreads not verified", "Settlement terms not configured", "Supported assets not verified"] },
+  { title: "Sub-Account Management", desc: "Institutional sub-account creation and risk segregation are not configured.", benefits: ["Sub-account limits not configured", "Risk limits not configured", "Collateral rules not configured", "Reporting integration not configured"] },
+  { title: "Custody Solutions", desc: "Institutional custody, MPC key management, and insurance integrations are not configured.", benefits: ["Custody provider required", "Insurance provider required", "Not verified", "Certification not verified"] },
+  { title: "API Trading Suite", desc: "A secure institutional API gateway, FIX protocol, and dedicated connectivity are not configured.", benefits: ["API gateway not configured", "FIX not configured", "Co-location not verified", "Uptime not measured"] },
 ]
 
 const stats = [
-  { value: "$50B+", label: "Daily Volume" },
-  { value: "40M+", label: "Global Users" },
-  { value: "99.99%", label: "System Uptime" },
-  { value: "500+", label: "Trading Pairs" },
+  { value: "Not connected", label: "Daily volume" },
+  { value: "Not verified", label: "Global users" },
+  { value: "Not measured", label: "System uptime" },
+  { value: "Provider-dependent", label: "Available instruments" },
 ]
 
 export default function InstitutionalPage() {
@@ -39,8 +39,8 @@ export default function InstitutionalPage() {
           <div className="mx-auto max-w-[1200px] px-4 py-12 lg:py-20">
             <div className="mx-auto max-w-2xl text-center">
               <span className="text-xs font-semibold uppercase tracking-wider text-primary">Institutional Services</span>
-              <h1 className="mt-3 text-3xl font-bold tracking-tight lg:text-5xl">Built for Institutional-Grade Trading</h1>
-              <p className="mt-4 text-sm text-muted-foreground lg:text-base">Deep liquidity, advanced infrastructure, and dedicated support tailored for funds, market makers, and professional traders.</p>
+              <h1 className="mt-3 text-3xl font-bold tracking-tight lg:text-5xl">Institutional Services Integration Status</h1>
+              <p className="mt-4 text-sm text-muted-foreground lg:text-base">Institutional trading, custody, liquidity, and support integrations are not configured. This page does not offer institutional services yet.</p>
               <div className="mt-6 flex items-center justify-center gap-3">
                 <Link href="/register"><Button className="h-11 rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground">Get Started <ArrowRight className="ml-1.5 h-4 w-4" /></Button></Link>
                 <Link href="/support"><Button variant="outline" className="h-11 rounded-lg border-border px-6 text-sm font-semibold">Contact Sales</Button></Link>
@@ -64,7 +64,7 @@ export default function InstitutionalPage() {
         {/* Features */}
         <section className="border-b border-border">
           <div className="mx-auto max-w-[1200px] px-4 py-10 lg:py-14">
-            <h2 className="mb-8 text-center text-xl font-bold">Why Institutions Choose Bybit</h2>
+            <h2 className="mb-8 text-center text-xl font-bold">Institutional Capability Status</h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {features.map((f) => (
                 <div key={f.title} className="rounded-xl border border-border bg-card p-5">

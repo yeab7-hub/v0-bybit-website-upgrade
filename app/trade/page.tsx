@@ -24,7 +24,7 @@ const percentages = [0, 25, 50, 75, 100]
 type OrderSide = "buy" | "sell"
 type OrderType = "Market" | "Limit" | "Stop-Limit"
 type BottomTab = "orders" | "positions" | "history" | "assets"
-type TradeMode = "Spot" | "Futures" | "Options"
+type TradeMode = "Spot" | "Futures"
 
 export default function TradePage() {
   const searchParams = useSearchParams()
@@ -45,14 +45,10 @@ export default function TradePage() {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<any>(null)
   const [tradeMode, setTradeMode] = useState<TradeMode>("Spot")
-  const [marginEnabled, setMarginEnabled] = useState(false)
-  const [postOnly, setPostOnly] = useState(false)
-  const [reduceOnly, setReduceOnly] = useState(false)
   const [tpslEnabled, setTpslEnabled] = useState(false)
   const [takeProfit, setTakeProfit] = useState("")
   const [stopLoss, setStopLoss] = useState("")
   const [leverage, setLeverage] = useState("10x")
-  const [marginType, setMarginType] = useState("Cross")
   const [durationSeconds, setDurationSeconds] = useState<number | null>(null)
   const [fundingCountdown, setFundingCountdown] = useState("--:--:--")
 
@@ -91,9 +87,16 @@ export default function TradePage() {
   const allPrices = [...(commodities ?? []), ...(forex ?? []), ...(stocks ?? []), ...(cfd ?? []), ...(crypto ?? [])]
 
   const isCryptoPair = selectedPair.endsWith("USDT") && !selectedPair.includes("/")
-  const pairDisplay = isCryptoPair ? selectedPair.replace("USDT", "/USDT") : selectedPair
+  const isSingleSymbol = !selectedPair.includes("/") && !isCryptoPair
+  // Single-symbol stocks/commodities/indices are settled internally against USDT.
+  // The market lookup still uses the original symbol; only the ledger pair gets a quote asset.
+  const pairDisplay = isCryptoPair
+    ? selectedPair.replace("USDT", "/USDT")
+    : isSingleSymbol
+      ? `${selectedPair}/USDT`
+      : selectedPair
   const baseAsset = isCryptoPair ? selectedPair.replace("USDT", "") : selectedPair.split("/")[0] || selectedPair
-  const quoteAsset = isCryptoPair ? "USDT" : (selectedPair.split("/")[1] || "USD")
+  const quoteAsset = isCryptoPair || isSingleSymbol ? "USDT" : (selectedPair.split("/")[1] || "USD")
 
   // safeFindPrice guarantees non-crypto pairs never resolve to a crypto price
   const liveCoin = safeFindPrice(allPrices, selectedPair)
@@ -167,7 +170,7 @@ export default function TradePage() {
     if (orders.length === 0) return
     const checkFills = async () => {
       try {
-        const res = await fetch("/api/trade/fill")
+        const res = await fetch("/api/trade/fill", { method: "POST" })
         const data = await res.json()
         if (data.filled > 0) {
           globalMutate("/api/trade?type=orders")
@@ -187,7 +190,7 @@ export default function TradePage() {
     if (positions.length === 0) return
     const checkTpSl = async () => {
       try {
-        const res = await fetch("/api/trade/monitor")
+        const res = await fetch("/api/trade/monitor", { method: "POST" })
         const data = await res.json()
         if (data.closed > 0) {
           globalMutate("/api/trade?type=positions")
@@ -205,6 +208,9 @@ export default function TradePage() {
     const effectiveSide = sideOverride ?? side
     if (!user) { setFeedback({ type: "error", msg: "Please log in to trade" }); return }
     if (baseQty <= 0) { setFeedback({ type: "error", msg: "Enter a valid amount" }); return }
+    if (tpslEnabled && !isFutures && effectiveSide === "sell") { setFeedback({ type: "error", msg: "Spot TP/SL is available on buy positions. Use Futures for short-position TP/SL." }); return }
+    if (tpslEnabled && !takeProfit.trim() && !stopLoss.trim()) { setFeedback({ type: "error", msg: "Enter a Take Profit or Stop Loss price." }); return }
+    if (orderType === "Stop-Limit" && isFutures) { setFeedback({ type: "error", msg: "Futures Stop-Limit is not available yet. Choose Market or Limit." }); return }
     if (orderType === "Stop-Limit" && (!stopPrice || parseFloat(stopPrice) <= 0)) {
       setFeedback({ type: "error", msg: "Enter a trigger price" }); return
     }
@@ -253,22 +259,31 @@ export default function TradePage() {
   }
 
   const cancelOrder = async (orderId: string) => {
-    await fetch(`/api/trade?id=${orderId}`, { method: "DELETE" })
-    globalMutate("/api/trade?type=orders")
-    globalMutate("/api/trade?type=balances")
+    setFeedback(null)
+    try {
+      const response = await fetch(`/api/trade?id=${encodeURIComponent(orderId)}`, { method: "DELETE" })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || "Could not cancel this order.")
+      await Promise.all([
+        globalMutate("/api/trade?type=orders"),
+        globalMutate("/api/trade?type=balances"),
+        globalMutate("/api/trade?type=order_history"),
+      ])
+      setFeedback({ type: "success", msg: "Order cancelled." })
+    } catch (cause) {
+      setFeedback({ type: "error", msg: cause instanceof Error ? cause.message : "Could not cancel this order." })
+    }
+    window.setTimeout(() => setFeedback(null), 4000)
   }
 
-  const closePosition = async (tradeId: string, pair?: string) => {
+  const closePosition = async (tradeId: string) => {
     setClosingId(tradeId)
     try {
-      // Use the live price currently shown on screen for this asset as the exit
-      // price, so the trade settles at the value the user sees rather than a
-      // stale server re-fetch. The backend validates this against its own feed.
-      const closePrice = pair ? safeFindPrice(allPrices, pair)?.price : undefined
+      // The server determines the settlement price from its verified market feed.
       const res = await fetch("/api/trade/close", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tradeId, closePrice }),
+        body: JSON.stringify({ tradeId }),
       })
       const data = await res.json()
       if (data.success) {
@@ -292,7 +307,7 @@ export default function TradePage() {
 
   const handleShare = async (detail: any) => {
     const pnl = Number(detail.pnl) || 0
-    const text = `${detail.pair} | ${detail.side?.toUpperCase()} | ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT\nPrice: $${Number(detail.price).toLocaleString()} | Qty: ${Number(detail.amount).toFixed(4)}\nTraded on Bybit`
+    const text = `${detail.pair} | ${detail.side?.toUpperCase()} | ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT\nPrice: $${Number(detail.price).toLocaleString()} | Qty: ${Number(detail.amount).toFixed(4)}\nTraded on this platform`
     if (navigator.share) {
       try { await navigator.share({ title: "My Trade", text }) } catch {}
     } else {
@@ -300,32 +315,30 @@ export default function TradePage() {
     }
   }
 
-  // Order book data via Binance WebSocket
+  // Only render depth received from an actual provider feed. Do not synthesize
+  // order-book quantities for asset classes without a connected depth source.
   const [asks, setAsks] = useState<{ price: number; qty: number }[]>([])
   const [bids, setBids] = useState<{ price: number; qty: number }[]>([])
 
   useEffect(() => {
-    if (!isCryptoPair) {
-      if (livePrice > 0) {
-        const a = Array.from({ length: 10 }, (_, i) => ({ price: livePrice + (i + 1) * livePrice * 0.0001, qty: Math.random() * 5 }))
-        const b = Array.from({ length: 10 }, (_, i) => ({ price: livePrice - (i + 1) * livePrice * 0.0001, qty: Math.random() * 5 }))
-        setAsks(a); setBids(b)
-      }
-      return
-    }
+    setAsks([])
+    setBids([])
+    if (!isCryptoPair) return
+
     const pair = selectedPair.toLowerCase()
     const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${pair}@depth20@1000ms`)
     ws.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data)
-        if (d.asks && d.bids) {
-          setAsks(d.asks.slice(0, 10).map((a: [string, string]) => ({ price: parseFloat(a[0]), qty: parseFloat(a[1]) })))
-          setBids(d.bids.slice(0, 10).map((b: [string, string]) => ({ price: parseFloat(b[0]), qty: parseFloat(b[1]) })))
+        if (Array.isArray(d.asks) && Array.isArray(d.bids)) {
+          setAsks(d.asks.slice(0, 10).map((a: [string, string]) => ({ price: Number(a[0]), qty: Number(a[1]) })).filter((a: {price:number;qty:number}) => Number.isFinite(a.price) && Number.isFinite(a.qty) && a.price > 0 && a.qty >= 0))
+          setBids(d.bids.slice(0, 10).map((b: [string, string]) => ({ price: Number(b[0]), qty: Number(b[1]) })).filter((b: {price:number;qty:number}) => Number.isFinite(b.price) && Number.isFinite(b.qty) && b.price > 0 && b.qty >= 0))
         }
-      } catch { /* ignore */ }
+      } catch { /* Ignore malformed provider messages. */ }
     }
+    ws.onerror = () => { setAsks([]); setBids([]) }
     return () => ws.close()
-  }, [selectedPair, isCryptoPair, livePrice])
+  }, [selectedPair, isCryptoPair])
 
   const maxQty = Math.max(...asks.map((a) => a.qty), ...bids.map((b) => b.qty), 0.01)
   const buyRatio = bids.reduce((s, b) => s + b.qty, 0)
@@ -336,7 +349,7 @@ export default function TradePage() {
   const fmtP = (p: number) => p >= 1000 ? p.toFixed(1) : p >= 1 ? p.toFixed(4) : p.toFixed(6)
   const fmtQ = (q: number) => q >= 100 ? q.toFixed(2) : q.toFixed(4)
 
-  const tradeModes: TradeMode[] = ["Spot", "Futures", "Options"]
+  const tradeModes: TradeMode[] = ["Spot", "Futures"]
 
   /* ====== ORDER BOOK ====== */
   const OrderBookPanel = (
@@ -344,8 +357,11 @@ export default function TradePage() {
       {/* Funding rate for futures */}
       {isFutures && (
         <div className="px-2 py-1.5 text-right">
-          <div className="text-[9px] text-muted-foreground">Funding Rate / Countdown</div>
-          <div className="font-mono text-[10px] text-foreground">{(FUNDING_RATE_PER_INTERVAL * 100).toFixed(4)}% / {fundingCountdown} (8h)</div>
+          <div className="text-[9px] text-muted-foreground">Configured platform funding / UTC interval</div>
+          <div className="font-mono text-[10px] text-foreground">{(FUNDING_RATE_PER_INTERVAL * 100).toFixed(4)}% configured / {fundingCountdown} (8h)</div>
+          <div className="mt-1 text-left text-[9px] leading-3 text-amber-700 dark:text-amber-300">
+            Internal-ledger Futures only. Liquidation is an estimate from this platform quote, not an exchange mark price.
+          </div>
         </div>
       )}
       <div className="flex items-center justify-between px-2 py-1">
@@ -362,14 +378,20 @@ export default function TradePage() {
           </div>
         ))}
       </div>
-      {/* Spread / Current price */}
-      <div className="flex items-center justify-between border-y border-border bg-secondary/20 px-2 py-1.5">
-        <div className="flex items-center gap-1">
-          <span className={`font-mono text-base font-bold ${change24h >= 0 ? "text-success" : "text-destructive"}`}>{fmtP(livePrice)}</span>
-          <span className="text-[9px] text-muted-foreground">{">"}</span>
+      {/* Only show a spread calculated from actual provider depth. */}
+      {asks.length > 0 && bids.length > 0 ? (
+        <div className="flex items-center justify-between border-y border-border bg-secondary/20 px-2 py-1.5">
+          <div className="flex items-center gap-1">
+            <span className={`font-mono text-base font-bold ${change24h >= 0 ? "text-success" : "text-destructive"}`}>{fmtP(livePrice)}</span>
+            <span className="text-[9px] text-muted-foreground">Live</span>
+          </div>
+          <span className="font-mono text-[10px] text-muted-foreground">Spread {fmtP(Math.max(0, asks[0].price - bids[0].price))}</span>
         </div>
-        <span className="font-mono text-[10px] text-muted-foreground">{fmtP(livePrice * 0.99999)}</span>
-      </div>
+      ) : (
+        <div role="status" className="border-y border-border bg-secondary/20 px-2 py-3 text-center text-[10px] text-muted-foreground">
+          {isCryptoPair ? "Waiting for live exchange depth…" : "Live order-book depth is not available for this instrument."}
+        </div>
+      )}
       {/* Bids (buys) */}
       <div className="flex-1 overflow-hidden">
         {bids.slice(0, 8).map((b, i) => (
@@ -380,22 +402,13 @@ export default function TradePage() {
           </div>
         ))}
       </div>
-      {/* Buy/Sell ratio bar */}
-      <div className="flex items-center overflow-hidden rounded-sm mx-1 mb-1">
-        <div className="flex items-center justify-start bg-success/15 px-1.5 py-0.5 text-[9px] font-semibold text-success" style={{ width: `${buyPct}%` }}>B {buyPct}%</div>
-        <div className="flex items-center justify-end bg-destructive/15 px-1.5 py-0.5 text-[9px] font-semibold text-destructive" style={{ width: `${sellPct}%` }}>{sellPct}% S</div>
-      </div>
-      {/* Depth grouping */}
-      <div className="flex items-center justify-end gap-1 px-2 pb-1">
-        <select className="rounded bg-secondary/40 px-1.5 py-0.5 text-[10px] text-foreground outline-none">
-          <option>0.1</option>
-          <option>1</option>
-          <option>10</option>
-        </select>
-        <button className="rounded bg-secondary/40 p-0.5">
-          <BarChart3 className="h-3 w-3 text-muted-foreground" />
-        </button>
-      </div>
+      {/* Buy/sell ratio is derived only from actual depth quantities. */}
+      {asks.length > 0 && bids.length > 0 && (
+        <div className="mx-1 mb-1 flex items-center overflow-hidden rounded-sm">
+          <div className="flex items-center justify-start bg-success/15 px-1.5 py-0.5 text-[9px] font-semibold text-success" style={{ width: `${buyPct}%` }}>B {buyPct}%</div>
+          <div className="flex items-center justify-end bg-destructive/15 px-1.5 py-0.5 text-[9px] font-semibold text-destructive" style={{ width: `${sellPct}%` }}>{sellPct}% S</div>
+        </div>
+      )}
     </div>
   )
 
@@ -405,13 +418,6 @@ export default function TradePage() {
       {/* Futures: Cross + Leverage selectors */}
       {isFutures && (
         <div className="mb-3 flex gap-2">
-          <select
-            value={marginType} onChange={(e) => setMarginType(e.target.value)}
-            className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-foreground outline-none"
-          >
-            <option>Cross</option>
-            <option>Isolated</option>
-          </select>
           <select
             value={leverage} onChange={(e) => setLeverage(e.target.value)}
             className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-foreground outline-none"
@@ -478,7 +484,7 @@ export default function TradePage() {
           className="w-full bg-transparent text-sm font-medium text-foreground outline-none">
           <option value="Limit">Limit</option>
           <option value="Market">Market</option>
-          <option value="Stop-Limit">Stop-Limit</option>
+          <option value="Stop-Limit" disabled={isFutures}>Stop-Limit{isFutures ? " (Spot only)" : ""}</option>
         </select>
       </div>
 
@@ -611,31 +617,10 @@ export default function TradePage() {
             <span className="ml-2 text-xs text-muted-foreground">{quoteAsset}</span>
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Applies to positions opened by a Market buy. Closes automatically when the mark price crosses your level.
+            Applies to immediately filled positions. Long TP must be above market and SL below; short Futures TP must be below market and SL above. TP/SL on resting orders is not supported yet.
           </p>
         </div>
       )}
-
-      {/* Post-Only + Reduce-Only + GTC */}
-      <div className="mb-3 flex flex-col gap-1.5">
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" checked={postOnly} onChange={(e) => setPostOnly(e.target.checked)} className="h-3.5 w-3.5 rounded border-border accent-foreground" />
-          Post-Only
-        </label>
-        {isFutures && (
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input type="checkbox" checked={reduceOnly} onChange={(e) => setReduceOnly(e.target.checked)} className="h-3.5 w-3.5 rounded border-border accent-foreground" />
-            Reduce-Only
-          </label>
-        )}
-        <div className="flex items-center justify-end">
-          <select className="rounded bg-transparent text-xs text-foreground outline-none">
-            <option>GTC</option>
-            <option>IOC</option>
-            <option>FOK</option>
-          </select>
-        </div>
-      </div>
 
       {/* Feedback */}
       {feedback && (
@@ -649,14 +634,14 @@ export default function TradePage() {
         <div className="flex flex-col gap-2">
           <button
             onClick={() => { setSide("buy"); handleSubmit("buy") }}
-            disabled={submitting || !baseQty}
+            disabled={submitting || !baseQty || livePrice <= 0}
             className="w-full rounded-lg bg-success py-3.5 text-sm font-bold text-[#0a0e17] transition-colors disabled:opacity-40"
           >
             {submitting && side === "buy" ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Long"}
           </button>
           <button
             onClick={() => { setSide("sell"); handleSubmit("sell") }}
-            disabled={submitting || !baseQty}
+            disabled={submitting || !baseQty || livePrice <= 0}
             className="w-full rounded-lg bg-destructive py-3.5 text-sm font-bold text-white transition-colors disabled:opacity-40"
           >
             {submitting && side === "sell" ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Short"}
@@ -665,7 +650,7 @@ export default function TradePage() {
       ) : (
         <button
           onClick={() => handleSubmit(side)}
-          disabled={submitting || !baseQty}
+          disabled={submitting || !baseQty || livePrice <= 0}
           className={`w-full rounded-lg py-3.5 text-sm font-semibold transition-colors disabled:opacity-40 ${isBuy ? "bg-success text-[#0a0e17]" : "bg-destructive text-white"}`}
         >
           {submitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : (isBuy ? `Buy ${baseAsset}` : `Sell ${baseAsset}`)}
@@ -753,11 +738,11 @@ export default function TradePage() {
                 const pairStr = pos.pair || "BTC/USDT"
                 // safeFindPrice prevents non-crypto pairs from resolving to crypto prices
                 const posCoin = safeFindPrice(allPrices, pairStr)
-                const curPrice = posCoin?.price ?? entryPrice
+                const curPrice = posCoin && Number(posCoin.price) > 0 ? Number(posCoin.price) : null
                 const isSell = pos.side === "sell"
-                const unrealizedPnl = isSell ? (entryPrice - curPrice) * qty : (curPrice - entryPrice) * qty
+                const unrealizedPnl = curPrice === null ? null : (isSell ? (entryPrice - curPrice) * qty : (curPrice - entryPrice) * qty)
                 const pnlBase = pos.position_mode === "futures" && Number(pos.margin) > 0 ? Number(pos.margin) : entryPrice * qty
-                const pnlPct = pnlBase > 0 ? (unrealizedPnl / pnlBase) * 100 : 0
+                const pnlPct = unrealizedPnl !== null && pnlBase > 0 ? (unrealizedPnl / pnlBase) * 100 : null
                 const isClosing = closingId === pos.id
                 const logoSymbol = posCoin?.symbol ?? pairStr.split("/")[0] ?? "BTC"
 
@@ -785,7 +770,7 @@ export default function TradePage() {
                           {pos.position_mode === "futures" && (
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                               <span>Margin: ${Number(pos.margin).toFixed(2)}</span>
-                              <span className="text-destructive/80">Liq: ${Number(pos.liquidation_price).toFixed(2)}</span>
+                              <span className="text-destructive/80">Est. liq: ${Number(pos.liquidation_price).toFixed(2)}</span>
                             </div>
                           )}
                           {pos.auto_close_at && (
@@ -797,15 +782,15 @@ export default function TradePage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-right">
-                          <div className={`font-mono text-xs font-bold ${unrealizedPnl >= 0 ? "text-success" : "text-destructive"}`}>
-                            {unrealizedPnl >= 0 ? "+" : ""}{unrealizedPnl.toFixed(2)} USDT
+                          <div className={`font-mono text-xs font-bold ${unrealizedPnl === null ? "text-muted-foreground" : unrealizedPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                            {unrealizedPnl === null ? "—" : `${unrealizedPnl >= 0 ? "+" : ""}${unrealizedPnl.toFixed(2)} USDT` }
                           </div>
-                          <div className={`font-mono text-[10px] ${pnlPct >= 0 ? "text-success" : "text-destructive"}`}>
-                            {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+                          <div className={`font-mono text-[10px] ${pnlPct === null ? "text-muted-foreground" : pnlPct >= 0 ? "text-success" : "text-destructive"}`}>
+                            {pnlPct === null ? "—" : `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%` }
                           </div>
                         </div>
                         <button
-                          onClick={(e) => { e.stopPropagation(); closePosition(pos.id, pos.pair) }}
+                          onClick={(e) => { e.stopPropagation(); closePosition(pos.id) }}
                           disabled={isClosing}
                           className="rounded-md border border-destructive px-2 py-1 text-[10px] font-semibold text-destructive disabled:opacity-50"
                         >
@@ -815,7 +800,7 @@ export default function TradePage() {
                     </div>
                     {/* Live price bar */}
                     <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[9px] text-muted-foreground">
-                      <span>Mark: ${curPrice.toLocaleString()}</span>
+                      <span>Mark: {curPrice === null ? "unavailable" : `${curPrice.toLocaleString()}`}</span>
                       {Number(pos.take_profit) > 0 && (
                         <span className="text-success">TP: ${Number(pos.take_profit).toLocaleString()}</span>
                       )}
@@ -853,6 +838,13 @@ export default function TradePage() {
                           {t.close_price && <span>{"=>"} ${Number(t.close_price).toLocaleString()}</span>}
                           <span>{Number(t.amount).toFixed(4)}</span>
                         </div>
+                        {t.close_reason && (
+                          <div className={`mt-0.5 text-[9px] font-medium uppercase ${String(t.close_reason).startsWith("admin_override_") ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                            {String(t.close_reason).startsWith("admin_override_")
+                              ? `Admin override: ${String(t.close_reason).replace("admin_override_", "")}`
+                              : String(t.close_reason).replace(/_/g, " ")}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
@@ -909,7 +901,7 @@ export default function TradePage() {
         </button>
         <div className="scrollbar-none flex items-center gap-1 overflow-x-auto">
           {tradeModes.map((m) => (
-            <button key={m} onClick={() => setTradeMode(m)}
+            <button key={m} onClick={() => { setTradeMode(m); if (m === "Futures" && orderType === "Stop-Limit") setOrderType("Limit") }}
               className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors ${tradeMode === m ? "font-bold text-foreground" : "text-muted-foreground"}`}
             >
               {m}
@@ -917,6 +909,12 @@ export default function TradePage() {
           ))}
         </div>
       </div>
+
+      {livePrice <= 0 && (
+        <div role="status" className="border-b border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          No verified current price is available for {pairDisplay}. Order submission is disabled until a valid quote is available.
+        </div>
+      )}
 
       {/* Pair Bar */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2 lg:px-4">
@@ -928,7 +926,6 @@ export default function TradePage() {
           <span className={`text-sm font-medium ${change24h >= 0 ? "text-success" : "text-destructive"}`}>
             {change24h >= 0 ? "+" : ""}{change24h.toFixed(2)}%
           </span>
-          <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">MM</span>
           <Link href={`/trade/chart?pair=${selectedPair}`} className="rounded border border-border p-1.5 lg:hidden">
             <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
           </Link>
@@ -959,13 +956,7 @@ export default function TradePage() {
               <button onClick={() => setSide("buy")} className={`px-6 py-2 text-sm font-semibold transition-colors ${isBuy ? "bg-success text-[#0a0e17]" : "text-muted-foreground"}`}>Buy</button>
               <button onClick={() => setSide("sell")} className={`px-6 py-2 text-sm font-semibold transition-colors ${!isBuy ? "bg-destructive text-white" : "text-muted-foreground"}`}>Sell</button>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Margin</span>
-              <button onClick={() => setMarginEnabled(!marginEnabled)}
-                className={`relative h-5 w-9 rounded-full transition-colors ${marginEnabled ? "bg-[#f7a600]" : "bg-secondary"}`}>
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-foreground transition-transform ${marginEnabled ? "left-[18px]" : "left-0.5"}`} />
-              </button>
-            </div>
+
           </div>
         )}
 
@@ -1004,13 +995,7 @@ export default function TradePage() {
                 <button onClick={() => setSide("sell")} className={`px-5 py-2 text-sm font-semibold transition-colors ${!isBuy ? "bg-destructive text-white" : "text-muted-foreground"}`}>Sell</button>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Margin</span>
-              <button onClick={() => setMarginEnabled(!marginEnabled)}
-                className={`relative h-5 w-9 rounded-full transition-colors ${marginEnabled ? "bg-[#f7a600]" : "bg-secondary"}`}>
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-foreground transition-transform ${marginEnabled ? "left-[18px]" : "left-0.5"}`} />
-              </button>
-            </div>
+
           </div>
           {OrderFormPanel}
         </div>
@@ -1057,18 +1042,18 @@ export default function TradePage() {
               const detailIsSell = selectedDetail.side === "sell"
               // Universal price lookup -- handles all formats
               const detailCoin = safeFindPrice(allPrices, detailPair)
-              const detailLivePrice = detailCoin?.price ?? detailEntryPrice
+              const detailLivePrice = detailCoin && Number(detailCoin.price) > 0 ? Number(detailCoin.price) : null
               const detailPnl = selectedDetail.status === "open"
-                ? (detailIsSell ? (detailEntryPrice - detailLivePrice) * detailQty : (detailLivePrice - detailEntryPrice) * detailQty)
+                ? detailLivePrice === null ? null : (detailIsSell ? (detailEntryPrice - detailLivePrice) * detailQty : (detailLivePrice - detailEntryPrice) * detailQty)
                 : Number(selectedDetail.pnl) || 0
-              const detailPnlPct = detailEntryPrice > 0
+              const detailPnlPct = detailLivePrice !== null && detailEntryPrice > 0
                 ? (detailIsSell ? ((detailEntryPrice - detailLivePrice) / detailEntryPrice) * 100 : ((detailLivePrice - detailEntryPrice) / detailEntryPrice) * 100)
-                : 0
+                : null
 
               return (
                 <div className="grid grid-cols-2 gap-2.5">
                   <DetailCell label={selectedDetail.status === "open" ? "Entry Price" : "Order Price"} value={`$${detailEntryPrice.toLocaleString()}`} />
-                  <DetailCell label="Current Price" value={detailLivePrice > 0 ? `$${formatPrice(detailLivePrice)}` : "--"} />
+                  <DetailCell label="Current Price" value={detailLivePrice !== null ? `${formatPrice(detailLivePrice)}` : "Unavailable"} />
                   <DetailCell label="Amount" value={`${detailQty.toFixed(6)} ${detailBase}`} />
                   <DetailCell label="Total" value={`$${(detailEntryPrice * detailQty).toFixed(2)}`} />
                   {selectedDetail.fee !== undefined && (
@@ -1077,11 +1062,15 @@ export default function TradePage() {
                   {selectedDetail.status === "open" ? (
                     <DetailCell
                       label="Unrealized P&L"
-                      value={`${detailPnl >= 0 ? "+" : ""}${detailPnl.toFixed(2)} USDT (${detailPnlPct >= 0 ? "+" : ""}${detailPnlPct.toFixed(2)}%)`}
-                      valueClass={detailPnl >= 0 ? "text-success" : "text-destructive"}
+                      value={detailPnl === null || detailPnlPct === null ? "Unavailable — no live quote" : `${detailPnl >= 0 ? "+" : ""}${detailPnl.toFixed(2)} USDT (${detailPnlPct >= 0 ? "+" : ""}${detailPnlPct.toFixed(2)}%)`}
+                      valueClass={detailPnl === null ? "text-muted-foreground" : detailPnl >= 0 ? "text-success" : "text-destructive"}
                     />
                   ) : selectedDetail.pnl !== undefined ? (
-                    <DetailCell label="P&L" value={`${detailPnl >= 0 ? "+" : ""}${detailPnl.toFixed(2)} USDT`} valueClass={detailPnl >= 0 ? "text-success" : "text-destructive"} />
+                    <DetailCell
+                      label="P&L"
+                      value={`${(Number(selectedDetail.pnl) || 0) >= 0 ? "+" : ""}${(Number(selectedDetail.pnl) || 0).toFixed(2)} USDT`}
+                      valueClass={(Number(selectedDetail.pnl) || 0) >= 0 ? "text-success" : "text-destructive"}
+                    />
                   ) : null}
                 </div>
               )
@@ -1092,8 +1081,15 @@ export default function TradePage() {
             {/* Close price and date for closed trades */}
             {selectedDetail.close_price && (
               <div className="mt-2 grid grid-cols-2 gap-2.5">
-                <DetailCell label="Close Price" value={`$${Number(selectedDetail.close_price).toLocaleString()}`} />
+                <DetailCell label="Close Price" value={`${Number(selectedDetail.close_price).toLocaleString()}`} />
                 <DetailCell label="Closed At" value={selectedDetail.closed_at ? new Date(selectedDetail.closed_at).toLocaleString() : "N/A"} />
+              </div>
+            )}
+            {selectedDetail.close_reason && (
+              <div className={`mt-2 rounded-lg border px-3 py-2 text-xs font-medium uppercase ${String(selectedDetail.close_reason).startsWith("admin_override_") ? "border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400" : "border-border text-muted-foreground"}`}>
+                {String(selectedDetail.close_reason).startsWith("admin_override_")
+                  ? `Admin override applied: ${String(selectedDetail.close_reason).replace("admin_override_", "")}`
+                  : String(selectedDetail.close_reason).replace(/_/g, " ")}
               </div>
             )}
             <div className="mt-4 flex gap-2">
@@ -1101,7 +1097,7 @@ export default function TradePage() {
                 <button onClick={() => { cancelOrder(selectedDetail.id); setSelectedDetail(null) }} className="flex-1 rounded-lg border border-destructive py-3 text-sm font-semibold text-destructive">Cancel Order</button>
               ) : selectedDetail.status === "open" ? (
                 <button
-                  onClick={() => { closePosition(selectedDetail.id, selectedDetail.pair); setSelectedDetail(null) }}
+                  onClick={() => { closePosition(selectedDetail.id); setSelectedDetail(null) }}
                   className="flex-1 rounded-lg bg-destructive py-3 text-sm font-semibold text-white"
                 >
                   Close Position at Market

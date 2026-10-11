@@ -6,7 +6,7 @@ import { Footer } from "@/components/footer"
 import Link from "next/link"
 import {
   ArrowDown, CreditCard, Building2, Wallet, Shield, Zap, Clock,
-  ChevronDown, BadgeCheck, Globe, ArrowRight,
+  ChevronDown, BadgeCheck, Globe,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLivePrices, formatPrice } from "@/hooks/use-live-prices"
@@ -23,19 +23,19 @@ const defaultCryptos = [
   { symbol: "AVAX", name: "Avalanche" },
 ]
 
-const currencies = ["USD", "EUR", "GBP", "AED", "INR", "TRY"]
+const currencies = ["USD"]
 
 const payMethods = [
-  { id: "card", label: "Credit/Debit Card", icon: CreditCard, fee: "1.8%", time: "Instant", desc: "Visa, Mastercard accepted" },
-  { id: "bank", label: "Bank Transfer", icon: Building2, fee: "0.5%", time: "1-3 days", desc: "SWIFT, SEPA, Wire" },
-  { id: "wallet", label: "Third Party", icon: Wallet, fee: "1.2%", time: "Instant", desc: "Apple Pay, Google Pay" },
+  { id: "card", label: "Credit/Debit Card", icon: CreditCard, status: "Not connected", desc: "Payment provider integration required" },
+  { id: "bank", label: "Bank Transfer", icon: Building2, status: "Not connected", desc: "Banking and settlement integration required" },
+  { id: "wallet", label: "Third Party", icon: Wallet, status: "Not connected", desc: "Third-party payment integration required" },
 ]
 
 const features = [
-  { icon: Zap, title: "Instant Purchase", desc: "Buy crypto in seconds with your preferred payment method. No complicated steps." },
-  { icon: Shield, title: "Secure Payments", desc: "All transactions are encrypted and processed through PCI-compliant payment gateways." },
-  { icon: Clock, title: "24/7 Available", desc: "Purchase crypto anytime, anywhere. Our service is available around the clock." },
-  { icon: Globe, title: "170+ Countries", desc: "Available in over 170 countries with local currency and payment method support." },
+  { icon: Zap, title: "Quote Preview", desc: "An estimate is shown only when a provider quote is available. It does not submit an order." },
+  { icon: Shield, title: "Provider Required", desc: "Payment security and settlement cannot be claimed until a payment provider is configured." },
+  { icon: Clock, title: "Purchases Unavailable", desc: "Card, bank, and third-party payment processing are not connected yet." },
+  { icon: Globe, title: "Regional Coverage", desc: "Supported countries and currencies have not been configured for purchases." },
 ]
 
 export default function BuyCryptoPage() {
@@ -43,21 +43,18 @@ export default function BuyCryptoPage() {
   const [fiatAmount, setFiatAmount] = useState("100")
   const [selectedSymbol, setSelectedSymbol] = useState("BTC")
   const [selectedCurrency, setSelectedCurrency] = useState("USD")
-  const [selectedMethod, setSelectedMethod] = useState("card")
   const [cryptoOpen, setCryptoOpen] = useState(false)
 
   const cryptos = useMemo(() => {
     return defaultCryptos.map((c) => {
       const live = livePrices.find((p) => p.symbol === c.symbol)
-      return { ...c, price: c.symbol === "USDT" ? 1 : (live?.price ?? 0) }
+      return { ...c, price: live?.price ?? 0 }
     })
   }, [livePrices])
 
   const selectedCrypto = cryptos.find((c) => c.symbol === selectedSymbol) || cryptos[0]
-  const fee = selectedMethod === "card" ? 0.018 : selectedMethod === "bank" ? 0.005 : 0.012
   const fiatNum = Number(fiatAmount) || 0
-  const feeAmount = fiatNum * fee
-  const cryptoAmount = selectedCrypto.price > 0 ? (fiatNum - feeAmount) / selectedCrypto.price : 0
+  const cryptoAmount = selectedCrypto.price > 0 && fiatNum > 0 ? fiatNum / selectedCrypto.price : 0
 
   return (
     <div className="min-h-screen bg-background">
@@ -70,17 +67,16 @@ export default function BuyCryptoPage() {
               {/* Left - Text */}
               <div className="flex-1 lg:py-8">
                 <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground lg:text-5xl">
-                  Buy Crypto Instantly
+                  Buy Crypto
                 </h1>
                 <p className="mt-4 max-w-lg text-pretty text-lg text-muted-foreground">
-                  Purchase Bitcoin, Ethereum, and 200+ cryptocurrencies using your credit card,
-                  bank transfer, or third-party payment methods.
+                  Preview an indicative USD-to-crypto amount when a current provider quote is available. Payment processing is not connected, so purchases cannot be completed yet.
                 </p>
                 <div className="mt-8 flex flex-wrap gap-6">
                   {[
-                    { val: "200+", label: "Supported Coins" },
-                    { val: "170+", label: "Countries" },
-                    { val: "$0", label: "Hidden Fees" },
+                    { val: "USD", label: "Estimate currency" },
+                    { val: "Provider", label: "Quote source" },
+                    { val: "Unavailable", label: "Payment processing" },
                   ].map((s) => (
                     <div key={s.label}>
                       <div className="font-mono text-2xl font-bold text-primary">{s.val}</div>
@@ -160,14 +156,10 @@ export default function BuyCryptoPage() {
                   <label className="mb-2 block text-xs font-medium text-muted-foreground">Payment Method</label>
                   <div className="space-y-2">
                     {payMethods.map((m) => (
-                      <button key={m.id} onClick={() => setSelectedMethod(m.id)}
-                        className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
-                          selectedMethod === m.id
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/30"
-                        }`}>
+                      <button key={m.id} type="button" disabled title="Payment provider is not configured"
+                        className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl border border-border p-3 text-left opacity-60">
                         <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                          selectedMethod === m.id ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"
+                          "bg-secondary text-muted-foreground"
                         }`}>
                           <m.icon className="h-5 w-5" />
                         </div>
@@ -176,8 +168,7 @@ export default function BuyCryptoPage() {
                           <div className="text-[10px] text-muted-foreground">{m.desc}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-xs font-medium text-foreground">Fee: {m.fee}</div>
-                          <div className="text-[10px] text-muted-foreground">{m.time}</div>
+                          <div className="text-xs font-medium text-muted-foreground">{m.status}</div>
                         </div>
                       </button>
                     ))}
@@ -188,23 +179,24 @@ export default function BuyCryptoPage() {
                 <div className="mb-4 rounded-xl bg-secondary/30 p-4 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Price</span>
-                    <span className="font-mono text-foreground">1 {selectedCrypto.symbol} = ${formatPrice(selectedCrypto.price)}</span>
+                    <span className="font-mono text-foreground">{selectedCrypto.price > 0 ? `1 ${selectedCrypto.symbol} = ${formatPrice(selectedCrypto.price)}` : "Quote unavailable"}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Fee</span>
-                    <span className="font-mono text-foreground">${feeAmount.toFixed(2)} ({(fee * 100).toFixed(1)}%)</span>
+                    <span className="text-muted-foreground">Provider fee</span>
+                    <span className="font-mono text-muted-foreground">Not configured</span>
                   </div>
                   <div className="flex items-center justify-between text-xs border-t border-border pt-2">
-                    <span className="font-medium text-foreground">You receive</span>
+                    <span className="font-medium text-foreground">Indicative estimate</span>
                     <span className="font-mono font-bold text-success">{cryptoAmount.toFixed(8)} {selectedCrypto.symbol}</span>
                   </div>
                 </div>
 
-                <Link href="/register">
-                  <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90" size="lg">
-                    Buy {selectedCrypto.symbol} <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
+                <Button disabled title="Purchases are unavailable until a payment provider and settlement flow are configured" className="w-full" size="lg">
+                  Purchases unavailable
+                </Button>
+                <p role="status" className="mt-2 text-center text-[10px] text-muted-foreground">
+                  This is an estimate only. No payment or crypto purchase is submitted.
+                </p>
 
                 <p className="mt-3 text-center text-[10px] text-muted-foreground">
                   By continuing you agree to our <Link href="/terms" className="underline">Terms of Service</Link>
@@ -218,8 +210,8 @@ export default function BuyCryptoPage() {
         <section className="border-b border-border">
           <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6">
             <div className="mb-10 text-center">
-              <h2 className="text-3xl font-bold text-foreground">Why Buy Crypto on Bybit</h2>
-              <p className="mt-2 text-muted-foreground">The fastest and most secure way to buy digital assets</p>
+              <h2 className="text-3xl font-bold text-foreground">Purchase Integration Status</h2>
+              <p className="mt-2 text-muted-foreground">Payment processing and settlement must be configured before purchases can be enabled.</p>
             </div>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               {features.map((f) => (
@@ -239,14 +231,14 @@ export default function BuyCryptoPage() {
         <section>
           <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6">
             <div className="mb-10 text-center">
-              <h2 className="text-3xl font-bold text-foreground">How It Works</h2>
-              <p className="mt-2 text-muted-foreground">Get started in 3 simple steps</p>
+              <h2 className="text-3xl font-bold text-foreground">Requirements Before Launch</h2>
+              <p className="mt-2 text-muted-foreground">Purchases will remain disabled until these services are implemented and tested.</p>
             </div>
             <div className="grid gap-8 md:grid-cols-3">
               {[
                 { step: "01", title: "Create Account", desc: "Sign up and complete identity verification to unlock all features." },
-                { step: "02", title: "Select Payment", desc: "Choose your preferred payment method and enter the amount you want to spend." },
-                { step: "03", title: "Receive Crypto", desc: "Your purchased crypto is instantly deposited into your Bybit wallet." },
+                { step: "02", title: "Connect a Payment Provider", desc: "Configure supported currencies, fees, regional eligibility, payment verification, and settlement." },
+                { step: "03", title: "Test Settlement", desc: "Verify payment reconciliation and wallet crediting before enabling purchases." },
               ].map((s) => (
                 <div key={s.step} className="relative rounded-xl border border-border bg-card p-6">
                   <div className="mb-4 font-mono text-4xl font-bold text-primary/20">{s.step}</div>

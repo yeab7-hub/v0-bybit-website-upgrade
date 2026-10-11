@@ -5,6 +5,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { User, Shield, Bell, Key, BellRing, Mail, Smartphone, MessageSquare, TrendingUp, AlertCircle, Megaphone, CheckCheck, Circle, Loader2, Inbox } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
 
 const sidebarItems = [
   { label: "Profile", href: "/account/settings", icon: User },
@@ -62,46 +63,113 @@ type Notification = {
 export default function NotificationsPage() {
   const [settings, setSettings] = useState(initialSettings)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState("")
+  const [notificationError, setNotificationError] = useState("")
   const [activeView, setActiveView] = useState<"inbox" | "settings">("inbox")
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loadingNotifs, setLoadingNotifs] = useState(true)
 
   useEffect(() => {
-    fetch("/api/notifications")
-      .then(r => r.json())
-      .then(d => {
-        if (d.notifications) setNotifications(d.notifications)
-        setLoadingNotifs(false)
+    let cancelled = false
+    const loadPreferences = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const stored = user?.user_metadata?.notification_settings
+        if (!cancelled && Array.isArray(stored)) {
+          const defaults = initialSettings
+          const merged = defaults.map((category, categoryIndex) => ({
+            ...category,
+            items: category.items.map((item, itemIndex) => {
+              const savedItem = stored[categoryIndex]?.items?.[itemIndex]
+              return savedItem && savedItem.label === item.label
+                ? { ...item, email: Boolean(savedItem.email), push: Boolean(savedItem.push), sms: Boolean(savedItem.sms) }
+                : item
+            }),
+          }))
+          setSettings(merged)
+        }
+      } catch {
+        // Defaults remain available if profile metadata cannot be read.
+      }
+    }
+    void loadPreferences()
+    fetch("/api/notifications", { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || "Could not load notifications.")
+        if (!cancelled) setNotifications(Array.isArray(data.notifications) ? data.notifications : [])
       })
-      .catch(() => setLoadingNotifs(false))
+      .catch((cause) => {
+        if (!cancelled) setNotificationError(cause instanceof Error ? cause.message : "Could not load notifications.")
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingNotifs(false)
+      })
+    return () => { cancelled = true }
   }, [])
 
   const markAsRead = async (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-    await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    }).catch(() => {})
+    setNotificationError("")
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+      if (!response.ok) throw new Error("Could not mark this notification as read.")
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    } catch (cause) {
+      setNotificationError(cause instanceof Error ? cause.message : "Could not update notification.")
+    }
   }
 
   const markAllRead = async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-    await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mark_all: true }),
-    }).catch(() => {})
+    setNotificationError("")
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mark_all: true }),
+      })
+      if (!response.ok) throw new Error("Could not mark notifications as read.")
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    } catch (cause) {
+      setNotificationError(cause instanceof Error ? cause.message : "Could not update notifications.")
+    }
   }
 
   const toggleSetting = (catIdx: number, itemIdx: number, channel: "email" | "push" | "sms") => {
-    const updated = [...settings]
-    updated[catIdx].items[itemIdx][channel] = !updated[catIdx].items[itemIdx][channel]
-    setSettings(updated)
+    setSettings((current) => current.map((category, categoryIndex) => {
+      if (categoryIndex !== catIdx) return category
+      return {
+        ...category,
+        items: category.items.map((item, itemIndex) =>
+          itemIndex === itemIdx ? { ...item, [channel]: !item[channel] } : item
+        ),
+      }
+    }))
     setSaved(false)
+    setSaveError("")
   }
 
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  const handleSave = async () => {
+    setSaving(true)
+    setSaved(false)
+    setSaveError("")
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.updateUser({ data: { notification_settings: settings } })
+      if (error) throw error
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 3000)
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : "Could not save notification preferences.")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const getNotifIcon = (type: string) => {
     switch (type) {
@@ -138,6 +206,8 @@ export default function NotificationsPage() {
                 </Link>
               ))}
             </div>
+
+            {notificationError && <p role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{notificationError}</p>}
 
             {/* View tabs: Inbox | Settings */}
             <div className="mb-6 flex items-center gap-4 border-b border-border">
@@ -218,13 +288,16 @@ export default function NotificationsPage() {
             {activeView === "settings" && (<div>
             <div className="mb-6 flex items-center justify-between">
               <h1 className="text-xl font-bold text-foreground">Notification Settings</h1>
-              <button onClick={handleSave} className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${saved ? "bg-[#0ecb81] text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
-                {saved ? "Saved!" : "Save Changes"}
+              <button onClick={handleSave} disabled={saving} className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${saved ? "bg-[#0ecb81] text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+                {saving ? "Saving…" : saved ? "Saved!" : "Save Changes"}
               </button>
             </div>
 
+            {saveError && <p role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{saveError}</p>}
+            <p className="mb-4 text-xs text-muted-foreground">Preferences are saved to your profile, but event delivery is not yet wired to respect these preferences. Push and SMS delivery services are not configured.</p>
+
             {/* Channel legend */}
-            <div className="mb-6 flex items-center gap-6 rounded-xl border border-border bg-card px-5 py-3">
+            <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:gap-6 sm:px-5">
               <span className="text-xs font-medium text-muted-foreground">Channels:</span>
               <div className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs text-foreground">Email</span></div>
               <div className="flex items-center gap-1.5"><BellRing className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs text-foreground">Push</span></div>
@@ -239,12 +312,12 @@ export default function NotificationsPage() {
                     <h2 className="text-sm font-semibold text-foreground">{cat.category}</h2>
                   </div>
                   {cat.items.map((item, itemIdx) => (
-                    <div key={item.label} className="flex items-center justify-between border-b border-border px-5 py-4 last:border-0">
+                    <div key={item.label} className="flex flex-col gap-3 border-b border-border px-4 py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                       <div className="flex-1 pr-4">
                         <div className="text-sm font-medium text-foreground">{item.label}</div>
                         <div className="text-xs text-muted-foreground">{item.description}</div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-end gap-4">
                         {(["email", "push", "sms"] as const).map(ch => (
                           <button key={ch} onClick={() => toggleSetting(catIdx, itemIdx, ch)} className={`relative h-5 w-9 rounded-full transition-colors ${item[ch] ? "bg-primary" : "bg-border"}`}>
                             <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${item[ch] ? "translate-x-4" : "translate-x-0.5"}`} />
@@ -264,7 +337,7 @@ export default function NotificationsPage() {
                   <h3 className="text-sm font-semibold text-foreground">Do Not Disturb</h3>
                   <p className="text-xs text-muted-foreground">Mute all push and SMS notifications during set hours</p>
                 </div>
-                <button className="relative h-5 w-9 rounded-full bg-border transition-colors"><div className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow" /></button>
+                <span className="rounded-full border border-border px-2 py-1 text-[10px] text-muted-foreground">Not configured</span>
               </div>
             </div>
             </div>)}

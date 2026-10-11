@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -14,7 +14,7 @@ import {
 import { BottomNav } from "@/components/bottom-nav"
 
 type AssetClass = "crypto" | "forex" | "commodities" | "stocks" | "cfd"
-type MarketCategory = "all" | "spot" | "derivatives" | "defi" | "metaverse" | "layer1" | "layer2" | "meme"
+type MarketCategory = "all" | "defi" | "metaverse" | "layer1" | "layer2" | "meme"
 type SortKey = "name" | "price" | "change" | "volume" | "marketCap"
 type SortDir = "asc" | "desc"
 
@@ -28,8 +28,6 @@ const assetClassTabs: { id: AssetClass; label: string }[] = [
 
 const categoryFilters: { id: MarketCategory; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "spot", label: "Spot" },
-  { id: "derivatives", label: "Derivatives" },
   { id: "defi", label: "DeFi" },
   { id: "layer1", label: "Layer 1" },
   { id: "layer2", label: "Layer 2" },
@@ -47,13 +45,37 @@ const categoryMap: Record<string, MarketCategory[]> = {
 }
 
 export default function MarketsPage() {
-  const { crypto, forex, commodities, stocks, cfd, isLoading } = useLivePrices(5000)
+  const { crypto, forex, commodities, stocks, cfd, isLoading, isError, data: priceFeed } = useLivePrices(5000)
   const [search, setSearch] = useState("")
   const [assetClass, setAssetClass] = useState<AssetClass>("crypto")
   const [category, setCategory] = useState<MarketCategory>("all")
   const [sortKey, setSortKey] = useState<SortKey>("volume")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
-  const [favorites, setFavorites] = useState<Set<string>>(new Set(["BTC", "ETH", "SOL", "EUR/USD", "XAU/USD", "AAPL"]))
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
+
+  // Share the watchlist with the dashboard and retain it after refresh.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("trading-platform-watchlist-v1")
+      if (saved) {
+        const parsed: unknown = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) setFavorites(new Set(parsed))
+      }
+    } catch { /* Keep the default list if browser storage is unavailable. */ }
+    const syncFromOtherTab = (event: StorageEvent) => {
+      if (event.key !== "trading-platform-watchlist-v1") return
+      if (event.newValue === null) {
+        setFavorites(new Set())
+        return
+      }
+      try {
+        const parsed: unknown = JSON.parse(event.newValue)
+        if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) setFavorites(new Set(parsed))
+      } catch { /* Ignore malformed browser storage. */ }
+    }
+    window.addEventListener("storage", syncFromOtherTab)
+    return () => window.removeEventListener("storage", syncFromOtherTab)
+  }, [])
 
   const getAssetsForClass = (): PriceData[] => {
     switch (assetClass) {
@@ -67,17 +89,16 @@ export default function MarketsPage() {
   }
 
   const currentAssets = getAssetsForClass()
-  const totalMarketValue = currentAssets.reduce((sum, asset) => sum + (asset.marketCap || asset.volume * asset.price), 0)
   const marketChange = currentAssets.length
     ? currentAssets.reduce((sum, asset) => sum + asset.change24h, 0) / currentAssets.length
     : 0
-  const formatCompactValue = (value: number) => value >= 1e12 ? `$${(value / 1e12).toFixed(2)}T` : value >= 1e9 ? `$${(value / 1e9).toFixed(2)}B` : value >= 1e6 ? `$${(value / 1e6).toFixed(2)}M` : "$0"
 
   const toggleFav = (symbol: string) => {
     setFavorites((prev) => {
       const next = new Set(prev)
       if (next.has(symbol)) next.delete(symbol)
       else next.add(symbol)
+      try { window.localStorage.setItem("trading-platform-watchlist-v1", JSON.stringify(Array.from(next))) } catch { /* Current-tab state still updates. */ }
       return next
     })
   }
@@ -93,7 +114,7 @@ export default function MarketsPage() {
       const q = search.toLowerCase()
       list = list.filter((c) => c.symbol.toLowerCase().includes(q) || c.name.toLowerCase().includes(q))
     }
-    if (assetClass === "crypto" && category !== "all" && category !== "spot" && category !== "derivatives") {
+    if (assetClass === "crypto" && category !== "all") {
       list = list.filter((c) => categoryMap[c.symbol]?.includes(category))
     }
     list.sort((a, b) => {
@@ -103,7 +124,7 @@ export default function MarketsPage() {
         case "price": cmp = a.price - b.price; break
         case "change": cmp = a.change24h - b.change24h; break
         case "volume": cmp = (a.volume * a.price) - (b.volume * b.price); break
-        case "marketCap": cmp = (a.volume * a.price) - (b.volume * b.price); break
+        case "marketCap": cmp = (a.marketCap ?? 0) - (b.marketCap ?? 0); break
       }
       return sortDir === "asc" ? cmp : -cmp
     })
@@ -113,7 +134,7 @@ export default function MarketsPage() {
   const topGainers = useMemo(() => [...currentAssets].sort((a, b) => b.change24h - a.change24h).slice(0, 5), [currentAssets])
   const topLosers = useMemo(() => [...currentAssets].sort((a, b) => a.change24h - b.change24h).slice(0, 5), [currentAssets])
   const hotCoins = useMemo(() => [...currentAssets].sort((a, b) => (b.volume * b.price) - (a.volume * a.price)).slice(0, 5), [currentAssets])
-  const newListings = useMemo(() => [...currentAssets].slice(-5).reverse(), [currentAssets])
+  const moreMarkets = useMemo(() => [...currentAssets].sort((a, b) => a.symbol.localeCompare(b.symbol)).slice(0, 5), [currentAssets])
 
   const SortIcon = ({ field }: { field: SortKey }) => (
     <ArrowUpDown className={`h-3 w-3 ${sortKey === field ? "text-primary" : "text-muted-foreground/40"}`} />
@@ -123,6 +144,16 @@ export default function MarketsPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <MarketTicker />
+      <div className="border-b border-border bg-card/50">
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-1 px-4 py-2 text-[11px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span role="status">
+            {isLoading ? "Loading provider market data…" : isError ? "Market data provider request failed; unavailable quotes are not replaced with estimates." : `Crypto feed: ${priceFeed?.source || "provider data"}`}
+          </span>
+          <span>
+            FX uses Frankfurter daily reference rates; stocks, commodities and indices may be delayed. {priceFeed?.timestamp ? `Last API response: ${new Date(priceFeed.timestamp).toLocaleTimeString()}` : ""}
+          </span>
+        </div>
+      </div>
       <main>
         {/* Hero */}
         <section className="border-b border-border">
@@ -134,11 +165,11 @@ export default function MarketsPage() {
                assetClass === "stocks" ? "Stock Markets" : "CFD Markets"}
             </h1>
             <p className="mt-2 text-muted-foreground">
-              {assetClass === "crypto" ? <>The tracked crypto market value is <span className="font-semibold text-foreground">{formatCompactValue(totalMarketValue)}</span> across {currentAssets.length} live assets, with a <span className={marketChange >= 0 ? "text-success" : "text-destructive"}>{marketChange >= 0 ? "+" : ""}{marketChange.toFixed(2)}%</span> average change.</> :
-               assetClass === "forex" ? "Real-time foreign exchange rates for major, minor, and exotic currency pairs." :
-               assetClass === "commodities" ? "Live prices for gold, silver, oil, natural gas, and other commodities." :
-               assetClass === "stocks" ? "Track major US and global equity markets in real time." :
-               "Trade global indices and other CFD instruments with up to 100x leverage."}
+              {assetClass === "crypto" ? <>Tracking {currentAssets.length} listed crypto assets with a <span className={marketChange >= 0 ? "text-success" : "text-destructive"}>{marketChange >= 0 ? "+" : ""}{marketChange.toFixed(2)}%</span> average listed 24h move.</> :
+               assetClass === "forex" ? "Reference exchange rates for major, minor, and exotic currency pairs; update frequency depends on the provider." :
+               assetClass === "commodities" ? "Provider-sourced prices for gold, silver, oil, natural gas, and other commodities; some feeds may be delayed." :
+               assetClass === "stocks" ? "Track selected US and global equities; quotes may be delayed or unavailable outside provider coverage." :
+               "View selected index and CFD reference quotes. Tradability and leverage depend on a configured, verified broker integration."}
             </p>
             {/* Asset class tabs */}
             <div className="mt-6 flex items-center gap-1 overflow-x-auto rounded-lg bg-secondary p-1">
@@ -224,11 +255,11 @@ export default function MarketsPage() {
               <div className="rounded-xl border border-border bg-card p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-chart-4" />
-                  <span className="text-sm font-semibold text-foreground">New Listings</span>
+                  <span className="text-sm font-semibold text-foreground">More Markets</span>
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </div>
-                {newListings.length === 0 && <p className="py-2 text-xs text-muted-foreground">Live market data unavailable.</p>}
-                {newListings.slice(0, 3).map((c) => (
+                {moreMarkets.length === 0 && <p className="py-2 text-xs text-muted-foreground">Live market data unavailable.</p>}
+                {moreMarkets.slice(0, 3).map((c) => (
                   <Link key={c.symbol} href={c.category === "crypto" ? `/trade?pair=${c.symbol}USDT` : `/trade?pair=${encodeURIComponent(c.symbol)}`} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
                       <MarketAsset symbol={c.symbol} size={20} />
@@ -321,7 +352,7 @@ export default function MarketsPage() {
                     : filtered.map((coin, idx) => (
                         <tr key={coin.symbol} className="group/row border-b border-border/50 transition-colors hover:bg-card/50">
                           <td className="px-4 py-3">
-                            <button onClick={() => toggleFav(coin.symbol)} className="text-muted-foreground hover:text-primary">
+                            <button type="button" onClick={() => toggleFav(coin.symbol)} aria-label={favorites.has(coin.symbol) ? `Remove ${coin.symbol} from favorites` : `Add ${coin.symbol} to favorites`} title={favorites.has(coin.symbol) ? "Remove from favorites" : "Add to favorites"} className="text-muted-foreground hover:text-primary">
                               <Star className={`h-4 w-4 ${favorites.has(coin.symbol) ? "fill-primary text-primary" : ""}`} />
                             </button>
                           </td>
@@ -346,16 +377,16 @@ export default function MarketsPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">
-                            ${formatVolume(coin.volume * coin.price)}
+                            ${formatVolume(coin.category === "crypto" ? coin.volume : coin.volume * coin.price)}
                           </td>
                           <td className="hidden px-4 py-3 lg:table-cell">
-                            {coin.sparkline && coin.sparkline.length > 1 && (
+                            {coin.sparkline && (coin.sparkline ?? []).length > 1 && (
                               <svg viewBox="0 0 80 24" className="ml-auto h-6 w-20" preserveAspectRatio="none">
                                 <path
-                                  d={coin.sparkline.map((v: number, i: number) => {
-                                    const x = (i / (coin.sparkline.length - 1)) * 80
-                                    const mn = Math.min(...coin.sparkline)
-                                    const mx = Math.max(...coin.sparkline)
+                                  d={(coin.sparkline ?? []).map((v: number, i: number) => {
+                                    const x = (i / ((coin.sparkline ?? []).length - 1)) * 80
+                                    const mn = Math.min(...(coin.sparkline ?? []))
+                                    const mx = Math.max(...(coin.sparkline ?? []))
                                     const y = 22 - ((v - mn) / (mx - mn || 1)) * 20
                                     return `${i === 0 ? "M" : "L"}${x},${y}`
                                   }).join(" ")}

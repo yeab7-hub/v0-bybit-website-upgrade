@@ -64,53 +64,98 @@ export async function PATCH(request: NextRequest) {
     .single()
 
   if (txErr || !tx) return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
+  if (action !== "approve" && action !== "reject") {
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+  }
+  if (tx.status !== "pending") {
+    return NextResponse.json({ error: "This transaction has already been reviewed or is being processed." }, { status: 409 })
+  }
+  if (tx.type !== "deposit" && tx.type !== "withdrawal") {
+    return NextResponse.json({ error: "Unsupported transaction type" }, { status: 400 })
+  }
+
+  // Claim a pending transaction before touching balances so concurrent admin
+  // requests cannot approve or reject the same request twice.
+  const { data: claimed, error: claimError } = await adminSupabase
+    .from("transactions")
+    .update({ status: "processing", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle()
+  if (claimError || !claimed) {
+    return NextResponse.json({ error: "This transaction is already being processed. Refresh and try again." }, { status: 409 })
+  }
 
   if (action === "approve") {
     if (tx.type === "deposit") {
-      const { data: balance } = await adminSupabase
+      const { data: balance, error: balanceReadError } = await adminSupabase
         .from("balances")
         .select("*")
         .eq("user_id", tx.user_id)
         .eq("asset", tx.asset)
-        .single()
+        .maybeSingle()
+
+      if (balanceReadError) {
+        await adminSupabase.from("transactions").update({ status: "pending", reviewed_by: null, reviewed_at: null }).eq("id", id).eq("status", "processing")
+        return NextResponse.json({ error: "Could not read the user's balance. The transaction remains pending." }, { status: 500 })
+      }
 
       if (balance) {
-        await adminSupabase.from("balances").update({
-          available: balance.available + tx.amount,
+        const { error: balanceUpdateError } = await adminSupabase.from("balances").update({
+          available: Number(balance.available) + Number(tx.amount),
           updated_at: new Date().toISOString(),
         }).eq("user_id", tx.user_id).eq("asset", tx.asset)
+        if (balanceUpdateError) {
+          await adminSupabase.from("transactions").update({ status: "pending", reviewed_by: null, reviewed_at: null }).eq("id", id).eq("status", "processing")
+          return NextResponse.json({ error: "Could not credit the deposit. The transaction remains pending." }, { status: 500 })
+        }
       } else {
-        await adminSupabase.from("balances").insert({
+        const { error: balanceInsertError } = await adminSupabase.from("balances").insert({
           user_id: tx.user_id,
           asset: tx.asset,
           available: tx.amount,
           in_order: 0,
         })
+        if (balanceInsertError) {
+          await adminSupabase.from("transactions").update({ status: "pending", reviewed_by: null, reviewed_at: null }).eq("id", id).eq("status", "processing")
+          return NextResponse.json({ error: "Could not create the user's balance. The transaction remains pending." }, { status: 500 })
+        }
       }
     }
 
     if (tx.type === "withdrawal") {
-      const { data: balance } = await adminSupabase
+      const { data: balance, error: balanceReadError } = await adminSupabase
         .from("balances")
         .select("*")
         .eq("user_id", tx.user_id)
         .eq("asset", tx.asset)
-        .single()
+        .maybeSingle()
 
-      if (balance) {
-        await adminSupabase.from("balances").update({
-          in_order: Math.max(0, (balance.in_order || 0) - tx.amount),
-          updated_at: new Date().toISOString(),
-        }).eq("user_id", tx.user_id).eq("asset", tx.asset)
+      if (balanceReadError || !balance) {
+        await adminSupabase.from("transactions").update({ status: "pending", reviewed_by: null, reviewed_at: null }).eq("id", id).eq("status", "processing")
+        return NextResponse.json({ error: "Could not find the withdrawal balance. The transaction remains pending." }, { status: 500 })
+      }
+
+      const { error: balanceUpdateError } = await adminSupabase.from("balances").update({
+        in_order: Math.max(0, Number(balance.in_order || 0) - Number(tx.amount)),
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", tx.user_id).eq("asset", tx.asset)
+      if (balanceUpdateError) {
+        await adminSupabase.from("transactions").update({ status: "pending", reviewed_by: null, reviewed_at: null }).eq("id", id).eq("status", "processing")
+        return NextResponse.json({ error: "Could not finalize the withdrawal balance. The transaction remains pending." }, { status: 500 })
       }
     }
 
-    await adminSupabase.from("transactions").update({
+    const { error: finalizeError } = await adminSupabase.from("transactions").update({
       status: "completed",
       notes: admin_note || "Approved by admin",
       reviewed_at: new Date().toISOString(),
       reviewed_by: user.id,
-    }).eq("id", id)
+    }).eq("id", id).eq("status", "processing")
+    if (finalizeError) {
+      return NextResponse.json({ error: "Balance operation succeeded but transaction finalization failed. Do not retry this request; reconcile this transaction before processing it again." }, { status: 500 })
+    }
 
     // Notify the user that their deposit/withdrawal was approved
     const { data: approvedProfile } = await adminSupabase
@@ -136,36 +181,48 @@ export async function PATCH(request: NextRequest) {
 
   if (action === "reject") {
     if (tx.type === "withdrawal") {
-      const { data: balance } = await adminSupabase
+      const { data: balance, error: balanceReadError } = await adminSupabase
         .from("balances")
         .select("*")
         .eq("user_id", tx.user_id)
         .eq("asset", tx.asset)
-        .single()
+        .maybeSingle()
 
-      if (balance) {
-        await adminSupabase.from("balances").update({
-          available: balance.available + tx.amount,
-          in_order: Math.max(0, (balance.in_order || 0) - tx.amount),
-          updated_at: new Date().toISOString(),
-        }).eq("user_id", tx.user_id).eq("asset", tx.asset)
+      if (balanceReadError || !balance) {
+        await adminSupabase.from("transactions").update({ status: "pending", reviewed_by: null, reviewed_at: null }).eq("id", id).eq("status", "processing")
+        return NextResponse.json({ error: "Could not find the withdrawal balance. The transaction remains pending." }, { status: 500 })
+      }
+
+      const { error: balanceUpdateError } = await adminSupabase.from("balances").update({
+        available: Number(balance.available) + Number(tx.amount),
+        in_order: Math.max(0, Number(balance.in_order || 0) - Number(tx.amount)),
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", tx.user_id).eq("asset", tx.asset)
+      if (balanceUpdateError) {
+        await adminSupabase.from("transactions").update({ status: "pending", reviewed_by: null, reviewed_at: null }).eq("id", id).eq("status", "processing")
+        return NextResponse.json({ error: "Could not release the withdrawal hold. The transaction remains pending." }, { status: 500 })
       }
     }
 
-    await adminSupabase.from("transactions").update({
+    const { error: finalizeError } = await adminSupabase.from("transactions").update({
       status: "rejected",
       notes: admin_note || "Rejected by admin",
       reviewed_at: new Date().toISOString(),
       reviewed_by: user.id,
-    }).eq("id", id)
+    }).eq("id", id).eq("status", "processing")
+    if (finalizeError) {
+      return NextResponse.json({ error: "Funds were released but transaction finalization failed. Do not retry this request; reconcile this transaction before processing it again." }, { status: 500 })
+    }
 
     // Create in-app notification for the user
-    const rejectionReason = admin_note || "Your withdrawal request did not meet our requirements."
+    const rejectionReason = admin_note || `Your ${tx.type} request did not meet our requirements.`
     await adminSupabase.from("notifications").insert({
       user_id: tx.user_id,
-      type: "withdrawal_rejected",
-      title: "Withdrawal Request Rejected",
-      message: `Your withdrawal of ${tx.amount} ${tx.asset} has been rejected. Reason: ${rejectionReason}. Funds have been returned to your available balance.`,
+      type: `${tx.type}_rejected`,
+      title: `${tx.type === "deposit" ? "Deposit" : "Withdrawal"} Request Rejected`,
+      message: tx.type === "withdrawal"
+        ? `Your withdrawal of ${tx.amount} ${tx.asset} has been rejected. Reason: ${rejectionReason}. Funds have been returned to your available balance.`
+        : `Your deposit request for ${tx.amount} ${tx.asset} has been rejected. Reason: ${rejectionReason}.`,
       data: { transaction_id: id, amount: tx.amount, asset: tx.asset, reason: rejectionReason },
       read: false,
     })

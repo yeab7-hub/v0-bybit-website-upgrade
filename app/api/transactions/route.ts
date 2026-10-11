@@ -1,5 +1,6 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
+import { checkAccountStatus } from "@/lib/account-status"
 import { notifyAdmin } from "@/lib/notify-admin"
 import { renderDepositEmail, renderWithdrawalEmail, sendBrandedEmail } from "@/lib/email/templates"
 
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
+    .limit(200)
 
   if (type) query = query.eq("type", type)
   if (status) query = query.eq("status", status)
@@ -30,34 +32,65 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await request.json()
+  let body: Record<string, any>
+  try {
+    const parsed: unknown = await request.json()
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    }
+    body = parsed as Record<string, any>
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
   const { action } = body
 
   if (action === "deposit") {
     const assetName = String(body.asset || "").trim().toUpperCase()
     const networkName = String(body.network || "").trim()
     const amountNum = Number(body.amount)
-    const txHash = String(body.tx_hash || "").trim()
+    const submittedTxHash = String(body.tx_hash || "").trim()
+    const txHash = /^0x[a-fA-F0-9]{64}$/.test(submittedTxHash) ? submittedTxHash.toLowerCase() : submittedTxHash
     if (!assetName || !networkName || !Number.isFinite(amountNum) || amountNum <= 0) {
       return NextResponse.json({ error: "Enter a valid asset, network, and positive amount" }, { status: 400 })
     }
     if (txHash.length > 256) return NextResponse.json({ error: "Transaction hash is too long" }, { status: 400 })
 
-    const { data: destination, error: destinationError } = await supabase
+    const findDestination = (symbol: string) => supabase
       .from("deposit_addresses")
       .select("symbol, network, is_active, min_deposit")
-      .eq("symbol", assetName)
+      .eq("symbol", symbol)
       .eq("network", networkName)
       .eq("is_active", true)
       .maybeSingle()
+    let { data: destination, error: destinationError } = await findDestination(assetName)
+    if (!destination && !destinationError && assetName === "ETH") {
+      const legacyResult = await findDestination("Ethereum")
+      destination = legacyResult.data
+      destinationError = legacyResult.error
+    }
     if (destinationError) return NextResponse.json({ error: "Deposit routing is unavailable. Please try again later." }, { status: 503 })
     if (!destination) return NextResponse.json({ error: "This deposit asset/network is not currently available" }, { status: 400 })
     if (Number(destination.min_deposit || 0) > amountNum) return NextResponse.json({ error: `Minimum deposit is ${destination.min_deposit} ${assetName}` }, { status: 400 })
 
     if (txHash) {
-      const { data: existing, error: duplicateError } = await supabase.from("transactions").select("*").eq("user_id", user.id).eq("type", "deposit").eq("asset", assetName).eq("network", networkName).eq("tx_hash", txHash).maybeSingle()
+      // A chain transaction hash must not be credited to multiple accounts.
+      // This check is network-wide, not scoped to the submitting user.
+      // The session client is row-scoped by RLS; use the server-only admin
+      // client for this cross-account duplicate check and return no other user's data.
+      const adminSupabase = await createAdminClient()
+      const { data: existing, error: duplicateError } = await adminSupabase
+        .from("transactions")
+        .select("id")
+        .eq("type", "deposit")
+        .eq("network", networkName)
+        .eq("tx_hash", txHash)
+        .maybeSingle()
       if (duplicateError) return NextResponse.json({ error: "Could not verify transaction hash" }, { status: 503 })
-      if (existing) return NextResponse.json(existing)
+      if (existing) {
+        return NextResponse.json({
+          error: "This transaction hash is already associated with a deposit request on this network.",
+        }, { status: 409 })
+      }
     }
 
     const { data, error } = await supabase.from("transactions").insert({
@@ -77,7 +110,7 @@ export async function POST(request: NextRequest) {
     if (user.email) {
       sendBrandedEmail({
         to: user.email,
-        subject: `Deposit Received - ${amountNum} ${assetName} - Bybit`,
+        subject: `Deposit Request Submitted - ${amountNum} ${assetName}`,
         html: renderDepositEmail({ status: "pending", amount: String(amountNum), asset: assetName, network: networkName }),
       }).catch(() => {})
     }
@@ -86,33 +119,70 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "withdraw") {
-    const { asset, network, amount, address, memo } = body
-    const amountNum = parseFloat(amount)
+    const asset = String(body.asset ?? "").trim().toUpperCase()
+    const network = String(body.network ?? "").trim()
+    const amountNum = Number(body.amount)
+    const address = String(body.address ?? "").trim()
+    const memo = String(body.memo ?? "").trim()
 
-    // Check balance
-    const { data: balance } = await supabase
+    if (!/^[A-Z0-9]{2,12}$/.test(asset) || !network || !address || !Number.isFinite(amountNum) || amountNum <= 0) {
+      return NextResponse.json({ error: "Enter a valid asset, network, destination address, and positive amount" }, { status: 400 })
+    }
+    if (address.length > 512 || network.length > 80 || memo.length > 256) {
+      return NextResponse.json({ error: "Withdrawal details exceed the allowed length" }, { status: 400 })
+    }
+    const accountStatus = await checkAccountStatus(supabase, user.id)
+    if (accountStatus.blocked) return NextResponse.json({ error: accountStatus.reason }, { status: 403 })
+
+    const findNetwork = (symbol: string) => supabase
+      .from("deposit_addresses")
+      .select("symbol, network")
+      .eq("symbol", symbol)
+      .eq("network", network)
+      .eq("is_active", true)
+      .maybeSingle()
+    let { data: supportedNetwork, error: networkError } = await findNetwork(asset)
+    if (!supportedNetwork && !networkError && asset === "ETH") {
+      const legacyResult = await findNetwork("Ethereum")
+      supportedNetwork = legacyResult.data
+      networkError = legacyResult.error
+    }
+    if (networkError) return NextResponse.json({ error: "Could not verify the selected network" }, { status: 503 })
+    if (!supportedNetwork) return NextResponse.json({ error: "This asset/network is not currently supported for withdrawals" }, { status: 400 })
+
+    // Read and lock the balance with a compare-and-set condition to prevent
+    // concurrent withdrawal requests from spending the same available funds.
+    const { data: balance, error: balanceError } = await supabase
       .from("balances")
       .select("available, in_order")
       .eq("user_id", user.id)
       .eq("asset", asset)
-      .single()
+      .maybeSingle()
 
-    if (!balance || balance.available < amountNum) {
+    if (balanceError) return NextResponse.json({ error: "Could not read your balance" }, { status: 500 })
+    if (!balance || Number(balance.available) < amountNum) {
       return NextResponse.json({ error: "Insufficient balance" }, { status: 400 })
     }
 
-    // Lock the funds (move from available to in_order)
-    const { error: lockErr } = await supabase
+    const oldAvailable = Number(balance.available)
+    const oldInOrder = Number(balance.in_order || 0)
+    const newAvailable = oldAvailable - amountNum
+    const newInOrder = oldInOrder + amountNum
+    const { data: lockedBalance, error: lockErr } = await supabase
       .from("balances")
       .update({
-        available: balance.available - amountNum,
-        in_order: (balance.in_order || 0) + amountNum,
+        available: newAvailable,
+        in_order: newInOrder,
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", user.id)
       .eq("asset", asset)
+      .eq("available", oldAvailable)
+      .select("id")
+      .maybeSingle()
 
-    if (lockErr) return NextResponse.json({ error: lockErr.message }, { status: 500 })
+    if (lockErr) return NextResponse.json({ error: "Could not reserve withdrawal funds" }, { status: 500 })
+    if (!lockedBalance) return NextResponse.json({ error: "Your balance changed. Refresh and try again." }, { status: 409 })
 
     const { data, error } = await supabase.from("transactions").insert({
       user_id: user.id,
@@ -125,7 +195,21 @@ export async function POST(request: NextRequest) {
       status: "pending",
     }).select().single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      // Roll back only if the balance still matches the exact values written above.
+      const { data: rollback } = await supabase.from("balances").update({
+        available: oldAvailable,
+        in_order: oldInOrder,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", user.id).eq("asset", asset)
+        .eq("available", newAvailable).eq("in_order", newInOrder)
+        .select("id").maybeSingle()
+      return NextResponse.json({
+        error: rollback
+          ? "Could not create the withdrawal request; the reserved funds were restored."
+          : "Could not create the withdrawal request and the reserved balance could not be restored automatically. Contact support before retrying.",
+      }, { status: 500 })
+    }
 
     notifyAdmin({
       subject: `New Withdrawal Request - ${amountNum} ${asset}`,
@@ -137,7 +221,7 @@ export async function POST(request: NextRequest) {
     if (user.email) {
       sendBrandedEmail({
         to: user.email,
-        subject: `Withdrawal Request Received - ${amountNum} ${asset} - Bybit`,
+        subject: `Withdrawal Request Received - ${amountNum} ${asset}`,
         html: renderWithdrawalEmail({ status: "pending", amount: String(amountNum), asset, address }),
       }).catch(() => {})
     }
@@ -146,32 +230,11 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "transfer") {
-    const { asset, amount, from_account, to_account } = body
-    const amountNum = parseFloat(amount)
-
-    // For internal transfers, auto-approve
-    const { data: balance } = await supabase
-      .from("balances")
-      .select("available")
-      .eq("user_id", user.id)
-      .eq("asset", asset)
-      .single()
-
-    if (!balance || balance.available < amountNum) {
-      return NextResponse.json({ error: "Insufficient balance" }, { status: 400 })
-    }
-
-    const { data, error } = await supabase.from("transactions").insert({
-      user_id: user.id,
-      type: "transfer",
-      asset,
-      amount: amountNum,
-      status: "completed",
-      notes: `${from_account} -> ${to_account}`,
-    }).select().single()
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data)
+    // The current balances schema does not track separate Spot/Funding/etc.
+    // Do not create a completed transaction unless funds can actually move.
+    return NextResponse.json({
+      error: "Internal account transfers are not configured yet. No funds were moved.",
+    }, { status: 501 })
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 })

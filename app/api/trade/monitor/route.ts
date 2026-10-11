@@ -1,15 +1,14 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { getUserTakerFeeRate } from "@/lib/trading-fees"
 import { elapsedFundingIntervals, calcFundingFee } from "@/lib/futures"
 import { getLivePrice } from "@/lib/live-price"
 
 /**
- * GET /api/trade/monitor
+ * POST /api/trade/monitor
  * Scans the user's OPEN positions and auto-closes any whose live market price
  * has crossed its Take Profit or Stop Loss threshold. Closure settles at the
- * TP/SL target price (not the momentary market price) so the realized outcome
- * matches the user's configured level. Direction-aware:
+ * observed market quote; a fast market can gap through a trigger. Direction-aware:
  *   LONG  (side buy) : TP when price >= take_profit, SL when price <= stop_loss
  *   SHORT (side sell): TP when price <= take_profit, SL when price >= stop_loss
  *
@@ -28,18 +27,51 @@ async function getPrice(pair: string, cache: { internal?: any }): Promise<number
   return price
 }
 
-export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+async function adjustAvailable(supabase: any, userId: string, asset: string, delta: number): Promise<boolean> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    let { data: balance } = await supabase.from("balances").select("*")
+      .eq("user_id", userId).eq("asset", asset).maybeSingle()
+    if (!balance) {
+      const { data: created, error } = await supabase.from("balances")
+        .insert({ user_id: userId, asset, available: 0, in_order: 0 }).select().single()
+      if (error || !created) return false
+      balance = created
+    }
+    const available = Number(balance.available) || 0
+    const next = available + delta
+    if (next < -1e-8) return false
+    const { data, error } = await supabase.from("balances").update({
+      available: Math.max(0, next), updated_at: new Date().toISOString(),
+    }).eq("user_id", userId).eq("asset", asset).eq("available", balance.available)
+      .select("asset").maybeSingle()
+    if (!error && data) return true
+  }
+  return false
+}
+
+export async function POST(request: NextRequest) {
+  // The route can be called by the signed-in user's trade page, or by a
+  // trusted scheduler using CRON_SECRET. The scheduler mode is needed so
+  // protection orders can be checked even when the trader is offline.
+  const cronSecret = process.env.CRON_SECRET
+  const isCron = Boolean(cronSecret && request.headers.get("authorization") === `Bearer ${cronSecret}`)
+  let userId: string | null = null
+
+  if (!isCron) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    userId = user.id
+  }
 
   const adminSupabase = await createAdminClient()
 
-  const { data: positions, error } = await adminSupabase
+  let positionsQuery = adminSupabase
     .from("trades")
     .select("*")
-    .eq("user_id", user.id)
     .eq("status", "open")
+  if (!isCron && userId) positionsQuery = positionsQuery.eq("user_id", userId)
+  const { data: positions, error } = await positionsQuery
 
   // If the TP/SL columns are missing (not migrated), or no positions, nothing to do.
   if (error || !positions || positions.length === 0) {
@@ -96,17 +128,17 @@ export async function GET() {
 
     // Liquidation takes priority over TP/SL -- it means the margin is gone.
     if (isFuturesPosition && liqPrice > 0) {
-      if (isShort && currentPrice >= liqPrice) { triggerPrice = liqPrice; reason = "liquidation" }
-      else if (!isShort && currentPrice <= liqPrice) { triggerPrice = liqPrice; reason = "liquidation" }
+      if (isShort && currentPrice >= liqPrice) { triggerPrice = currentPrice; reason = "liquidation" }
+      else if (!isShort && currentPrice <= liqPrice) { triggerPrice = currentPrice; reason = "liquidation" }
     }
 
     if (!reason) {
       if (isShort) {
-        if (tp > 0 && currentPrice <= tp) { triggerPrice = tp; reason = "take_profit" }
-        else if (sl > 0 && currentPrice >= sl) { triggerPrice = sl; reason = "stop_loss" }
+        if (tp > 0 && currentPrice <= tp) { triggerPrice = currentPrice; reason = "take_profit" }
+        else if (sl > 0 && currentPrice >= sl) { triggerPrice = currentPrice; reason = "stop_loss" }
       } else {
-        if (tp > 0 && currentPrice >= tp) { triggerPrice = tp; reason = "take_profit" }
-        else if (sl > 0 && currentPrice <= sl) { triggerPrice = sl; reason = "stop_loss" }
+        if (tp > 0 && currentPrice >= tp) { triggerPrice = currentPrice; reason = "take_profit" }
+        else if (sl > 0 && currentPrice <= sl) { triggerPrice = currentPrice; reason = "stop_loss" }
       }
     }
 
@@ -132,21 +164,25 @@ export async function GET() {
     const priceDelta = isShort ? entryPrice - triggerPrice : triggerPrice - entryPrice
     const pnl = priceDelta * qty - fee - Number(position.fee || 0)
 
-    // Close the position leg in place.
-    await adminSupabase.from("trades").update({
+    // Claim the open position before settling. Multiple tabs may run the
+    // monitor concurrently; only the request that changes open -> closed pays out.
+    const { data: closedPosition, error: closeError } = await adminSupabase.from("trades").update({
       status: "closed",
       close_price: triggerPrice,
       closed_at: new Date().toISOString(),
       close_reason: reason,
       fee: Number(position.fee || 0) + fee,
       pnl,
-    }).eq("id", position.id)
+    }).eq("id", position.id).eq("user_id", position.user_id).eq("status", "open").select("id").maybeSingle()
+    if (closeError || !closedPosition) continue
 
     // Settle balances. Futures: no base asset was ever held, only margin;
     // credit back margin + pnl. Spot: a LONG leg held the base asset.
     if (isFuturesPosition) {
       const margin = Number(position.margin) || 0
-      const creditAmount = margin + pnl
+      // The opening fee was already debited when margin was reserved. Add it
+    // back here because pnl is net of both opening and closing fees.
+    const creditAmount = margin + pnl + Number(position.fee || 0)
       const { data: qBal } = await adminSupabase
         .from("balances").select("*")
         .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
@@ -162,34 +198,37 @@ export async function GET() {
         })
       }
     } else {
+      // A Spot long must still own the base asset before its position can be
+      // settled. This prevents a prior manual sell from being auto-closed a
+      // second time and crediting quote funds twice.
       if (!isShort) {
-        const { data: bBal } = await adminSupabase
-          .from("balances").select("*")
-          .eq("user_id", position.user_id).eq("asset", baseAsset).single()
-        if (bBal) {
-          await adminSupabase.from("balances").update({
-            available: Math.max(0, bBal.available - qty),
-            updated_at: new Date().toISOString(),
-          }).eq("user_id", position.user_id).eq("asset", baseAsset)
+        const baseDebited = await adjustAvailable(adminSupabase, position.user_id, baseAsset, -qty)
+        if (!baseDebited) {
+          await adminSupabase.from("trades").update({
+            close_price: null,
+            close_reason: "position_balance_unavailable",
+            pnl: 0,
+          }).eq("id", position.id).eq("status", "closed")
+          closedCount++
+          continue
         }
       }
 
-      const creditAmount = (entryPrice * qty) + pnl
-      const { data: qBal } = await adminSupabase
-        .from("balances").select("*")
-        .eq("user_id", position.user_id).eq("asset", quoteAsset).single()
-      if (qBal) {
-        await adminSupabase.from("balances").update({
-          available: Math.max(0, qBal.available + creditAmount),
-          updated_at: new Date().toISOString(),
-        }).eq("user_id", position.user_id).eq("asset", quoteAsset)
-      } else {
-        await adminSupabase.from("balances").insert({
-          user_id: position.user_id,
-          asset: quoteAsset,
-          available: Math.max(0, creditAmount),
-          in_order: 0,
-        })
+      // Opening fee was charged at entry and is included in P&L reporting, so
+      // add it back to the returned entry notional to avoid charging twice.
+      const creditAmount = (entryPrice * qty) + pnl + Number(position.fee || 0)
+      const quoteCredited = await adjustAvailable(adminSupabase, position.user_id, quoteAsset, creditAmount)
+      if (!quoteCredited) {
+        if (!isShort) await adjustAvailable(adminSupabase, position.user_id, baseAsset, qty)
+        await adminSupabase.from("trades").update({
+          status: "open",
+          close_price: null,
+          closed_at: null,
+          close_reason: null,
+          fee: Number(position.fee || 0),
+          pnl: 0,
+        }).eq("id", position.id).eq("status", "closed")
+        continue
       }
     }
 

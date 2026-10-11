@@ -7,25 +7,8 @@ import { Wallet, Globe, Shield, Zap, ArrowRight, ExternalLink, Layers, Coins } f
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
-const dapps = [
-  { name: "Uniswap", category: "DEX", chain: "Ethereum", tvl: "$4.2B", icon: "U", color: "bg-pink-500/20 text-pink-400" },
-  { name: "Aave", category: "Lending", chain: "Ethereum", tvl: "$8.1B", icon: "A", color: "bg-purple-500/20 text-purple-400" },
-  { name: "Jupiter", category: "DEX", chain: "Solana", tvl: "$1.8B", icon: "J", color: "bg-green-500/20 text-green-400" },
-  { name: "Lido", category: "Staking", chain: "Ethereum", tvl: "$15.2B", icon: "L", color: "bg-blue-500/20 text-blue-400" },
-  { name: "Raydium", category: "DEX", chain: "Solana", tvl: "$890M", icon: "R", color: "bg-cyan-500/20 text-cyan-400" },
-  { name: "Compound", category: "Lending", chain: "Ethereum", tvl: "$2.4B", icon: "C", color: "bg-emerald-500/20 text-emerald-400" },
-  { name: "Marinade", category: "Staking", chain: "Solana", tvl: "$1.2B", icon: "M", color: "bg-orange-500/20 text-orange-400" },
-  { name: "GMX", category: "Derivatives", chain: "Arbitrum", tvl: "$520M", icon: "G", color: "bg-indigo-500/20 text-indigo-400" },
-]
-
-const chains = [
-  { name: "Ethereum", tokens: 245, icon: "ETH" },
-  { name: "BNB Chain", tokens: 189, icon: "BNB" },
-  { name: "Solana", tokens: 156, icon: "SOL" },
-  { name: "Arbitrum", tokens: 98, icon: "ARB" },
-  { name: "Polygon", tokens: 124, icon: "MATIC" },
-  { name: "Avalanche", tokens: 87, icon: "AVAX" },
-]
+const dapps: { name: string; category: string; chain: string; tvl: string; icon: string; color: string }[] = []
+const chains: { name: string; tokens: number; icon: string }[] = []
 
 const categories = ["All", "DEX", "Lending", "Staking", "Derivatives", "NFT", "GameFi"]
 
@@ -42,10 +25,10 @@ export default function Web3Page() {
           <div className="mx-auto max-w-[1400px] px-4 py-10 lg:py-16">
             <div className="flex items-center gap-2 text-primary"><Globe className="h-5 w-5" /><span className="text-xs font-semibold uppercase tracking-wider">Web3</span></div>
             <h1 className="mt-2 text-2xl font-bold text-foreground lg:text-4xl">Your Gateway to Web3</h1>
-            <p className="mt-2 max-w-lg text-sm text-muted-foreground">Access DeFi, NFTs, and dApps across multiple blockchains. One wallet for everything.</p>
+            <p className="mt-2 max-w-lg text-sm text-muted-foreground">Wallet connection, dApp access, and on-chain transactions are not integrated in this app yet.</p>
             <div className="mt-6 flex gap-3">
-              <Button className="bg-primary font-semibold text-primary-foreground hover:bg-primary/90">Connect Wallet</Button>
-              <Button variant="outline" className="border-border text-foreground hover:bg-secondary">Create Web3 Wallet</Button>
+              <Button disabled title="Wallet connectivity is not integrated" className="bg-primary font-semibold text-primary-foreground opacity-60">Wallet connection unavailable</Button>
+              <Button disabled title="Wallet creation and key management are not integrated" variant="outline" className="border-border text-foreground opacity-60">Wallet creation unavailable</Button>
             </div>
           </div>
         </div>
@@ -54,10 +37,10 @@ export default function Web3Page() {
           {/* Stats */}
           <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[
-              { icon: Wallet, label: "Web3 Wallets", value: "2.4M+", color: "text-primary" },
-              { icon: Layers, label: "Supported Chains", value: "12", color: "text-blue-400" },
-              { icon: Globe, label: "dApps Integrated", value: "500+", color: "text-green-400" },
-              { icon: Shield, label: "Assets Secured", value: "$1.2B+", color: "text-purple-400" },
+              { icon: Wallet, label: "Wallet integration", value: "Not configured", color: "text-primary" },
+              { icon: Layers, label: "Network support", value: "Not configured", color: "text-blue-400" },
+              { icon: Globe, label: "dApp directory", value: "Not connected", color: "text-green-400" },
+              { icon: Shield, label: "Custody status", value: "Not verified", color: "text-purple-400" },
             ].map((s, i) => (
               <div key={i} className="rounded-xl border border-border bg-card p-4">
                 <s.icon className={`h-5 w-5 ${s.color}`} />
@@ -70,7 +53,9 @@ export default function Web3Page() {
           {/* Supported Chains */}
           <h2 className="mb-4 text-lg font-bold text-foreground">Supported Chains</h2>
           <div className="mb-8 grid grid-cols-3 gap-3 lg:grid-cols-6">
-            {chains.map((c, i) => (
+            {chains.length === 0 ? (
+              <p className="col-span-full rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No blockchain networks are configured for wallet transactions.</p>
+            ) : chains.map((c, i) => (
               <div key={i} className="flex flex-col items-center rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/30">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-xs font-bold text-foreground">{c.icon}</div>
                 <div className="mt-2 text-xs font-semibold text-foreground">{c.name}</div>
@@ -85,11 +70,13 @@ export default function Web3Page() {
           </div>
           <div className="mb-4 flex gap-1 overflow-x-auto pb-2">
             {categories.map(c => (
-              <button key={c} onClick={() => setCat(c)} className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${cat === c ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>{c}</button>
+              <button disabled title="dApp listings are not connected" key={c} onClick={() => setCat(c)} className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${cat === c ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>{c}</button>
             ))}
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {filtered.map((d, i) => (
+            {filtered.length === 0 ? (
+              <p className="col-span-full rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">The dApp directory is unavailable until verified listings and live data are connected.</p>
+            ) : filtered.map((d, i) => (
               <div key={i} className="group cursor-pointer rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30">
                 <div className="flex items-center gap-3">
                   <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${d.color} text-sm font-bold`}>{d.icon}</div>
@@ -109,9 +96,9 @@ export default function Web3Page() {
           {/* Features */}
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
             {[
-              { icon: Shield, title: "Self-Custody", desc: "You control your private keys. Your assets, your rules." },
-              { icon: Zap, title: "Multi-Chain Swaps", desc: "Swap tokens across chains instantly with the best rates." },
-              { icon: Coins, title: "On-Chain Earn", desc: "Access DeFi yields directly from your Web3 wallet." },
+              { icon: Shield, title: "Self-Custody", desc: "This page does not create or manage private keys; self-custody is not available here." },
+              { icon: Zap, title: "Multi-Chain Swaps", desc: "Cross-chain swaps and quote routing are not integrated." },
+              { icon: Coins, title: "On-Chain Earn", desc: "On-chain yield products and transaction signing are not integrated." },
             ].map((f, i) => (
               <div key={i} className="rounded-xl border border-border bg-card p-6">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><f.icon className="h-5 w-5 text-primary" /></div>
