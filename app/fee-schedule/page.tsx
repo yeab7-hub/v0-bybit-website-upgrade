@@ -101,8 +101,8 @@ function OptionsPlaceholder() {
 function ConvertFeeInfo() {
   return (
     <div className="py-6 text-center">
-      <p className="text-2xl font-bold text-green-400">0%</p>
-      <p className="mt-1 text-xs text-muted-foreground">Convert is zero-fee on every pair. The only cost is the live market rate at the moment you convert.</p>
+      <p className="text-base font-semibold text-foreground">Conversion costs not verified</p>
+      <p className="mt-1 text-xs text-muted-foreground">A universal zero-fee rate is not confirmed. Review the current quote and any displayed costs before confirming a conversion.</p>
     </div>
   )
 }
@@ -142,7 +142,7 @@ export default function FeeSchedulePage() {
               <li>- Your tier is calculated live from your actual trailing 30-day trading volume across Spot and Futures combined.</li>
               <li>- Spot and Futures (Derivatives) share the same real tier table and rates.</li>
               <li>- Every order on this platform settles against the live market price, so in practice the rate charged behaves as a taker fee.</li>
-              <li>- Deposit fees are zero for all assets and networks.</li>
+              <li>- Blockchain network fees or provider charges may apply; fees vary by asset, network, and configured integration.</li>
             </ul>
           </div>
         </div>
