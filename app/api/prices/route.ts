@@ -24,20 +24,39 @@ const BYBIT_SYMBOLS = [
 
 async function fetchBybit(): Promise<any[] | null> {
   try {
-    const res = await fetch(BYBIT_TICKER, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(6000), cache: "no-store" })
+    const res = await fetch(BYBIT_TICKER, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(6000),
+      cache: "no-store",
+    })
     if (!res.ok) return null
     const json = await res.json()
     const rows = json?.result?.list
     if (!Array.isArray(rows)) return null
+
     return rows
       .filter((ticker: any) => BYBIT_SYMBOLS.some((item) => item.symbol === ticker.symbol))
       .map((ticker: any) => {
-      const info = BYBIT_SYMBOLS.find((item) => item.symbol === ticker.symbol)
-      const price = Number(ticker.lastPrice)
-      const prev = Number(ticker.prevPrice24h)
-      return { id: info?.base?.toLowerCase() || ticker.symbol, symbol: info?.base || ticker.symbol.replace("USDT", ""), name: info?.name || ticker.symbol, price, change24h: Number(ticker.price24hPcnt || 0) * 100, volume: Number(ticker.turnover24h || 0), marketCap: 0, high24h: Number(ticker.highPrice24h || 0), low24h: Number(ticker.lowPrice24h || 0), sparkline: [], category: "crypto" }
-    }).filter((coin: any) => coin.price > 0)
-  } catch { return null }
+        const info = BYBIT_SYMBOLS.find((item) => item.symbol === ticker.symbol)!
+        const price = Number(ticker.lastPrice)
+        return {
+          id: info.base.toLowerCase(),
+          symbol: info.base,
+          name: info.name,
+          price,
+          change24h: Number(ticker.price24hPcnt || 0) * 100,
+          volume: Number(ticker.turnover24h || 0),
+          marketCap: 0,
+          high24h: Number(ticker.highPrice24h || 0),
+          low24h: Number(ticker.lowPrice24h || 0),
+          sparkline: [],
+          category: "crypto",
+        }
+      })
+      .filter((coin: any) => Number.isFinite(coin.price) && coin.price > 0)
+  } catch {
+    return null
+  }
 }
 
 // ─── Source 2: CoinCap v2 ───
