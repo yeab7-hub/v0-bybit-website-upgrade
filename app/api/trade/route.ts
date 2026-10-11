@@ -19,6 +19,39 @@ async function ensureBalance(supabase: any, userId: string, asset: string) {
   return created
 }
 
+/** Apply a balance delta with compare-and-set retries to prevent concurrent
+ * requests from spending the same observed balance or overwriting a newer one. */
+async function changeBalance(
+  supabase: any,
+  userId: string,
+  asset: string,
+  availableDelta: number,
+  inOrderDelta = 0,
+  retries = 4,
+): Promise<{ ok: boolean; insufficient?: boolean; conflict?: boolean; available?: number }> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const balance = await ensureBalance(supabase, userId, asset)
+    if (!balance) return { ok: false, conflict: true }
+    const available = Number(balance.available) || 0
+    const inOrder = Number(balance.in_order) || 0
+    const nextAvailable = available + availableDelta
+    const nextInOrder = inOrder + inOrderDelta
+    if (nextAvailable < -1e-8 || nextInOrder < -1e-8) {
+      return { ok: false, insufficient: true, available }
+    }
+
+    let query = supabase.from("balances").update({
+      available: Math.max(0, nextAvailable),
+      in_order: Math.max(0, nextInOrder),
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId).eq("asset", asset).eq("available", balance.available)
+    query = balance.in_order == null ? query.is("in_order", null) : query.eq("in_order", balance.in_order)
+    const { data, error } = await query.select("asset").maybeSingle()
+    if (!error && data) return { ok: true, available: nextAvailable }
+  }
+  return { ok: false, conflict: true }
+}
+
 /* ---------- GET ---------- */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -365,56 +398,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert trade record -- buy = open position, sell = closed position
-    const { data: insertedTrade } = await adminSupabase.from("trades").insert({
+    // Persist TP/SL in the position row itself so the monitor never has
+    // to rely on a best-effort follow-up write.
+    const { data: insertedTrade, error: tradeInsertError } = await adminSupabase.from("trades").insert({
       user_id: user.id, order_id: order.id, pair, side,
       price: execPrice, amount, total, fee, pnl,
       status: side === "buy" ? "open" : "closed",
       close_price: side === "sell" ? execPrice : null,
       closed_at: side === "sell" ? new Date().toISOString() : null,
+      take_profit: side === "buy" ? takeProfit : null,
+      stop_loss: side === "buy" ? stopLoss : null,
     }).select("id").single()
 
-    // Attach TP/SL to the freshly opened long position. Done as a best-effort
-    // separate update so that, if the take_profit/stop_loss columns have not
-    // been migrated yet, the core trade still succeeds instead of erroring out.
-    if (side === "buy" && insertedTrade?.id && (takeProfit || stopLoss)) {
-      try {
-        await adminSupabase.from("trades").update({
-          take_profit: takeProfit,
-          stop_loss: stopLoss,
-        }).eq("id", insertedTrade.id)
-      } catch { /* columns not migrated yet -- ignore */ }
+    if (tradeInsertError || !insertedTrade) {
+      await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
+      return NextResponse.json({ error: "Could not record this trade; no balance was changed." }, { status: 500 })
     }
 
-    // Update balances
-    if (side === "buy") {
-      // Deduct quote
-      const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
-      await adminSupabase.from("balances").update({
-        available: Math.max(0, qBal.available - total - fee),
-        updated_at: new Date().toISOString()
-      }).eq("user_id", user.id).eq("asset", quoteAsset)
+    // Compare-and-set debit first, then credit the other asset. If either
+    // ledger update fails, compensate and remove the uncommitted records.
+    const debitAsset = side === "buy" ? quoteAsset : baseAsset
+    const debitAmount = side === "buy" ? total + fee : amount
+    const debit = await changeBalance(adminSupabase, user.id, debitAsset, -debitAmount)
+    if (!debit.ok) {
+      await adminSupabase.from("trades").delete().eq("id", insertedTrade.id).eq("user_id", user.id)
+      await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
+      return NextResponse.json({
+        error: debit.insufficient
+          ? `Insufficient ${debitAsset} balance after concurrent activity. Refresh and try again.`
+          : "Your balance changed while placing this order. Refresh and try again.",
+      }, { status: debit.insufficient ? 400 : 409 })
+    }
 
-      // Credit base
-      const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
-      await adminSupabase.from("balances").update({
-        available: bBal.available + amount,
-        updated_at: new Date().toISOString()
-      }).eq("user_id", user.id).eq("asset", baseAsset)
-    } else {
-      // Deduct base
-      const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
-      await adminSupabase.from("balances").update({
-        available: Math.max(0, bBal.available - amount),
-        updated_at: new Date().toISOString()
-      }).eq("user_id", user.id).eq("asset", baseAsset)
-
-      // Credit quote proceeds at the actual execution price
-      const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
-      await adminSupabase.from("balances").update({
-        available: Math.max(0, qBal.available + total - fee),
-        updated_at: new Date().toISOString()
-      }).eq("user_id", user.id).eq("asset", quoteAsset)
+    const creditAsset = side === "buy" ? baseAsset : quoteAsset
+    const creditAmount = side === "buy" ? amount : total - fee
+    const credit = await changeBalance(adminSupabase, user.id, creditAsset, creditAmount)
+    if (!credit.ok) {
+      await changeBalance(adminSupabase, user.id, debitAsset, debitAmount)
+      await adminSupabase.from("trades").delete().eq("id", insertedTrade.id).eq("user_id", user.id)
+      await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
+      return NextResponse.json({ error: "Balance settlement failed and was rolled back. Please refresh before retrying." }, { status: 500 })
     }
 
     const tradeMsg = `${side === "buy" ? "Bought" : "Sold"} ${amount} ${baseAsset} @ $${Number(execPrice).toLocaleString()} | Fee: $${fee.toFixed(2)}${pnl !== 0 ? ` | P&L: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : ""}`
@@ -439,21 +462,18 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Lock balance
-  if (side === "buy") {
-    const qBal = await ensureBalance(adminSupabase, user.id, quoteAsset)
-    await adminSupabase.from("balances").update({
-      available: Math.max(0, qBal.available - lockTotal - (lockTotal * feeRate)),
-      in_order: (qBal.in_order || 0) + lockTotal + (lockTotal * feeRate),
-      updated_at: new Date().toISOString()
-    }).eq("user_id", user.id).eq("asset", quoteAsset)
-  } else {
-    const bBal = await ensureBalance(adminSupabase, user.id, baseAsset)
-    await adminSupabase.from("balances").update({
-      available: Math.max(0, bBal.available - amount),
-      in_order: (bBal.in_order || 0) + amount,
-      updated_at: new Date().toISOString()
-    }).eq("user_id", user.id).eq("asset", baseAsset)
+  // Reserve funds atomically enough to prevent concurrent orders from
+  // spending the same available balance. Remove the order if reservation fails.
+  const reserveAsset = side === "buy" ? quoteAsset : baseAsset
+  const reserveAmount = side === "buy" ? lockTotal * (1 + feeRate) : amount
+  const reserved = await changeBalance(adminSupabase, user.id, reserveAsset, -reserveAmount, reserveAmount)
+  if (!reserved.ok) {
+    await adminSupabase.from("orders").delete().eq("id", order.id).eq("user_id", user.id)
+    return NextResponse.json({
+      error: reserved.insufficient
+        ? `Insufficient ${reserveAsset} balance to reserve this order.`
+        : "Your balance changed while reserving this order. Refresh and try again.",
+    }, { status: reserved.insufficient ? 400 : 409 })
   }
 
   return NextResponse.json({
