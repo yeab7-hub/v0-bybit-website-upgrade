@@ -118,7 +118,7 @@ export async function GET() {
         const lockedAmount = order.price * remaining + (order.price * remaining * feeRate)
         await adminSupabase.from("balances").update({
           in_order: Math.max(0, (qBal.in_order || 0) - lockedAmount),
-          available: qBal.available + Math.max(0, (order.price - fillPrice) * remaining),
+          available: qBal.available + Math.max(0, (Number(order.price) - fillPrice) * remaining * (1 + feeRate)),
           updated_at: new Date().toISOString()
         }).eq("user_id", user.id).eq("asset", quoteAsset)
       }
