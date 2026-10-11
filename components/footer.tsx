@@ -109,7 +109,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground md:flex-row">
-          <span>{"© 2026 Bybit. All rights reserved."}</span>
+          <span>{"© 2026 BYBIT. All rights reserved."}</span>
           <div className="flex items-center gap-4">
             <Link href="/terms" className="hover:text-foreground">Terms of Service</Link>
             <Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link>
