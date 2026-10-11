@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Search, ChevronDown, Shield, Clock, Star, Filter } from "lucide-react"
+import { Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
@@ -18,7 +18,6 @@ export default function P2PPage() {
   const [fiat, setFiat] = useState("USD")
   const [payment, setPayment] = useState("All")
   const [amount, setAmount] = useState("")
-  const [showFilters, setShowFilters] = useState(false)
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -36,12 +35,12 @@ export default function P2PPage() {
           {/* Buy/Sell + Crypto tabs */}
           <div className="flex flex-wrap items-center gap-4 border-b border-border pb-4">
             <div className="flex rounded-lg bg-secondary p-0.5">
-              <button onClick={() => setTab("buy")} className={`rounded-md px-6 py-2 text-sm font-semibold transition-colors ${tab === "buy" ? "bg-[#0ecb81] text-white" : "text-muted-foreground hover:text-foreground"}`}>Buy</button>
-              <button onClick={() => setTab("sell")} className={`rounded-md px-6 py-2 text-sm font-semibold transition-colors ${tab === "sell" ? "bg-[#f6465d] text-white" : "text-muted-foreground hover:text-foreground"}`}>Sell</button>
+              <button disabled title="P2P trading is unavailable until escrow and payment services are connected" className={`rounded-md px-6 py-2 text-sm font-semibold transition-colors ${tab === "buy" ? "bg-[#0ecb81] text-white" : "text-muted-foreground hover:text-foreground"}`}>Buy</button>
+              <button disabled title="P2P trading is unavailable until escrow and payment services are connected" className={`rounded-md px-6 py-2 text-sm font-semibold transition-colors ${tab === "sell" ? "bg-[#f6465d] text-white" : "text-muted-foreground hover:text-foreground"}`}>Sell</button>
             </div>
             <div className="flex gap-1">
               {["BTC", "ETH", "USDT", "USDC", "SOL"].map(c => (
-                <button key={c} onClick={() => setCrypto(c)} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${crypto === c ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>{c}</button>
+                <button key={c} disabled title="P2P trading is unavailable until escrow and payment services are connected" className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${crypto === c ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>{c}</button>
               ))}
             </div>
           </div>
@@ -50,33 +49,22 @@ export default function P2PPage() {
           <div className="flex flex-wrap items-center gap-3 py-4">
             <div className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2">
               <span className="text-xs text-muted-foreground">Amount</span>
-              <input type="number" placeholder="Enter amount" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-24 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+              <input type="number" placeholder="P2P service unavailable" value={amount} disabled className="w-24 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
               <span className="text-xs font-medium text-foreground">{fiat}</span>
             </div>
             <div className="flex items-center gap-1 rounded-lg bg-secondary px-3 py-2">
               <span className="text-xs text-muted-foreground">Fiat</span>
-              <select value={fiat} onChange={(e) => setFiat(e.target.value)} className="bg-transparent text-sm font-medium text-foreground outline-none">
+              <select value={fiat} disabled title="P2P trading is unavailable until escrow and payment services are connected" className="bg-transparent text-sm font-medium text-foreground outline-none">
                 {currencies.map(c => <option key={c} value={c} className="bg-card">{c}</option>)}
               </select>
             </div>
             <div className="hidden flex-wrap gap-1 lg:flex">
               {paymentMethods.map(m => (
-                <button key={m} onClick={() => setPayment(m)} className={`rounded-md px-3 py-1.5 text-xs transition-colors ${payment === m ? "bg-primary/10 text-primary font-medium" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>{m}</button>
+                <button key={m} disabled title="P2P trading is unavailable until escrow and payment services are connected" className={`rounded-md px-3 py-1.5 text-xs transition-colors ${payment === m ? "bg-primary/10 text-primary font-medium" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>{m}</button>
               ))}
             </div>
-            <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-1 rounded-lg bg-secondary px-3 py-2 text-xs text-muted-foreground hover:text-foreground lg:hidden">
-              <Filter className="h-3.5 w-3.5" /> Filters
-            </button>
-          </div>
 
-          {/* Mobile filters */}
-          {showFilters && (
-            <div className="mb-4 flex flex-wrap gap-1 lg:hidden">
-              {paymentMethods.map(m => (
-                <button key={m} onClick={() => setPayment(m)} className={`rounded-md px-3 py-1.5 text-xs transition-colors ${payment === m ? "bg-primary/10 text-primary font-medium" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>{m}</button>
-              ))}
-            </div>
-          )}
+          </div>
 
           {/* Live offer state */}
           {merchants.length === 0 ? (
