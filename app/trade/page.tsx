@@ -24,7 +24,7 @@ const percentages = [0, 25, 50, 75, 100]
 type OrderSide = "buy" | "sell"
 type OrderType = "Market" | "Limit" | "Stop-Limit"
 type BottomTab = "orders" | "positions" | "history" | "assets"
-type TradeMode = "Spot" | "Futures" | "Options"
+type TradeMode = "Spot" | "Futures"
 
 export default function TradePage() {
   const searchParams = useSearchParams()
@@ -336,7 +336,7 @@ export default function TradePage() {
   const fmtP = (p: number) => p >= 1000 ? p.toFixed(1) : p >= 1 ? p.toFixed(4) : p.toFixed(6)
   const fmtQ = (q: number) => q >= 100 ? q.toFixed(2) : q.toFixed(4)
 
-  const tradeModes: TradeMode[] = ["Spot", "Futures", "Options"]
+  const tradeModes: TradeMode[] = ["Spot", "Futures"]
 
   /* ====== ORDER BOOK ====== */
   const OrderBookPanel = (
@@ -918,6 +918,10 @@ export default function TradePage() {
         </div>
       </div>
 
+      <div role="note" className="border-b border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[10px] leading-4 text-muted-foreground lg:px-4">
+        Orders are recorded in this platform’s internal ledger; this app does not yet route them to an external broker or exchange. Non-crypto quotes may be delayed. An internal fill is not proof of an externally executed trade.
+      </div>
+
       {/* Pair Bar */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2 lg:px-4">
         <button onClick={() => setShowPairSelector(true)} className="flex items-center gap-1.5">
@@ -928,7 +932,6 @@ export default function TradePage() {
           <span className={`text-sm font-medium ${change24h >= 0 ? "text-success" : "text-destructive"}`}>
             {change24h >= 0 ? "+" : ""}{change24h.toFixed(2)}%
           </span>
-          <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">MM</span>
           <Link href={`/trade/chart?pair=${selectedPair}`} className="rounded border border-border p-1.5 lg:hidden">
             <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
           </Link>
