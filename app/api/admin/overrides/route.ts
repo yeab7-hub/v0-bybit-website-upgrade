@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   let query = adminSupabase
     .from("trade_overrides")
-    .select("*, profiles(email, full_name)")
+    .select("*")
     .order("created_at", { ascending: false })
 
   if (userId) {
@@ -46,7 +46,21 @@ export async function GET(request: NextRequest) {
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ overrides: data ?? [] })
+  // Merge profile info manually -- trade_overrides.user_id references auth.users,
+  // so a PostgREST profiles(...) embed has no foreign key and would error.
+  const rows = data ?? []
+  const ids = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean)))
+  let profileMap = new Map<string, { email: string; full_name: string }>()
+  if (ids.length > 0) {
+    const { data: profiles } = await adminSupabase
+      .from("profiles")
+      .select("id, email, full_name")
+      .in("id", ids)
+    profileMap = new Map((profiles ?? []).map((p: any) => [p.id, { email: p.email, full_name: p.full_name }]))
+  }
+  const overrides = rows.map((r) => ({ ...r, profiles: profileMap.get(r.user_id) ?? null }))
+
+  return NextResponse.json({ overrides })
 }
 
 // POST - create or update an override
